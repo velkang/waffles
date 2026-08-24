@@ -1,0 +1,3139 @@
+import {
+  createUseReadContract,
+  createUseWriteContract,
+  createUseSimulateContract,
+  createUseWatchContractEvent,
+} from 'wagmi/codegen'
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AmmFactory
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const ammFactoryAbi = [
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'allPairs',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'allPairsLength',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokenA', internalType: 'address', type: 'address' },
+      { name: 'tokenB', internalType: 'address', type: 'address' },
+    ],
+    name: 'createPair',
+    outputs: [{ name: 'pair', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+    ],
+    name: 'getPair',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'parameters',
+    outputs: [
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'token0',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'token1',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'pair',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+      {
+        name: 'pairCount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'PairCreated',
+  },
+  { type: 'error', inputs: [], name: 'IdenticalAddresses' },
+  { type: 'error', inputs: [], name: 'PairExists' },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AmmMigrator
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const ammMigratorAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'factory_',
+        internalType: 'contract AmmFactory',
+        type: 'address',
+      },
+      { name: 'usdc_', internalType: 'contract IERC20', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'DEAD_ADDRESS',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'factory',
+    outputs: [
+      { name: '', internalType: 'contract AmmFactory', type: 'address' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'tokenAmount', internalType: 'uint256', type: 'uint256' },
+      { name: 'usdcAmount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'migrate',
+    outputs: [{ name: 'pool', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AmmPair
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const ammPairAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'BPS_DENOM',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MINIMUM_LIQUIDITY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'spender', internalType: 'address', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'to', internalType: 'address', type: 'address' }],
+    name: 'burn',
+    outputs: [
+      { name: 'amount0', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount1', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'factory',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'getReserves',
+    outputs: [
+      { name: '', internalType: 'uint256', type: 'uint256' },
+      { name: '', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'to', internalType: 'address', type: 'address' }],
+    name: 'mint',
+    outputs: [{ name: 'liquidity', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'to', internalType: 'address', type: 'address' }],
+    name: 'skim',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'amount0Out', internalType: 'uint256', type: 'uint256' },
+      { name: 'amount1Out', internalType: 'uint256', type: 'uint256' },
+      { name: 'to', internalType: 'address', type: 'address' },
+    ],
+    name: 'swap',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'sync',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'token0',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'token1',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Burn',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Mint',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'amount0In',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1In',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount0Out',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amount1Out',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Swap',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'reserve0',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'reserve1',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Sync',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'allowance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientAllowance',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'spender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSpender',
+  },
+  { type: 'error', inputs: [], name: 'InsufficientInputAmount' },
+  { type: 'error', inputs: [], name: 'InsufficientLiquidity' },
+  { type: 'error', inputs: [], name: 'InsufficientLiquidityBurned' },
+  { type: 'error', inputs: [], name: 'InsufficientLiquidityMinted' },
+  { type: 'error', inputs: [], name: 'InsufficientOutputAmount' },
+  { type: 'error', inputs: [], name: 'InvalidTo' },
+  { type: 'error', inputs: [], name: 'K' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// AmmRouter
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const ammRouterAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      {
+        name: 'factory_',
+        internalType: 'contract AmmFactory',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'BPS_DENOM',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'FEE_NUM',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'factory',
+    outputs: [
+      { name: '', internalType: 'contract AmmFactory', type: 'address' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'pair', internalType: 'address', type: 'address' },
+      { name: 'tokenIn', internalType: 'address', type: 'address' },
+      { name: 'amountIn', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'quoteExactInput',
+    outputs: [{ name: 'amountOut', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'pair', internalType: 'address', type: 'address' },
+      { name: 'tokenIn', internalType: 'address', type: 'address' },
+      { name: 'amountIn', internalType: 'uint256', type: 'uint256' },
+      { name: 'minAmountOut', internalType: 'uint256', type: 'uint256' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'deadline', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'swapExactTokensForTokens',
+    outputs: [{ name: 'amountOut', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'sender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'pair', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'tokenIn',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amountIn',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'amountOut',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      { name: 'to', internalType: 'address', type: 'address', indexed: false },
+    ],
+    name: 'SwapExactIn',
+  },
+  { type: 'error', inputs: [], name: 'Expired' },
+  { type: 'error', inputs: [], name: 'InvalidAddress' },
+  { type: 'error', inputs: [], name: 'InvalidPair' },
+  { type: 'error', inputs: [], name: 'InvalidToken' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+  { type: 'error', inputs: [], name: 'Slippage' },
+  { type: 'error', inputs: [], name: 'ZeroInput' },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// BondingCurve
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const bondingCurveAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'token_', internalType: 'address', type: 'address' },
+      { name: 'usdc_', internalType: 'address', type: 'address' },
+      { name: 'creator_', internalType: 'address', type: 'address' },
+      { name: 'treasury_', internalType: 'address', type: 'address' },
+      { name: 'migrator_', internalType: 'address', type: 'address' },
+      { name: 'initialCurveSupply_', internalType: 'uint256', type: 'uint256' },
+      { name: 'reserveTokens_', internalType: 'uint256', type: 'uint256' },
+      { name: 'virtualUsdc_', internalType: 'uint256', type: 'uint256' },
+      { name: 'virtualTokens_', internalType: 'uint256', type: 'uint256' },
+      { name: 'graduationMcap_', internalType: 'uint256', type: 'uint256' },
+      { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
+      { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'BPS_DENOM',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'usdcIn', internalType: 'uint256', type: 'uint256' },
+      { name: 'minTokensOut', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'buy',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'canGraduate',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'claimCreatorFees',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'creator',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'creatorEarnings',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'currentPrice',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeBps',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduate',
+    outputs: [{ name: 'pool', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduated',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationMarketCap',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationMcap',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationPool',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationPrice',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationProgressBps',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'initialCurveSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'k',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'marketCap',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'migrator',
+    outputs: [
+      {
+        name: '',
+        internalType: 'contract ILiquidityMigrator',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'protocolFeeBps',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'usdcIn', internalType: 'uint256', type: 'uint256' }],
+    name: 'quoteBuy',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'tokensIn', internalType: 'uint256', type: 'uint256' }],
+    name: 'quoteSell',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'reserveTokens',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'reserveUsdc',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'tokensIn', internalType: 'uint256', type: 'uint256' },
+      { name: 'minUsdcOut', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'sell',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'sellableTokens',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'token',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply_',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'treasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'virtualTokens',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'virtualUsdc',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'amount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CreatorFeesClaimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'pool',
+        internalType: 'address',
+        type: 'address',
+        indexed: false,
+      },
+    ],
+    name: 'Graduated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'trader',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      { name: 'isBuy', internalType: 'bool', type: 'bool', indexed: true },
+      {
+        name: 'usdcAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'tokenAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'priceAfter',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'mcapAfter',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Traded',
+  },
+  { type: 'error', inputs: [], name: 'CurveClosed' },
+  { type: 'error', inputs: [], name: 'InsufficientReserve' },
+  { type: 'error', inputs: [], name: 'InvalidParameters' },
+  { type: 'error', inputs: [], name: 'NotCreator' },
+  { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+  { type: 'error', inputs: [], name: 'Slippage' },
+  { type: 'error', inputs: [], name: 'ThresholdNotReached' },
+  { type: 'error', inputs: [], name: 'ZeroOutput' },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// LaunchFactory
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const launchFactoryAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'usdc_', internalType: 'address', type: 'address' },
+      { name: 'treasury_', internalType: 'address', type: 'address' },
+      { name: 'migrator_', internalType: 'address', type: 'address' },
+      { name: 'creationFee_', internalType: 'uint256', type: 'uint256' },
+      { name: 'virtualUsdc_', internalType: 'uint256', type: 'uint256' },
+      { name: 'virtualTokens_', internalType: 'uint256', type: 'uint256' },
+      { name: 'graduationMcap_', internalType: 'uint256', type: 'uint256' },
+      { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
+      { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'CURVE_RESERVE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'acceptOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'allTokens',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'allTokensLength',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'symbol', internalType: 'string', type: 'string' },
+      { name: 'description', internalType: 'string', type: 'string' },
+      { name: 'imageUri', internalType: 'string', type: 'string' },
+      { name: 'website', internalType: 'string', type: 'string' },
+      { name: 'twitter', internalType: 'string', type: 'string' },
+      { name: 'telegram', internalType: 'string', type: 'string' },
+    ],
+    name: 'createToken',
+    outputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'curve', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'creationFee',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'feeBps',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'graduationMcap',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'launchOfToken',
+    outputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'curve', internalType: 'address', type: 'address' },
+      { name: 'creator', internalType: 'address', type: 'address' },
+      { name: 'description', internalType: 'string', type: 'string' },
+      { name: 'imageUri', internalType: 'string', type: 'string' },
+      { name: 'website', internalType: 'string', type: 'string' },
+      { name: 'twitter', internalType: 'string', type: 'string' },
+      { name: 'telegram', internalType: 'string', type: 'string' },
+      { name: 'createdAt', internalType: 'uint64', type: 'uint64' },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'migrator',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pendingOwner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'protocolFeeBps',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'fee', internalType: 'uint256', type: 'uint256' }],
+    name: 'setCreationFee',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'migrator_', internalType: 'address', type: 'address' }],
+    name: 'setMigrator',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'newOwner', internalType: 'address', type: 'address' }],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'treasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'virtualTokens',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'virtualUsdc',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'newFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'CreationFeeUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousMigrator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newMigrator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'MigratorUpdated',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'pendingOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferStarted',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'previousOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'newOwner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'OwnershipTransferred',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'token',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'curve',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'creator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'creationFeePaid',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'TokenCreated',
+  },
+  { type: 'error', inputs: [], name: 'InvalidAddress' },
+  { type: 'error', inputs: [], name: 'InvalidParameters' },
+  {
+    type: 'error',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'SafeERC20FailedOperation',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MemeToken
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const memeTokenAbi = [
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'name_', internalType: 'string', type: 'string' },
+      { name: 'symbol_', internalType: 'string', type: 'string' },
+      { name: 'supply', internalType: 'uint256', type: 'uint256' },
+      { name: 'initialHolder', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'spender', internalType: 'address', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'allowance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientAllowance',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'spender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSpender',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// MockUSDC
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const mockUsdcAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'spender', internalType: 'address', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'pure',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'allowance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientAllowance',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'spender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSpender',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// React
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__
+ */
+export const useReadAmmFactory = /*#__PURE__*/ createUseReadContract({
+  abi: ammFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"allPairs"`
+ */
+export const useReadAmmFactoryAllPairs = /*#__PURE__*/ createUseReadContract({
+  abi: ammFactoryAbi,
+  functionName: 'allPairs',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"allPairsLength"`
+ */
+export const useReadAmmFactoryAllPairsLength =
+  /*#__PURE__*/ createUseReadContract({
+    abi: ammFactoryAbi,
+    functionName: 'allPairsLength',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"getPair"`
+ */
+export const useReadAmmFactoryGetPair = /*#__PURE__*/ createUseReadContract({
+  abi: ammFactoryAbi,
+  functionName: 'getPair',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"parameters"`
+ */
+export const useReadAmmFactoryParameters = /*#__PURE__*/ createUseReadContract({
+  abi: ammFactoryAbi,
+  functionName: 'parameters',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammFactoryAbi}__
+ */
+export const useWriteAmmFactory = /*#__PURE__*/ createUseWriteContract({
+  abi: ammFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"createPair"`
+ */
+export const useWriteAmmFactoryCreatePair =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: ammFactoryAbi,
+    functionName: 'createPair',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammFactoryAbi}__
+ */
+export const useSimulateAmmFactory = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"createPair"`
+ */
+export const useSimulateAmmFactoryCreatePair =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammFactoryAbi,
+    functionName: 'createPair',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammFactoryAbi}__
+ */
+export const useWatchAmmFactoryEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: ammFactoryAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammFactoryAbi}__ and `eventName` set to `"PairCreated"`
+ */
+export const useWatchAmmFactoryPairCreatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammFactoryAbi,
+    eventName: 'PairCreated',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__
+ */
+export const useReadAmmMigrator = /*#__PURE__*/ createUseReadContract({
+  abi: ammMigratorAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"DEAD_ADDRESS"`
+ */
+export const useReadAmmMigratorDeadAddress =
+  /*#__PURE__*/ createUseReadContract({
+    abi: ammMigratorAbi,
+    functionName: 'DEAD_ADDRESS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadAmmMigratorFactory = /*#__PURE__*/ createUseReadContract({
+  abi: ammMigratorAbi,
+  functionName: 'factory',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadAmmMigratorUsdc = /*#__PURE__*/ createUseReadContract({
+  abi: ammMigratorAbi,
+  functionName: 'usdc',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammMigratorAbi}__
+ */
+export const useWriteAmmMigrator = /*#__PURE__*/ createUseWriteContract({
+  abi: ammMigratorAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"migrate"`
+ */
+export const useWriteAmmMigratorMigrate = /*#__PURE__*/ createUseWriteContract({
+  abi: ammMigratorAbi,
+  functionName: 'migrate',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammMigratorAbi}__
+ */
+export const useSimulateAmmMigrator = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammMigratorAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"migrate"`
+ */
+export const useSimulateAmmMigratorMigrate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammMigratorAbi,
+    functionName: 'migrate',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__
+ */
+export const useReadAmmPair = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadAmmPairBpsDenom = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'BPS_DENOM',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"FEE_BPS"`
+ */
+export const useReadAmmPairFeeBps = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'FEE_BPS',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"MINIMUM_LIQUIDITY"`
+ */
+export const useReadAmmPairMinimumLiquidity =
+  /*#__PURE__*/ createUseReadContract({
+    abi: ammPairAbi,
+    functionName: 'MINIMUM_LIQUIDITY',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"allowance"`
+ */
+export const useReadAmmPairAllowance = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'allowance',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useReadAmmPairBalanceOf = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'balanceOf',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"decimals"`
+ */
+export const useReadAmmPairDecimals = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'decimals',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadAmmPairFactory = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'factory',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"getReserves"`
+ */
+export const useReadAmmPairGetReserves = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'getReserves',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"name"`
+ */
+export const useReadAmmPairName = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'name',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useReadAmmPairSymbol = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'symbol',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"token0"`
+ */
+export const useReadAmmPairToken0 = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'token0',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"token1"`
+ */
+export const useReadAmmPairToken1 = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'token1',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useReadAmmPairTotalSupply = /*#__PURE__*/ createUseReadContract({
+  abi: ammPairAbi,
+  functionName: 'totalSupply',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__
+ */
+export const useWriteAmmPair = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"approve"`
+ */
+export const useWriteAmmPairApprove = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'approve',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"burn"`
+ */
+export const useWriteAmmPairBurn = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'burn',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"mint"`
+ */
+export const useWriteAmmPairMint = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"skim"`
+ */
+export const useWriteAmmPairSkim = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'skim',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"swap"`
+ */
+export const useWriteAmmPairSwap = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'swap',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"sync"`
+ */
+export const useWriteAmmPairSync = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'sync',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useWriteAmmPairTransfer = /*#__PURE__*/ createUseWriteContract({
+  abi: ammPairAbi,
+  functionName: 'transfer',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useWriteAmmPairTransferFrom = /*#__PURE__*/ createUseWriteContract(
+  { abi: ammPairAbi, functionName: 'transferFrom' },
+)
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__
+ */
+export const useSimulateAmmPair = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"approve"`
+ */
+export const useSimulateAmmPairApprove =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammPairAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"burn"`
+ */
+export const useSimulateAmmPairBurn = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+  functionName: 'burn',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"mint"`
+ */
+export const useSimulateAmmPairMint = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"skim"`
+ */
+export const useSimulateAmmPairSkim = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+  functionName: 'skim',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"swap"`
+ */
+export const useSimulateAmmPairSwap = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+  functionName: 'swap',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"sync"`
+ */
+export const useSimulateAmmPairSync = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammPairAbi,
+  functionName: 'sync',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useSimulateAmmPairTransfer =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammPairAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useSimulateAmmPairTransferFrom =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammPairAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__
+ */
+export const useWatchAmmPairEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: ammPairAbi,
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useWatchAmmPairApprovalEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Approval',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Burn"`
+ */
+export const useWatchAmmPairBurnEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Burn',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Mint"`
+ */
+export const useWatchAmmPairMintEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Mint',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Swap"`
+ */
+export const useWatchAmmPairSwapEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Swap',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Sync"`
+ */
+export const useWatchAmmPairSyncEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Sync',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useWatchAmmPairTransferEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammPairAbi,
+    eventName: 'Transfer',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__
+ */
+export const useReadAmmRouter = /*#__PURE__*/ createUseReadContract({
+  abi: ammRouterAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadAmmRouterBpsDenom = /*#__PURE__*/ createUseReadContract({
+  abi: ammRouterAbi,
+  functionName: 'BPS_DENOM',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"FEE_NUM"`
+ */
+export const useReadAmmRouterFeeNum = /*#__PURE__*/ createUseReadContract({
+  abi: ammRouterAbi,
+  functionName: 'FEE_NUM',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadAmmRouterFactory = /*#__PURE__*/ createUseReadContract({
+  abi: ammRouterAbi,
+  functionName: 'factory',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"quoteExactInput"`
+ */
+export const useReadAmmRouterQuoteExactInput =
+  /*#__PURE__*/ createUseReadContract({
+    abi: ammRouterAbi,
+    functionName: 'quoteExactInput',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammRouterAbi}__
+ */
+export const useWriteAmmRouter = /*#__PURE__*/ createUseWriteContract({
+  abi: ammRouterAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
+ */
+export const useWriteAmmRouterSwapExactTokensForTokens =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: ammRouterAbi,
+    functionName: 'swapExactTokensForTokens',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammRouterAbi}__
+ */
+export const useSimulateAmmRouter = /*#__PURE__*/ createUseSimulateContract({
+  abi: ammRouterAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
+ */
+export const useSimulateAmmRouterSwapExactTokensForTokens =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: ammRouterAbi,
+    functionName: 'swapExactTokensForTokens',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammRouterAbi}__
+ */
+export const useWatchAmmRouterEvent = /*#__PURE__*/ createUseWatchContractEvent(
+  { abi: ammRouterAbi },
+)
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammRouterAbi}__ and `eventName` set to `"SwapExactIn"`
+ */
+export const useWatchAmmRouterSwapExactInEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: ammRouterAbi,
+    eventName: 'SwapExactIn',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__
+ */
+export const useReadBondingCurve = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadBondingCurveBpsDenom = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'BPS_DENOM',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"canGraduate"`
+ */
+export const useReadBondingCurveCanGraduate =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'canGraduate',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"creator"`
+ */
+export const useReadBondingCurveCreator = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'creator',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"creatorEarnings"`
+ */
+export const useReadBondingCurveCreatorEarnings =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'creatorEarnings',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"currentPrice"`
+ */
+export const useReadBondingCurveCurrentPrice =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'currentPrice',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"feeBps"`
+ */
+export const useReadBondingCurveFeeBps = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'feeBps',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduated"`
+ */
+export const useReadBondingCurveGraduated = /*#__PURE__*/ createUseReadContract(
+  { abi: bondingCurveAbi, functionName: 'graduated' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationMarketCap"`
+ */
+export const useReadBondingCurveGraduationMarketCap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduationMarketCap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationMcap"`
+ */
+export const useReadBondingCurveGraduationMcap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduationMcap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationPool"`
+ */
+export const useReadBondingCurveGraduationPool =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduationPool',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationPrice"`
+ */
+export const useReadBondingCurveGraduationPrice =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduationPrice',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationProgressBps"`
+ */
+export const useReadBondingCurveGraduationProgressBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduationProgressBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"initialCurveSupply"`
+ */
+export const useReadBondingCurveInitialCurveSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'initialCurveSupply',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"k"`
+ */
+export const useReadBondingCurveK = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'k',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"marketCap"`
+ */
+export const useReadBondingCurveMarketCap = /*#__PURE__*/ createUseReadContract(
+  { abi: bondingCurveAbi, functionName: 'marketCap' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"migrator"`
+ */
+export const useReadBondingCurveMigrator = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'migrator',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"protocolFeeBps"`
+ */
+export const useReadBondingCurveProtocolFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'protocolFeeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"quoteBuy"`
+ */
+export const useReadBondingCurveQuoteBuy = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'quoteBuy',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"quoteSell"`
+ */
+export const useReadBondingCurveQuoteSell = /*#__PURE__*/ createUseReadContract(
+  { abi: bondingCurveAbi, functionName: 'quoteSell' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"reserveTokens"`
+ */
+export const useReadBondingCurveReserveTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'reserveTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"reserveUsdc"`
+ */
+export const useReadBondingCurveReserveUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'reserveUsdc',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sellableTokens"`
+ */
+export const useReadBondingCurveSellableTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'sellableTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"token"`
+ */
+export const useReadBondingCurveToken = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'token',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"totalSupply_"`
+ */
+export const useReadBondingCurveTotalSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'totalSupply_',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadBondingCurveTreasury = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'treasury',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadBondingCurveUsdc = /*#__PURE__*/ createUseReadContract({
+  abi: bondingCurveAbi,
+  functionName: 'usdc',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"virtualTokens"`
+ */
+export const useReadBondingCurveVirtualTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'virtualTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"virtualUsdc"`
+ */
+export const useReadBondingCurveVirtualUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: bondingCurveAbi,
+    functionName: 'virtualUsdc',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__
+ */
+export const useWriteBondingCurve = /*#__PURE__*/ createUseWriteContract({
+  abi: bondingCurveAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"buy"`
+ */
+export const useWriteBondingCurveBuy = /*#__PURE__*/ createUseWriteContract({
+  abi: bondingCurveAbi,
+  functionName: 'buy',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
+ */
+export const useWriteBondingCurveClaimCreatorFees =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: bondingCurveAbi,
+    functionName: 'claimCreatorFees',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduate"`
+ */
+export const useWriteBondingCurveGraduate =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduate',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sell"`
+ */
+export const useWriteBondingCurveSell = /*#__PURE__*/ createUseWriteContract({
+  abi: bondingCurveAbi,
+  functionName: 'sell',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__
+ */
+export const useSimulateBondingCurve = /*#__PURE__*/ createUseSimulateContract({
+  abi: bondingCurveAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"buy"`
+ */
+export const useSimulateBondingCurveBuy =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: bondingCurveAbi,
+    functionName: 'buy',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
+ */
+export const useSimulateBondingCurveClaimCreatorFees =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: bondingCurveAbi,
+    functionName: 'claimCreatorFees',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduate"`
+ */
+export const useSimulateBondingCurveGraduate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: bondingCurveAbi,
+    functionName: 'graduate',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sell"`
+ */
+export const useSimulateBondingCurveSell =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: bondingCurveAbi,
+    functionName: 'sell',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__
+ */
+export const useWatchBondingCurveEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: bondingCurveAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"CreatorFeesClaimed"`
+ */
+export const useWatchBondingCurveCreatorFeesClaimedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: bondingCurveAbi,
+    eventName: 'CreatorFeesClaimed',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"Graduated"`
+ */
+export const useWatchBondingCurveGraduatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: bondingCurveAbi,
+    eventName: 'Graduated',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"Traded"`
+ */
+export const useWatchBondingCurveTradedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: bondingCurveAbi,
+    eventName: 'Traded',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__
+ */
+export const useReadLaunchFactory = /*#__PURE__*/ createUseReadContract({
+  abi: launchFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"CURVE_RESERVE"`
+ */
+export const useReadLaunchFactoryCurveReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'CURVE_RESERVE',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"allTokens"`
+ */
+export const useReadLaunchFactoryAllTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'allTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"allTokensLength"`
+ */
+export const useReadLaunchFactoryAllTokensLength =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'allTokensLength',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"creationFee"`
+ */
+export const useReadLaunchFactoryCreationFee =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'creationFee',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"feeBps"`
+ */
+export const useReadLaunchFactoryFeeBps = /*#__PURE__*/ createUseReadContract({
+  abi: launchFactoryAbi,
+  functionName: 'feeBps',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"graduationMcap"`
+ */
+export const useReadLaunchFactoryGraduationMcap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'graduationMcap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"launchOfToken"`
+ */
+export const useReadLaunchFactoryLaunchOfToken =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'launchOfToken',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"migrator"`
+ */
+export const useReadLaunchFactoryMigrator = /*#__PURE__*/ createUseReadContract(
+  { abi: launchFactoryAbi, functionName: 'migrator' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useReadLaunchFactoryOwner = /*#__PURE__*/ createUseReadContract({
+  abi: launchFactoryAbi,
+  functionName: 'owner',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"pendingOwner"`
+ */
+export const useReadLaunchFactoryPendingOwner =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'pendingOwner',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"protocolFeeBps"`
+ */
+export const useReadLaunchFactoryProtocolFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'protocolFeeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadLaunchFactoryTreasury = /*#__PURE__*/ createUseReadContract(
+  { abi: launchFactoryAbi, functionName: 'treasury' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadLaunchFactoryUsdc = /*#__PURE__*/ createUseReadContract({
+  abi: launchFactoryAbi,
+  functionName: 'usdc',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"virtualTokens"`
+ */
+export const useReadLaunchFactoryVirtualTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'virtualTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"virtualUsdc"`
+ */
+export const useReadLaunchFactoryVirtualUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: launchFactoryAbi,
+    functionName: 'virtualUsdc',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__
+ */
+export const useWriteLaunchFactory = /*#__PURE__*/ createUseWriteContract({
+  abi: launchFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
+ */
+export const useWriteLaunchFactoryAcceptOwnership =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchFactoryAbi,
+    functionName: 'acceptOwnership',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"createToken"`
+ */
+export const useWriteLaunchFactoryCreateToken =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchFactoryAbi,
+    functionName: 'createToken',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
+ */
+export const useWriteLaunchFactorySetCreationFee =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchFactoryAbi,
+    functionName: 'setCreationFee',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setMigrator"`
+ */
+export const useWriteLaunchFactorySetMigrator =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchFactoryAbi,
+    functionName: 'setMigrator',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useWriteLaunchFactoryTransferOwnership =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: launchFactoryAbi,
+    functionName: 'transferOwnership',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__
+ */
+export const useSimulateLaunchFactory = /*#__PURE__*/ createUseSimulateContract(
+  { abi: launchFactoryAbi },
+)
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
+ */
+export const useSimulateLaunchFactoryAcceptOwnership =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchFactoryAbi,
+    functionName: 'acceptOwnership',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"createToken"`
+ */
+export const useSimulateLaunchFactoryCreateToken =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchFactoryAbi,
+    functionName: 'createToken',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
+ */
+export const useSimulateLaunchFactorySetCreationFee =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchFactoryAbi,
+    functionName: 'setCreationFee',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setMigrator"`
+ */
+export const useSimulateLaunchFactorySetMigrator =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchFactoryAbi,
+    functionName: 'setMigrator',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useSimulateLaunchFactoryTransferOwnership =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: launchFactoryAbi,
+    functionName: 'transferOwnership',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__
+ */
+export const useWatchLaunchFactoryEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: launchFactoryAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"CreationFeeUpdated"`
+ */
+export const useWatchLaunchFactoryCreationFeeUpdatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchFactoryAbi,
+    eventName: 'CreationFeeUpdated',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"MigratorUpdated"`
+ */
+export const useWatchLaunchFactoryMigratorUpdatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchFactoryAbi,
+    eventName: 'MigratorUpdated',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"OwnershipTransferStarted"`
+ */
+export const useWatchLaunchFactoryOwnershipTransferStartedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchFactoryAbi,
+    eventName: 'OwnershipTransferStarted',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useWatchLaunchFactoryOwnershipTransferredEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchFactoryAbi,
+    eventName: 'OwnershipTransferred',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"TokenCreated"`
+ */
+export const useWatchLaunchFactoryTokenCreatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: launchFactoryAbi,
+    eventName: 'TokenCreated',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__
+ */
+export const useReadMemeToken = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"allowance"`
+ */
+export const useReadMemeTokenAllowance = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'allowance',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useReadMemeTokenBalanceOf = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'balanceOf',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"decimals"`
+ */
+export const useReadMemeTokenDecimals = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'decimals',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"name"`
+ */
+export const useReadMemeTokenName = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'name',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useReadMemeTokenSymbol = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'symbol',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useReadMemeTokenTotalSupply = /*#__PURE__*/ createUseReadContract({
+  abi: memeTokenAbi,
+  functionName: 'totalSupply',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__
+ */
+export const useWriteMemeToken = /*#__PURE__*/ createUseWriteContract({
+  abi: memeTokenAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"approve"`
+ */
+export const useWriteMemeTokenApprove = /*#__PURE__*/ createUseWriteContract({
+  abi: memeTokenAbi,
+  functionName: 'approve',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useWriteMemeTokenTransfer = /*#__PURE__*/ createUseWriteContract({
+  abi: memeTokenAbi,
+  functionName: 'transfer',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useWriteMemeTokenTransferFrom =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: memeTokenAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__
+ */
+export const useSimulateMemeToken = /*#__PURE__*/ createUseSimulateContract({
+  abi: memeTokenAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"approve"`
+ */
+export const useSimulateMemeTokenApprove =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: memeTokenAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useSimulateMemeTokenTransfer =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: memeTokenAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useSimulateMemeTokenTransferFrom =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: memeTokenAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__
+ */
+export const useWatchMemeTokenEvent = /*#__PURE__*/ createUseWatchContractEvent(
+  { abi: memeTokenAbi },
+)
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useWatchMemeTokenApprovalEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: memeTokenAbi,
+    eventName: 'Approval',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useWatchMemeTokenTransferEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: memeTokenAbi,
+    eventName: 'Transfer',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__
+ */
+export const useReadMockUsdc = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"allowance"`
+ */
+export const useReadMockUsdcAllowance = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'allowance',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useReadMockUsdcBalanceOf = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'balanceOf',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"decimals"`
+ */
+export const useReadMockUsdcDecimals = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'decimals',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"name"`
+ */
+export const useReadMockUsdcName = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'name',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useReadMockUsdcSymbol = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'symbol',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useReadMockUsdcTotalSupply = /*#__PURE__*/ createUseReadContract({
+  abi: mockUsdcAbi,
+  functionName: 'totalSupply',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link mockUsdcAbi}__
+ */
+export const useWriteMockUsdc = /*#__PURE__*/ createUseWriteContract({
+  abi: mockUsdcAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"approve"`
+ */
+export const useWriteMockUsdcApprove = /*#__PURE__*/ createUseWriteContract({
+  abi: mockUsdcAbi,
+  functionName: 'approve',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"mint"`
+ */
+export const useWriteMockUsdcMint = /*#__PURE__*/ createUseWriteContract({
+  abi: mockUsdcAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useWriteMockUsdcTransfer = /*#__PURE__*/ createUseWriteContract({
+  abi: mockUsdcAbi,
+  functionName: 'transfer',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useWriteMockUsdcTransferFrom =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: mockUsdcAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link mockUsdcAbi}__
+ */
+export const useSimulateMockUsdc = /*#__PURE__*/ createUseSimulateContract({
+  abi: mockUsdcAbi,
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"approve"`
+ */
+export const useSimulateMockUsdcApprove =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: mockUsdcAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"mint"`
+ */
+export const useSimulateMockUsdcMint = /*#__PURE__*/ createUseSimulateContract({
+  abi: mockUsdcAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useSimulateMockUsdcTransfer =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: mockUsdcAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link mockUsdcAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useSimulateMockUsdcTransferFrom =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: mockUsdcAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link mockUsdcAbi}__
+ */
+export const useWatchMockUsdcEvent = /*#__PURE__*/ createUseWatchContractEvent({
+  abi: mockUsdcAbi,
+})
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link mockUsdcAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useWatchMockUsdcApprovalEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: mockUsdcAbi,
+    eventName: 'Approval',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link mockUsdcAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useWatchMockUsdcTransferEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: mockUsdcAbi,
+    eventName: 'Transfer',
+  })

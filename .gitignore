@@ -1,0 +1,36 @@
+# Local agent tooling
+.agents/
+.impeccable/
+skills-lock.json
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Dependencies
+node_modules/
+
+# Build and test output
+.next/
+dist/
+coverage/
+/contract/out/
+/contract/broadcast/
+/contract/cache/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# OS and editor files
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*~
+PRODUCT.md

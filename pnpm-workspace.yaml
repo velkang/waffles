@@ -1,0 +1,8 @@
+packages:
+  - frontend
+  - indexer
+
+onlyBuiltDependencies:
+  - "@reown/appkit"
+  - esbuild
+  - unrs-resolver
