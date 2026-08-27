@@ -1,44 +1,113 @@
 @import "tailwindcss";
 
-@theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
 @layer base {
   :root {
-    color-scheme: dark;
+    --bg-ground: #0e0f12;
+    --bg-surface: #141519;
+    --bg-inset: #1a1b21;
+    --bg-hover: #212328;
+    --border-main: #24262e;
+    --border-subtle: #1a1b22;
+    --accent-copper: #db9d6a;
+    --accent-copper-hover: #e5ab7a;
+    --accent-copper-dim: #3b2718;
+    --color-emerald: #4ade80;
+    --color-crimson: #ef4444;
+    --color-amber: #f59e0b;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --text-muted: #71717a;
   }
 
   body {
-    background-color: #09090b;
-    color: #f4f4f5;
-    font-family: var(--font-sans), system-ui, sans-serif;
+    background-color: #0e0f12;
+    color: #fafafa;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
     -webkit-font-smoothing: antialiased;
   }
+}
 
-  ::selection {
-    background-color: #34d399;
-    color: #09090b;
-  }
+/* Custom scrollbars for high-density tables & feeds */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0e0f12;
+}
+::-webkit-scrollbar-thumb {
+  background: #24262e;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #db9d6a;
+}
 
-  :focus-visible {
-    outline: 2px solid #34d399;
-    outline-offset: 2px;
-  }
+/* Flat UI Utilities */
+.pump-card {
+  background-color: #141519;
+  border: 1px solid #24262e;
+  border-radius: 10px;
+  transition: border-color 0.15s ease;
+}
 
-  * {
-    scrollbar-width: thin;
-    scrollbar-color: #3f3f46 transparent;
-  }
+.pump-card:hover {
+  border-color: #383a45;
+}
 
-  input {
-    caret-color: #34d399;
-  }
+.pump-btn-primary {
+  background-color: #db9d6a;
+  color: #0e0f12;
+  font-weight: 700;
+  border-radius: 6px;
+  transition: background-color 0.15s ease;
+}
 
-  table,
-  dl,
-  dd {
-    font-variant-numeric: tabular-nums;
-  }
+.pump-btn-primary:hover {
+  background-color: #e5ab7a;
+}
+
+.pump-pill {
+  background-color: #1a1b21;
+  border: 1px solid #24262e;
+  color: #a1a1aa;
+  font-weight: 600;
+  border-radius: 9999px;
+  transition: all 0.15s ease;
+}
+
+.pump-pill:hover {
+  color: #fafafa;
+  border-color: #383a45;
+}
+
+.pump-pill-active {
+  background-color: #db9d6a;
+  border-color: #db9d6a;
+  color: #0e0f12;
+  font-weight: 700;
+  border-radius: 9999px;
+}
+
+.pump-pill-active:hover {
+  background-color: #e5ab7a;
+  border-color: #e5ab7a;
+  color: #0e0f12;
+}
+
+/* Marquee ticker animation (no gradients) */
+@keyframes marquee-flat {
+  0% { transform: translateX(0%); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-marquee-flat {
+  display: flex;
+  width: max-content;
+  animation: marquee-flat 30s linear infinite;
+}
+
+.animate-marquee-flat:hover {
+  animation-play-state: paused;
 }

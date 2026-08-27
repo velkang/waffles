@@ -1,37 +1,62 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Header } from "@/components/Header";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const inter = Inter({
+  variable: "--font-sans",
   subsets: ["latin"],
 });
 
 const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+  variable: "--font-mono",
   subsets: ["latin"],
 });
 
 export const metadata: Metadata = {
-  title: "arc.fun — Launch tokens on Arc",
+  title: "arc.fun — Fair Launchpad on Arc L1",
   description:
-    "Permissionless token launchpad on Arc: create a token in seconds, trade on a USDC bonding curve, graduate to DEX liquidity.",
+    "Permissionless token launchpad on Arc: create tokens in seconds, trade on Circle USDC bonding curves, and graduate automatically to permanent DEX liquidity.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body className="flex min-h-full flex-col bg-zinc-950 text-zinc-100">
+      <body className="flex min-h-full flex-col bg-[#0e0f12] text-[#fafafa] selection:bg-[#db9d6a] selection:text-[#0e0f12]">
         <Providers>
           <Header />
-          <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">
+          <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
             {children}
           </main>
+          <footer className="border-t border-[#24262e] bg-[#0e0f12] py-6 text-center text-xs text-zinc-500">
+            <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-white">
+                  arc<span className="text-[#db9d6a]">.fun</span>
+                </span>
+                <span className="text-zinc-600">|</span>
+                <span>USDC-Native Launchpad on Arc L1</span>
+              </div>
+              <div className="flex items-center gap-4 text-zinc-500">
+                <span>Verified Contracts</span>
+                <span>•</span>
+                <span>Permanent AMM Liquidity</span>
+                <span>•</span>
+                <span>Circle USDC Settled</span>
+              </div>
+            </div>
+          </footer>
         </Providers>
       </body>
     </html>

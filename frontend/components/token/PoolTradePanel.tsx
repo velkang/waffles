@@ -19,24 +19,23 @@ import {
 } from "@/generated/contracts-generated";
 import { formatPrice, formatToken, formatUsd } from "@/lib/format";
 import { FACTORY_ADDRESS, ROUTER_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 type Address = `0x${string}`;
 type Mode = "buy" | "sell";
 
 const SLIPPAGE_OPTIONS = [50, 100, 300] as const;
+const BUY_PRESETS = [25, 100, 250] as const;
+const SELL_PRESETS = [25, 50, 100] as const;
 const BPS_DENOM = 10_000n;
-const FEE_NUM = 9_975n; // AmmPair swap fee: 0.25% to LPs
+const FEE_NUM = 9_975n;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
-/// @notice V2 constant-product exact-in quote with the 0.25% pool fee.
 function poolQuote(amountIn: bigint, rIn: bigint, rOut: bigint): bigint {
   if (amountIn <= 0n || rIn <= 0n || rOut <= 0n) return 0n;
   return (amountIn * FEE_NUM * rOut) / (rIn * BPS_DENOM + amountIn * FEE_NUM);
 }
 
-/// Post-graduation trading against the token/USDC AmmPair. The pool is
-/// resolved on-chain (factory -> migrator -> AMM factory -> getPair), so this
-/// works even when the indexer is offline.
 export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   const { address: account } = useAccount();
   const publicClient = usePublicClient();
@@ -47,7 +46,6 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   const [phase, setPhase] = useState<"idle" | "approve" | "swap">("idle");
   const [error, setError] = useState("");
 
-  // --- resolve the pool on-chain ---
   const { data: migrator } = useReadLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
   });
@@ -72,8 +70,7 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   });
 
   const tokenIsToken0 =
-    token0 !== undefined &&
-    token0.toLowerCase() === tokenAddress.toLowerCase();
+    token0 !== undefined && token0.toLowerCase() === tokenAddress.toLowerCase();
 
   const [r0, r1] = reservesQuery.data ?? [];
   const rUsdc = tokenIsToken0 ? r1 : r0;
@@ -83,7 +80,6 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       ? (rUsdc * 10n ** 18n) / rToken
       : undefined;
 
-  // --- balances & allowances (spender: the atomic router) ---
   const usdcBalance = useReadMockUsdcBalanceOf({
     address: USDC_ADDRESS,
     args: [account ?? ZERO_ADDRESS],
@@ -126,9 +122,7 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   }, [parsedAmount, rUsdc, rToken, mode]);
 
   const needsApproval =
-    parsedAmount !== undefined &&
-    allowance !== undefined &&
-    allowance < parsedAmount;
+    parsedAmount !== undefined && allowance !== undefined && allowance < parsedAmount;
 
   const insufficientBalance =
     parsedAmount !== undefined && balance !== undefined && balance < parsedAmount;
@@ -137,19 +131,6 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     quote !== undefined && quote > 0n
       ? (quote * (BPS_DENOM - BigInt(slippageBps))) / BPS_DENOM
       : undefined;
-
-  const priceImpactPct = useMemo(() => {
-    if (quote === undefined || parsedAmount === undefined || poolPrice === undefined)
-      return undefined;
-    const marginal = Number(poolPrice) / 1e6; // usd per token
-    if (marginal <= 0) return undefined;
-    const exec =
-      mode === "buy"
-        ? Number(parsedAmount) / 1e6 / (Number(quote) / 1e18)
-        : Number(quote) / 1e6 / (Number(parsedAmount) / 1e18);
-    if (!isFinite(exec) || exec <= 0) return undefined;
-    return Math.abs((exec / marginal - 1) * 100);
-  }, [quote, parsedAmount, poolPrice, mode]);
 
   const approveUsdcAsync = useWriteMockUsdcApprove().writeContractAsync;
   const approveTokenAsync = useWriteMemeTokenApprove().writeContractAsync;
@@ -213,8 +194,8 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       refetchAll();
       setError(
         err instanceof Error
-          ? err.message.length > 200
-            ? `${err.message.slice(0, 200)}…`
+          ? err.message.length > 180
+            ? `${err.message.slice(0, 180)}…`
             : err.message
           : String(err),
       );
@@ -232,240 +213,183 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     quote === undefined ||
     quote === 0n;
 
-  const inputCls =
-    "w-full bg-transparent text-right font-mono text-2xl tabular-nums outline-none placeholder:text-zinc-600";
-
   if (poolLoading) {
-    return (
-      <div className="h-96 animate-pulse rounded-2xl border border-zinc-800 bg-zinc-900" />
-    );
+    return <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />;
   }
 
   if (!pool) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-zinc-200">Trade</span>
-          <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-300">
-            🎓 Graduated
-          </span>
-        </div>
-        <p className="rounded-lg bg-zinc-800/60 px-3 py-2 text-xs text-zinc-400">
-          This token graduated, but no DEX pool was found for it. Trading is
-          only possible on-chain.
-        </p>
-      </div>
-    );
-  }
-
-  if (!ROUTER_ADDRESS) {
-    return (
-      <div className="rounded-2xl border border-amber-500/30 bg-zinc-900 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-semibold text-zinc-200">Trade</span>
-          <span className="rounded-full bg-violet-500/20 px-2 py-0.5 text-xs text-violet-300">
-            Graduated
-          </span>
-        </div>
-        <p className="rounded-lg bg-amber-500/10 px-3 py-2 text-sm text-amber-200" role="status">
-          DEX trading is paused until the atomic router address is configured.
-          Your assets cannot be sent through the old two-step flow.
+      <div className="rounded-[10px] border border-[#24262e] bg-[#141519] p-6 text-center font-mono">
+        <StatusBadge graduated={true} />
+        <p className="mt-3 text-xs text-zinc-400">
+          Token has graduated · DEX AMM pool resolving on-chain
         </p>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      {/* mode toggle + venue badge */}
-      <div className="mb-3 flex items-center justify-between">
-        <div className="grid flex-1 grid-cols-2 gap-1 rounded-xl bg-zinc-950 p-1">
-          {(["buy", "sell"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => {
-                setMode(m);
-                setAmount("");
-                setError("");
-              }}
-              className={`rounded-lg py-2 text-sm font-semibold uppercase tracking-wide transition-colors ${
-                mode === m
-                  ? m === "buy"
-                    ? "bg-emerald-500 text-emerald-950"
-                    : "bg-red-500 text-red-950"
-                  : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-        <span className="ml-3 shrink-0 rounded-full bg-violet-500/20 px-2 py-0.5 text-[11px] text-violet-300">
-          🎓 DEX pool
-        </span>
-      </div>
-
-      <form onSubmit={submit} className="space-y-3">
-        {/* pay field */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors focus-within:border-emerald-500/60">
-          <div className="flex items-center justify-between text-xs text-zinc-500">
-            <span>{mode === "buy" ? "You pay" : "You sell"}</span>
-            {account && (
-              <button
-                type="button"
-                onClick={() =>
-                  balance !== undefined &&
-                  setAmount(formatUnits(balance, mode === "buy" ? 6 : 18))
-                }
-                className="font-mono text-emerald-400 hover:text-emerald-300"
-              >
-                MAX {balance !== undefined ? formatToken(balance) : ""}
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              aria-label={mode === "buy" ? "USDC amount" : "Token amount"}
-              className={inputCls}
-              placeholder="0.00"
-              inputMode="decimal"
-              autoComplete="off"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-            />
-            <span className="shrink-0 text-sm font-semibold text-zinc-400">
-              {mode === "buy" ? "USDC" : "TOKEN"}
-            </span>
-          </div>
+    <div className="space-y-4 font-mono">
+      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-3.5">
+        {/* Pool Header */}
+        <div className="flex items-center justify-between pb-2 border-b border-[#24262e]">
+          <span className="text-xs font-bold text-[#4ade80]">DEX AMM PAIR ACTIVE</span>
+          <StatusBadge graduated={true} size="xs" />
         </div>
 
-        {/* receive field */}
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/60 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-500">You receive (min)</span>
-            <span
-              className={`font-mono text-lg tabular-nums ${
-                minOut !== undefined ? "text-zinc-200" : "text-zinc-600"
-              }`}
-            >
-              {minOut !== undefined
-                ? mode === "buy"
-                  ? `${formatToken(minOut)} TOKEN`
-                  : formatUsd(minOut)
-                : quote !== undefined && quote > 0n
-                  ? "…"
-                  : "—"}
-            </span>
-          </div>
+        {/* Mode Switch Tabs */}
+        <div className="grid grid-cols-2 gap-1 rounded-[6px] bg-[#101114] p-1 border border-[#24262e] text-xs">
+          <button
+            type="button"
+            onClick={() => {
+              setMode("buy");
+              setAmount("");
+              setError("");
+            }}
+            className={`rounded-[4px] py-2 font-bold transition ${
+              mode === "buy"
+                ? "bg-[#db9d6a] text-[#0e0f12]"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            Buy
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setMode("sell");
+              setAmount("");
+              setError("");
+            }}
+            className={`rounded-[4px] py-2 font-bold transition ${
+              mode === "sell"
+                ? "bg-[#ef4444] text-white"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            Sell
+          </button>
         </div>
 
-        {/* slippage */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-zinc-500">Max slippage</span>
-          <div className="flex gap-1">
-            {SLIPPAGE_OPTIONS.map((bps) => (
-              <button
-                key={bps}
-                type="button"
-                onClick={() => setSlippageBps(bps)}
-                aria-pressed={slippageBps === bps}
-                className={`rounded-md px-2 py-0.5 font-mono text-xs tabular-nums transition-colors ${
-                  slippageBps === bps
-                    ? "bg-zinc-700 text-white"
-                    : "text-zinc-500 hover:text-zinc-300"
-                }`}
-              >
-                {Number(bps) / 100}%
-              </button>
-            ))}
+        <form onSubmit={submit} className="space-y-3">
+          {/* Amount Input */}
+          <div className="rounded-[8px] bg-[#1a1b21] border border-[#24262e] p-3 focus-within:border-[#db9d6a] transition">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <span>{mode === "buy" ? "YOU PAY (USDC)" : "YOU SELL (TOKENS)"}</span>
+              {account && (
+                <div className="flex items-center gap-1">
+                  <span>
+                    Bal: {balance !== undefined ? (mode === "buy" ? formatUsd(balance) : formatToken(balance)) : "—"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      balance !== undefined &&
+                      setAmount(formatUnits(balance, mode === "buy" ? 6 : 18))
+                    }
+                    className="font-bold text-[#db9d6a] hover:underline ml-1"
+                  >
+                    [MAX]
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-2xl font-black text-zinc-400">$</span>
+              <input
+                aria-label="Swap amount"
+                className="w-full bg-transparent text-2xl font-black text-white outline-none placeholder:text-zinc-600"
+                placeholder="0"
+                inputMode="decimal"
+                autoComplete="off"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+              />
+              <span className="shrink-0 text-xs font-bold text-zinc-400">
+                {mode === "buy" ? "USD ⇅" : "TOKEN ⇅"}
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* details */}
-        {parsedAmount !== undefined && (
-          <dl className="space-y-1.5 border-t border-zinc-800 pt-3 text-xs">
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Quote</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {quote !== undefined
-                  ? mode === "buy"
-                    ? `${formatToken(quote)} TOKEN`
-                    : formatUsd(quote)
-                  : "—"}
-              </dd>
+          {/* Quick Presets */}
+          {mode === "buy" ? (
+            <div className="flex items-center gap-1.5 text-xs">
+              {BUY_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setAmount(String(preset))}
+                  className="flex-1 rounded-[6px] bg-[#1a1b21] border border-[#24262e] py-1.5 font-bold text-zinc-300 hover:border-[#db9d6a] hover:text-[#db9d6a] transition"
+                >
+                  ${preset}
+                </button>
+              ))}
             </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Pool fee · 0.25%</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {mode === "buy"
-                  ? formatUsd((parsedAmount * 25n) / BPS_DENOM)
-                  : `${formatToken((parsedAmount * 25n) / BPS_DENOM)} tokens`}
-              </dd>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs">
+              {SELL_PRESETS.map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => {
+                    if (balance !== undefined && balance > 0n) {
+                      const sel = (balance * BigInt(pct)) / 100n;
+                      setAmount(formatUnits(sel, 18));
+                    }
+                  }}
+                  className="flex-1 rounded-[6px] bg-[#1a1b21] border border-[#24262e] py-1.5 font-bold text-zinc-300 hover:border-[#ef4444] hover:text-[#ef4444] transition"
+                >
+                  {pct}%
+                </button>
+              ))}
             </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Price impact</dt>
-              <dd
-                className={`font-mono tabular-nums ${
-                  (priceImpactPct ?? 0) > 5 ? "text-amber-400" : "text-zinc-300"
-                }`}
-              >
-                {priceImpactPct !== undefined
-                  ? `${priceImpactPct.toFixed(2)}%`
-                  : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Pool price</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {formatPrice(poolPrice)}
-              </dd>
-            </div>
-          </dl>
-        )}
+          )}
 
-        {!account ? (
-          <p className="rounded-lg bg-zinc-800/60 px-3 py-2 text-xs text-zinc-400">
-            Connect your wallet to trade.
-          </p>
-        ) : null}
-        {insufficientBalance ? (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            Not enough {mode === "buy" ? "USDC" : "tokens"} in your wallet.
-          </p>
-        ) : null}
-        {error && (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            {error}
-          </p>
-        )}
+          {/* Output Readout */}
+          {minOut !== undefined && (
+            <div className="rounded-[6px] bg-[#101114] border border-[#24262e] p-2.5 flex items-center justify-between text-xs">
+              <span className="text-zinc-400">ESTIMATED OUTPUT</span>
+              <span className="font-bold text-white">
+                {mode === "buy" ? `${formatToken(minOut)} tokens` : formatUsd(minOut)}
+              </span>
+            </div>
+          )}
 
-        <button
-          type="submit"
-          disabled={disabled}
-          className={`w-full rounded-xl py-3 text-sm font-bold uppercase tracking-wide transition-colors ${
-            disabled
-              ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
-              : mode === "buy"
-                ? "bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
-                : "bg-red-500 text-red-950 hover:bg-red-400"
-          }`}
-        >
-          {busy
-            ? phase === "approve"
-              ? "Approving…"
-              : "Swapping atomically…"
-            : !account
-              ? "Connect wallet"
-              : parsedAmount === undefined || parsedAmount === 0n
-                ? "Enter an amount"
-                : quote === undefined || quote === 0n
-                  ? "Insufficient pool liquidity"
+          {insufficientBalance && (
+            <p className="rounded-[6px] border border-red-500/40 bg-[#2b1114] p-2 text-xs text-red-300 font-bold">
+              Insufficient {mode === "buy" ? "USDC" : "Token"} balance
+            </p>
+          )}
+          {error && (
+            <p className="rounded-[6px] border border-red-500/40 bg-[#2b1114] p-2 text-xs text-red-300">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={disabled}
+            className={`w-full rounded-[8px] py-3 text-xs font-black uppercase tracking-wider transition active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed ${
+              mode === "buy"
+                ? "bg-[#db9d6a] text-[#0e0f12] hover:bg-[#e5ab7a]"
+                : "bg-[#ef4444] text-white hover:bg-[#dc2626]"
+            }`}
+          >
+            {busy
+              ? phase === "approve"
+                ? "Approving Token…"
+                : "Executing Swap…"
+              : !account
+                ? "Connect wallet to trade"
+                : !parsedAmount || parsedAmount === 0n
+                  ? "Enter an amount"
                   : needsApproval
-                    ? `Approve & ${mode}`
-                    : `${mode} on DEX`}
-        </button>
-      </form>
+                    ? `Approve & ${mode === "buy" ? "Buy" : "Sell"}`
+                    : `${mode === "buy" ? "Buy" : "Sell"} on DEX`}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

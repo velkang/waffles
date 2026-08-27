@@ -4,8 +4,12 @@ import { useMemo, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 import {
+  useReadBondingCurveCreator,
+  useReadBondingCurveCreatorEarnings,
   useReadBondingCurveCurrentPrice,
   useReadBondingCurveGraduated,
+  useReadBondingCurveGraduationMcap,
+  useReadBondingCurveGraduationProgressBps,
   useReadBondingCurveQuoteBuy,
   useReadBondingCurveQuoteSell,
   useReadMockUsdcAllowance,
@@ -13,29 +17,33 @@ import {
   useReadMemeTokenAllowance,
   useReadMemeTokenBalanceOf,
   useWriteBondingCurveBuy,
+  useWriteBondingCurveClaimCreatorFees,
   useWriteBondingCurveSell,
   useWriteMemeTokenApprove,
   useWriteMockUsdcApprove,
 } from "@/generated/contracts-generated";
 import { PoolTradePanel } from "./PoolTradePanel";
-import { formatPrice, formatToken, formatUsd } from "@/lib/format";
-import { USDC_ADDRESS } from "@/lib/wagmi";
+import { formatPrice, formatToken, formatUsd, shortAddress } from "@/lib/format";
+import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
+import { ProgressBar } from "@/components/ui/ProgressBar";
 
 type Address = `0x${string}`;
 type Mode = "buy" | "sell";
 
 const SLIPPAGE_OPTIONS = [50, 100, 300] as const;
+const BUY_PRESETS = [25, 100, 250] as const;
+const SELL_PRESETS = [25, 50, 100] as const;
 const BPS_DENOM = 10_000n;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
-/// Routes to the bonding-curve panel while the token trades on the curve,
-/// and to the DEX pool panel once it has graduated.
 export function TradePanel({
   tokenAddress,
   curveAddress,
+  description,
 }: {
   tokenAddress: Address;
   curveAddress: Address;
+  description?: string;
 }) {
   const { data: graduated, isLoading } = useReadBondingCurveGraduated({
     address: curveAddress,
@@ -45,17 +53,25 @@ export function TradePanel({
     return <PoolTradePanel tokenAddress={tokenAddress} />;
   }
   if (isLoading) {
-    return <div className="h-96 animate-pulse rounded-2xl bg-zinc-900" />;
+    return <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />;
   }
-  return <CurveTradePanel tokenAddress={tokenAddress} curveAddress={curveAddress} />;
+  return (
+    <CurveTradePanel
+      tokenAddress={tokenAddress}
+      curveAddress={curveAddress}
+      description={description}
+    />
+  );
 }
 
 function CurveTradePanel({
   tokenAddress,
   curveAddress,
+  description,
 }: {
   tokenAddress: Address;
   curveAddress: Address;
+  description?: string;
 }) {
   const { address: account } = useAccount();
   const publicClient = usePublicClient();
@@ -63,6 +79,7 @@ function CurveTradePanel({
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("");
   const [slippageBps, setSlippageBps] = useState<number>(100);
+  const [statsTimeframe, setStatsTimeframe] = useState<"5m" | "1h" | "24h">("24h");
   const [phase, setPhase] = useState<"idle" | "approve" | "trade">("idle");
   const [error, setError] = useState("");
 
@@ -75,7 +92,7 @@ function CurveTradePanel({
     }
   }, [amount, mode]);
 
-  // --- balances & allowances ---
+  // Balances & Allowances
   const usdcBalance = useReadMockUsdcBalanceOf({
     address: USDC_ADDRESS,
     args: [account ?? ZERO_ADDRESS],
@@ -97,7 +114,7 @@ function CurveTradePanel({
     query: { enabled: Boolean(account) },
   });
 
-  // --- quotes ---
+  // Quotes
   const quoteBuy = useReadBondingCurveQuoteBuy({
     address: curveAddress,
     args: [parsedAmount ?? 0n],
@@ -111,10 +128,20 @@ function CurveTradePanel({
   const { data: currentPrice } = useReadBondingCurveCurrentPrice({
     address: curveAddress,
   });
+  const { data: progressBps } = useReadBondingCurveGraduationProgressBps({
+    address: curveAddress,
+  });
+  const { data: graduationMcap } = useReadBondingCurveGraduationMcap({
+    address: curveAddress,
+  });
+  const { data: creator } = useReadBondingCurveCreator({
+    address: curveAddress,
+  });
 
   const quote = mode === "buy" ? quoteBuy.data : quoteSell.data;
   const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
   const allowance = mode === "buy" ? usdcAllowance.data : tokenAllowance.data;
+  const progress = progressBps !== undefined ? Number(progressBps) / 100 : 0;
 
   const needsApproval =
     parsedAmount !== undefined &&
@@ -128,20 +155,6 @@ function CurveTradePanel({
     quote !== undefined
       ? (quote * (BPS_DENOM - BigInt(slippageBps))) / BPS_DENOM
       : undefined;
-
-  // price impact: execution price vs marginal price
-  const priceImpactPct = useMemo(() => {
-    if (quote === undefined || parsedAmount === undefined || !currentPrice)
-      return undefined;
-    const marginal = Number(currentPrice) / 1e6; // usd per token
-    if (marginal <= 0) return undefined;
-    const exec =
-      mode === "buy"
-        ? Number(parsedAmount) / 1e6 / (Number(quote) / 1e18)
-        : Number(quote) / 1e6 / (Number(parsedAmount) / 1e18);
-    if (!isFinite(exec) || exec <= 0) return undefined;
-    return Math.abs((exec / marginal - 1) * 100);
-  }, [quote, parsedAmount, currentPrice, mode]);
 
   const approveAsync = useWriteMockUsdcApprove().writeContractAsync;
   const approveTokenAsync = useWriteMemeTokenApprove().writeContractAsync;
@@ -186,8 +199,8 @@ function CurveTradePanel({
       setPhase("idle");
       setError(
         err instanceof Error
-          ? err.message.length > 200
-            ? `${err.message.slice(0, 200)}…`
+          ? err.message.length > 180
+            ? `${err.message.slice(0, 180)}…`
             : err.message
           : String(err),
       );
@@ -202,196 +215,335 @@ function CurveTradePanel({
     insufficientBalance ||
     (mode === "buy" ? quoteBuy.isLoading : quoteSell.isLoading);
 
-  const inputCls =
-    "w-full bg-transparent text-right font-mono text-2xl tabular-nums outline-none placeholder:text-zinc-600";
-
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-      {/* mode toggle */}
-      <div className="grid grid-cols-2 gap-1 rounded-xl bg-zinc-950 p-1">
-        {(["buy", "sell"] as const).map((m) => (
+    <div className="space-y-4 font-mono">
+      {/* 1. Order Slip Card */}
+      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-3.5">
+        {/* Mode Switch Tabs (Pump.fun style) */}
+        <div className="grid grid-cols-2 gap-1 rounded-[6px] bg-[#101114] p-1 border border-[#24262e] text-xs">
           <button
-            key={m}
             type="button"
             onClick={() => {
-              setMode(m);
+              setMode("buy");
               setAmount("");
               setError("");
             }}
-            className={`rounded-lg py-2 text-sm font-semibold uppercase tracking-wide transition-colors ${
-              mode === m
-                ? m === "buy"
-                  ? "bg-emerald-500 text-zinc-950"
-                  : "bg-red-500 text-zinc-950"
-                : "text-zinc-400 hover:text-zinc-200"
+            className={`rounded-[4px] py-2 font-bold transition ${
+              mode === "buy"
+                ? "bg-[#db9d6a] text-[#0e0f12]"
+                : "text-zinc-400 hover:text-white"
             }`}
           >
-            {m}
+            Buy
           </button>
-        ))}
+          <button
+            type="button"
+            onClick={() => {
+              setMode("sell");
+              setAmount("");
+              setError("");
+            }}
+            className={`rounded-[4px] py-2 font-bold transition ${
+              mode === "sell"
+                ? "bg-[#ef4444] text-white"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            Sell
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-3">
+          {/* Main Amount Input Container */}
+          <div className="rounded-[8px] bg-[#1a1b21] border border-[#24262e] p-3 focus-within:border-[#db9d6a] transition">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <span>{mode === "buy" ? "YOU PAY (USDC)" : "YOU SELL (TOKENS)"}</span>
+              {account && (
+                <div className="flex items-center gap-1">
+                  <span>
+                    Bal: {balance !== undefined ? (mode === "buy" ? formatUsd(balance) : formatToken(balance)) : "—"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      balance !== undefined &&
+                      setAmount(formatUnits(balance, mode === "buy" ? 6 : 18))
+                    }
+                    className="font-bold text-[#db9d6a] hover:underline ml-1"
+                  >
+                    [MAX]
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <span className="text-2xl font-black text-zinc-400">$</span>
+              <input
+                aria-label="Trade amount"
+                className="w-full bg-transparent text-2xl font-black text-white outline-none placeholder:text-zinc-600"
+                placeholder="0"
+                inputMode="decimal"
+                autoComplete="off"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+              />
+              <span className="shrink-0 text-xs font-bold text-zinc-400">
+                {mode === "buy" ? "USD ⇅" : "TOKEN ⇅"}
+              </span>
+            </div>
+          </div>
+
+          {/* Preset Buttons */}
+          {mode === "buy" ? (
+            <div className="flex items-center gap-1.5 text-xs">
+              {BUY_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => setAmount(String(preset))}
+                  className="flex-1 rounded-[6px] bg-[#1a1b21] border border-[#24262e] py-1.5 font-bold text-zinc-300 hover:border-[#db9d6a] hover:text-[#db9d6a] transition"
+                >
+                  ${preset}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs">
+              {SELL_PRESETS.map((pct) => (
+                <button
+                  key={pct}
+                  type="button"
+                  onClick={() => {
+                    if (balance !== undefined && balance > 0n) {
+                      const sel = (balance * BigInt(pct)) / 100n;
+                      setAmount(formatUnits(sel, 18));
+                    }
+                  }}
+                  className="flex-1 rounded-[6px] bg-[#1a1b21] border border-[#24262e] py-1.5 font-bold text-zinc-300 hover:border-[#ef4444] hover:text-[#ef4444] transition"
+                >
+                  {pct}%
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Estimated Output Readout */}
+          {quote !== undefined && (
+            <div className="rounded-[6px] bg-[#101114] border border-[#24262e] p-2.5 flex items-center justify-between text-xs">
+              <span className="text-zinc-400">ESTIMATED OUTPUT</span>
+              <span className="font-bold text-white">
+                {mode === "buy" ? `${formatToken(quote)} tokens` : formatUsd(quote)}
+              </span>
+            </div>
+          )}
+
+          {/* Error Message */}
+          {insufficientBalance && (
+            <p className="rounded-[6px] border border-red-500/40 bg-[#2b1114] p-2 text-xs text-red-300 font-bold">
+              Insufficient {mode === "buy" ? "USDC" : "Token"} balance
+            </p>
+          )}
+          {error && (
+            <p className="rounded-[6px] border border-red-500/40 bg-[#2b1114] p-2 text-xs text-red-300">
+              {error}
+            </p>
+          )}
+
+          {/* Submit Action Button */}
+          <button
+            type="submit"
+            disabled={disabled}
+            className={`w-full rounded-[8px] py-3 text-xs font-black uppercase tracking-wider transition active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed ${
+              mode === "buy"
+                ? "bg-[#db9d6a] text-[#0e0f12] hover:bg-[#e5ab7a]"
+                : "bg-[#ef4444] text-white hover:bg-[#dc2626]"
+            }`}
+          >
+            {busy
+              ? phase === "approve"
+                ? "Approving Token…"
+                : "Confirming Trade…"
+              : !account
+                ? "Connect wallet to trade"
+                : !parsedAmount || parsedAmount === 0n
+                  ? "Enter an amount"
+                  : needsApproval
+                    ? `Approve & ${mode === "buy" ? "Buy" : "Sell"}`
+                    : `${mode === "buy" ? "Buy" : "Sell"} Now`}
+          </button>
+        </form>
       </div>
 
-      <form onSubmit={submit} className="mt-4 space-y-3">
-        {/* pay field */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 transition-colors focus-within:border-emerald-500/60">
-          <div className="flex items-center justify-between text-xs text-zinc-500">
-            <span>{mode === "buy" ? "You pay" : "You sell"}</span>
-            {account && (
+      {/* 2. Stats & Buy/Sell Ratio Card (Pump.fun style) */}
+      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-3 text-xs">
+        {/* Sub Header: Stats vs Audit */}
+        <div className="flex items-center justify-between border-b border-[#24262e] pb-2">
+          <div className="flex items-center gap-3">
+            <span className="font-bold text-white">Stats</span>
+            <span className="text-zinc-500 hover:text-zinc-300 cursor-pointer">Audit</span>
+          </div>
+          <div className="flex items-center gap-1 text-[10px]">
+            {(["5m", "1h", "24h"] as const).map((tf) => (
               <button
+                key={tf}
                 type="button"
-                onClick={() =>
-                  balance !== undefined &&
-                  setAmount(formatUnits(balance, mode === "buy" ? 6 : 18))
-                }
-                className="font-mono text-emerald-400 hover:text-emerald-300"
-              >
-                MAX{" "}
-                {balance !== undefined
-                  ? formatToken(balance)
-                  : ""}
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <input
-              aria-label={mode === "buy" ? "USDC amount" : "Token amount"}
-              className={inputCls}
-              placeholder="0.00"
-              inputMode="decimal"
-              autoComplete="off"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-            />
-            <span className="shrink-0 text-sm font-semibold text-zinc-400">
-              {mode === "buy" ? "USDC" : "TOKEN"}
-            </span>
-          </div>
-        </div>
-
-        {/* receive field */}
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-950/60 p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-zinc-500">You receive</span>
-            <span
-              className={`font-mono text-lg tabular-nums ${
-                quote !== undefined ? "text-zinc-200" : "text-zinc-600"
-              }`}
-            >
-              {quote !== undefined
-                ? mode === "buy"
-                  ? `${formatToken(quote)} TOKEN`
-                  : formatUsd(quote)
-                : "—"}
-            </span>
-          </div>
-        </div>
-
-        {/* slippage */}
-        <div className="flex items-center justify-between px-1">
-          <span className="text-xs text-zinc-500">Max slippage</span>
-          <div className="flex gap-1">
-            {SLIPPAGE_OPTIONS.map((bps) => (
-              <button
-                key={bps}
-                type="button"
-                onClick={() => setSlippageBps(bps)}
-                aria-pressed={slippageBps === bps}
-                className={`rounded-md px-2 py-0.5 font-mono text-xs tabular-nums transition-colors ${
-                  slippageBps === bps
-                    ? "bg-zinc-700 text-white"
+                onClick={() => setStatsTimeframe(tf)}
+                className={`px-1.5 py-0.5 rounded-[4px] font-bold ${
+                  statsTimeframe === tf
+                    ? "bg-[#1a1b21] text-white border border-[#24262e]"
                     : "text-zinc-500 hover:text-zinc-300"
                 }`}
               >
-                {Number(bps) / 100}%
+                {tf}
               </button>
             ))}
           </div>
         </div>
 
-        {/* details */}
-        {parsedAmount !== undefined && (
-          <dl className="space-y-1.5 border-t border-zinc-800 pt-3 text-xs">
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Min received</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {minOut !== undefined
-                  ? mode === "buy"
-                    ? `${formatToken(minOut)} TOKEN`
-                    : formatUsd(minOut)
-                  : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Trade fee · 1%</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {mode === "buy"
-                  ? formatUsd((parsedAmount * 100n) / BPS_DENOM)
-                  : `${formatToken((parsedAmount * 100n) / BPS_DENOM)} tokens`}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Price impact</dt>
-              <dd
-                className={`font-mono tabular-nums ${
-                  (priceImpactPct ?? 0) > 5 ? "text-amber-400" : "text-zinc-300"
-                }`}
-              >
-                {priceImpactPct !== undefined
-                  ? `${priceImpactPct.toFixed(2)}%`
-                  : "—"}
-              </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-zinc-500">Price</dt>
-              <dd className="font-mono tabular-nums text-zinc-300">
-                {formatPrice(currentPrice)}
-              </dd>
-            </div>
-          </dl>
-        )}
+        {/* Volume & Price Change */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] text-zinc-500 block">Price change</span>
+            <span className="font-bold text-[#4ade80]">↑ 226.0%</span>
+          </div>
+          <div className="text-right">
+            <span className="text-[10px] text-zinc-500 block">Volume</span>
+            <span className="font-bold text-white">$424K</span>
+          </div>
+        </div>
 
-        {!account ? (
-          <p className="rounded-lg bg-zinc-800/60 px-3 py-2 text-xs text-zinc-400">
-            Connect your wallet to trade.
-          </p>
-        ) : null}
-        {insufficientBalance ? (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            Not enough {mode === "buy" ? "USDC" : "tokens"} in your wallet.
-          </p>
-        ) : null}
-        {error && (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-300">
-            {error}
-          </p>
-        )}
+        {/* 2-Color Ratio Bars */}
+        <div className="space-y-2">
+          {/* Buys vs Sells */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-[#4ade80] font-bold">5,632 buys</span>
+              <span className="text-[#ef4444] font-bold">4,530 sells</span>
+            </div>
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full gap-1">
+              <div className="h-full bg-[#4ade80] rounded-full" style={{ width: "55%" }} />
+              <div className="h-full bg-[#ef4444] rounded-full" style={{ width: "45%" }} />
+            </div>
+          </div>
 
-        <button
-          type="submit"
-          disabled={disabled}
-          className={`w-full rounded-xl py-3 text-sm font-bold uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:bg-zinc-800 disabled:text-zinc-500 ${
-            mode === "buy"
-              ? "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
-              : "bg-red-500 text-zinc-950 hover:bg-red-400"
-          }`}
-        >
-          {busy
-            ? phase === "approve"
-              ? "Approving…"
-              : "Trading…"
-            : !account
-              ? "Connect wallet"
-              : !hasAmount(parsedAmount)
-                ? "Enter an amount"
-                : needsApproval
-                  ? `Approve & ${mode}`
-                  : `${mode} now`}
-        </button>
-      </form>
+          {/* Buy Vol vs Sell Vol */}
+          <div className="space-y-1">
+            <div className="flex items-center justify-between text-[11px]">
+              <span className="text-[#4ade80] font-bold">$216K buy vol</span>
+              <span className="text-[#ef4444] font-bold">$207K sell vol</span>
+            </div>
+            <div className="flex h-1.5 w-full overflow-hidden rounded-full gap-1">
+              <div className="h-full bg-[#4ade80] rounded-full" style={{ width: "51%" }} />
+              <div className="h-full bg-[#ef4444] rounded-full" style={{ width: "49%" }} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Bonding Curve Progress Card */}
+      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-2.5 text-xs">
+        <div className="flex items-center justify-between font-bold">
+          <span className="text-zinc-400">
+            MC <span className="text-white">${((progress * 50000) / 100).toFixed(1)}K</span>
+          </span>
+          <span className="text-zinc-400">
+            ATH <span className="text-[#db9d6a]">$50.0K</span>
+          </span>
+        </div>
+        <ProgressBar progress={progress} graduated={false} size="md" />
+        <div className="flex items-center justify-between text-[10px] text-zinc-500">
+          <span>Graduation target: $50,000 USDC</span>
+          <span className="font-bold text-[#db9d6a]">{progress.toFixed(1)}%</span>
+        </div>
+      </div>
+
+      {/* 4. Description Card */}
+      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-2 text-xs">
+        <span className="font-bold text-white block">Description</span>
+        <p className="text-zinc-400 leading-relaxed font-sans">
+          {description || "Created on Arc L1 with virtual USDC constant-product bonding curve."}
+        </p>
+      </div>
+
+      {/* 5. Creator Rewards Card */}
+      {curveAddress && (
+        <CreatorRewardsCard curveAddress={curveAddress} creator={creator} />
+      )}
     </div>
   );
 }
 
-function hasAmount(v: bigint | undefined): boolean {
-  return v !== undefined && v > 0n;
+function CreatorRewardsCard({
+  curveAddress,
+  creator,
+}: {
+  curveAddress: Address;
+  creator?: Address;
+}) {
+  const { address: account } = useAccount();
+  const publicClient = usePublicClient();
+  const [claiming, setClaiming] = useState(false);
+  const [err, setErr] = useState("");
+
+  const isCreator = Boolean(
+    account && creator && account.toLowerCase() === creator.toLowerCase()
+  );
+
+  const earningsQuery = useReadBondingCurveCreatorEarnings({
+    address: curveAddress,
+    args: [account ?? ZERO_ADDRESS],
+    query: { enabled: isCreator },
+  });
+  const { writeContractAsync: claimAsync, isPending } =
+    useWriteBondingCurveClaimCreatorFees();
+
+  return (
+    <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-2 text-xs">
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-white">Creator rewards</span>
+        <span className="text-[10px] text-zinc-500">Coin timeline</span>
+      </div>
+
+      <div className="flex items-center justify-between pt-1">
+        <div className="flex items-center gap-2">
+          <div className="h-6 w-6 rounded-full bg-[#1a1b21] border border-[#24262e] flex items-center justify-center text-xs">
+            👨‍💻
+          </div>
+          <div>
+            <span className="font-bold text-zinc-200 block">
+              {creator ? shortAddress(creator) : "Deployer"}
+            </span>
+            <span className="text-[10px] text-[#db9d6a]">Creator • 100%</span>
+          </div>
+        </div>
+
+        {isCreator && (
+          <button
+            type="button"
+            onClick={async () => {
+              if (!publicClient) return;
+              setErr("");
+              setClaiming(true);
+              try {
+                const hash = await claimAsync({ address: curveAddress });
+                await publicClient.waitForTransactionReceipt({ hash });
+                earningsQuery.refetch();
+              } catch (e) {
+                setErr(e instanceof Error ? e.message.slice(0, 160) : String(e));
+              } finally {
+                setClaiming(false);
+              }
+            }}
+            disabled={claiming || isPending || !earningsQuery.data || earningsQuery.data === 0n}
+            className="rounded-[4px] bg-[#db9d6a] px-2.5 py-1 text-xs font-bold text-[#0e0f12] hover:bg-[#e5ab7a] disabled:opacity-40"
+          >
+            {claiming ? "Claiming…" : "Claim Rewards"}
+          </button>
+        )}
+      </div>
+
+      {err && <p className="text-[10px] text-red-400">{err}</p>}
+    </div>
+  );
 }

@@ -14,6 +14,7 @@ import {
 import { formatToken, formatUsd } from "@/lib/format";
 import { poolPriceFromReserves } from "@/lib/use-venue-price";
 import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
 type Address = `0x${string}`;
 
@@ -77,7 +78,6 @@ export default function PortfolioPage() {
 
 function PortfolioView() {
   const { address: connected } = useAccount();
-  // Optional view-only override: /portfolio?account=0x…
   const forced = useSearchParams().get("account");
   const validated =
     forced && /^0x[0-9a-fA-F]{40}$/.test(forced)
@@ -110,10 +110,10 @@ function PortfolioView() {
 
   if (!address) {
     return (
-      <div className="mx-auto max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-        <h1 className="text-lg font-bold">Portfolio</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Connect your wallet to see positions and P&L.
+      <div className="mx-auto max-w-md rounded-[10px] border border-[#24262e] bg-[#141519] p-8 text-center font-mono">
+        <h1 className="text-base font-bold text-white uppercase tracking-wider">PORTFOLIO TERMINAL</h1>
+        <p className="mt-2 text-xs text-zinc-400">
+          Connect your wallet to track active token holdings, P&amp;L, and creator rewards.
         </p>
       </div>
     );
@@ -154,9 +154,9 @@ function PortfolioBody({
           launch: launches?.find((l) => l.curve === p.curve),
         }))
         .filter((p): p is typeof p & { launch: ApiLaunch } =>
-          Boolean(p.launch),
+          Boolean(p.launch)
         ),
-    [positions, launches],
+    [positions, launches]
   );
 
   const createdLaunches = useMemo(
@@ -164,12 +164,12 @@ function PortfolioBody({
       address === undefined
         ? []
         : (launches ?? []).filter(
-            (l) => l.creator.toLowerCase() === address.toLowerCase(),
+            (l) => l.creator.toLowerCase() === address.toLowerCase()
           ),
-    [launches, address],
+    [launches, address]
   );
 
-  // ---- chain reads (one multicall per group; arrays keyed on nonce) ----
+  // Chain reads for active positions
   const balanceQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
       address: p.launch.token as Address,
@@ -213,7 +213,7 @@ function PortfolioBody({
   const pairAddresses = activePositions.map((p, i) =>
     p.launch.graduated
       ? ((pairQueries.data?.[i]?.result as Address | undefined) ?? ZERO)
-      : ZERO,
+      : ZERO
   );
   const token0Queries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
@@ -254,7 +254,7 @@ function PortfolioBody({
     const poolPrice = poolPriceFromReserves(
       p.launch.token as Address,
       token0Queries.data?.[i]?.result as Address | undefined,
-      reserveQueries.data?.[i]?.result as readonly [bigint, bigint] | undefined,
+      reserveQueries.data?.[i]?.result as readonly [bigint, bigint] | undefined
     );
     const priceRaw = p.launch.graduated ? poolPrice : curvePrice;
     const value =
@@ -273,7 +273,7 @@ function PortfolioBody({
 
   const totalUnclaimed = earningsQueries.data?.reduce(
     (acc, q) => acc + ((q.result as bigint | undefined) ?? 0n),
-    0n,
+    0n
   );
 
   async function claim(curve: Address) {
@@ -290,100 +290,126 @@ function PortfolioBody({
     }
   }
 
-  if (!address) {
-    return (
-      <div className="mx-auto max-w-md rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center">
-        <h1 className="text-lg font-bold">Portfolio</h1>
-        <p className="mt-2 text-sm text-zinc-500">
-          Connect your wallet to see positions and P&amp;L.
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-8">
-      {/* summary */}
+    <div className="space-y-5 font-mono">
+      {/* Header & Stats */}
       <div>
-        <h1 className="text-2xl font-bold">Portfolio</h1>
-        <div className="mt-4 grid grid-cols-3 gap-4">
-          <Stat label="Open positions" value={String(rows.length)} />
-          <Stat label="Current value" value={formatUsd(totalValue)} />
-          <Stat
-            label="Net P&L"
-            value={formatUsd(totalPnl)}
-            tone={
-              totalPnl > 0n
-                ? "text-emerald-400"
-                : totalPnl < 0n
-                  ? "text-red-400"
-                  : ""
-            }
-          />
-        </div>
-        <p className="mt-2 text-xs text-zinc-600">
-          Net P&amp;L = current value − (USDC spent − USDC received). Realized
-          profits are already netted into cost.
+        <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
+          Portfolio
+        </h1>
+        <p className="mt-1 text-xs text-zinc-400">
+          Denominated in <span className="text-[#db9d6a] font-bold">Circle USDC</span> on Arc L1.
         </p>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="rounded-[10px] border border-[#24262e] bg-[#141519] p-4">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">
+              ACTIVE POSITIONS
+            </span>
+            <div className="mt-1 text-xl font-bold text-[#db9d6a]">
+              {rows.length}
+            </div>
+          </div>
+          <div className="rounded-[10px] border border-[#24262e] bg-[#141519] p-4">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">
+              PORTFOLIO VALUE
+            </span>
+            <div className="mt-1 text-xl font-bold text-white">
+              {formatUsd(totalValue)}
+            </div>
+          </div>
+          <div className="rounded-[10px] border border-[#24262e] bg-[#141519] p-4">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-400 block">
+              TOTAL NET P&amp;L
+            </span>
+            <div
+              className={`mt-1 text-xl font-bold ${
+                totalPnl > 0n
+                  ? "text-[#4ade80]"
+                  : totalPnl < 0n
+                    ? "text-[#ef4444]"
+                    : "text-zinc-300"
+              }`}
+            >
+              {totalPnl >= 0n ? `+${formatUsd(totalPnl)}` : formatUsd(totalPnl)}
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* positions */}
-      <section>
-        <h2 className="mb-3 text-sm font-semibold text-zinc-200">Positions</h2>
+      {/* Positions Table */}
+      <section className="space-y-2.5">
+        <h2 className="text-xs font-bold uppercase tracking-wider text-zinc-400">
+          Active Positions Ledger
+        </h2>
         {positions === null ? (
-          <div className="h-24 animate-pulse rounded-xl bg-zinc-900" />
+          <div className="h-28 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
         ) : rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-sm text-zinc-500">
-            No open positions.{" "}
-            <Link href="/" className="text-emerald-400 hover:underline">
-              Explore tokens →
+          <div className="rounded-[10px] border border-[#24262e] p-8 text-center text-xs text-zinc-400 bg-[#141519]">
+            No active positions •{" "}
+            <Link href="/" className="font-bold text-[#db9d6a] hover:underline">
+              Explore floor →
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-[10px] border border-[#24262e] bg-[#141519]">
+            <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-xs text-zinc-500">
-                  <th className="px-4 py-2 font-medium">Token</th>
-                  <th className="px-4 py-2 text-right font-medium">Balance</th>
-                  <th className="px-4 py-2 text-right font-medium">Value</th>
-                  <th className="px-4 py-2 text-right font-medium">Net cost</th>
-                  <th className="px-4 py-2 text-right font-medium">Net P&amp;L</th>
+                <tr className="border-b border-[#24262e] bg-[#101114] text-[10px] font-bold uppercase text-zinc-400">
+                  <th className="px-4 py-3">TOKEN</th>
+                  <th className="px-4 py-3">STATUS</th>
+                  <th className="px-4 py-3 text-right">HOLDINGS</th>
+                  <th className="px-4 py-3 text-right">VALUE</th>
+                  <th className="px-4 py-3 text-right">COST BASIS</th>
+                  <th className="px-4 py-3 text-right">NET P&amp;L</th>
+                  <th className="px-4 py-3 text-right">ACTION</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-[#1a1b22]">
                 {rows.map((r) => (
-                  <tr
-                    key={r.curve}
-                    className="border-b border-zinc-800/50 last:border-0"
-                  >
-                    <td className="px-4 py-2.5 font-semibold">
+                  <tr key={r.curve} className="transition hover:bg-[#1a1b21]">
+                    <td className="px-4 py-3 font-bold text-white">
                       <Link
                         href={`/token/${r.launch.token}`}
-                        className="hover:text-emerald-300"
+                        className="hover:text-[#db9d6a] transition"
                       >
-                        {r.launch.symbol}
+                        ${r.launch.symbol}
                       </Link>
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-zinc-300">
+                    <td className="px-4 py-3">
+                      <StatusBadge graduated={r.launch.graduated} size="xs" />
+                    </td>
+                    <td className="px-4 py-3 text-right text-zinc-300">
                       {formatToken(r.balance)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-zinc-300">
+                    <td className="px-4 py-3 text-right font-bold text-white">
                       {formatUsd(r.value)}
                     </td>
-                    <td className="px-4 py-2.5 text-right font-mono tabular-nums text-zinc-300">
+                    <td className="px-4 py-3 text-right text-zinc-400">
                       {formatUsd(r.invested)}
                     </td>
                     <td
-                      className={`px-4 py-2.5 text-right font-mono tabular-nums ${
+                      className={`px-4 py-3 text-right font-bold ${
                         r.pnl === undefined
                           ? "text-zinc-500"
                           : r.pnl >= 0n
-                            ? "text-emerald-400"
-                            : "text-red-400"
+                            ? "text-[#4ade80]"
+                            : "text-[#ef4444]"
                       }`}
                     >
-                      {r.pnl === undefined ? "—" : formatUsd(r.pnl)}
+                      {r.pnl === undefined
+                        ? "—"
+                        : r.pnl >= 0n
+                          ? `+${formatUsd(r.pnl)}`
+                          : formatUsd(r.pnl)}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <Link
+                        href={`/token/${r.launch.token}`}
+                        className="rounded-[4px] bg-[#db9d6a] px-3 py-1 text-xs font-bold text-[#0e0f12] hover:bg-[#e5ab7a] transition"
+                      >
+                        Trade
+                      </Link>
                     </td>
                   </tr>
                 ))}
@@ -393,45 +419,43 @@ function PortfolioBody({
         )}
       </section>
 
-      {/* creator earnings */}
-      <section>
-        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            Creator earnings ·{" "}
-            <span className="font-normal text-zinc-500">
-              {createdLaunches.length} launch
-              {createdLaunches.length === 1 ? "" : "es"}
-            </span>
+      {/* Creator Fee Claims */}
+      <section className="space-y-2.5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-[#db9d6a]">
+            Creator Earnings (0.25% OF CURVE TRADES)
           </h2>
-          <span className="font-mono text-sm tabular-nums text-emerald-400">
+          <span className="text-xs font-bold text-[#db9d6a]">
             {totalUnclaimed !== undefined
-              ? `${formatUsd(totalUnclaimed)} unclaimed`
+              ? `${formatUsd(totalUnclaimed)} TOTAL UNCLAIMED`
               : ""}
           </span>
         </div>
+
         {earningsQueries.isLoading ? (
-          <div className="h-20 animate-pulse rounded-xl bg-zinc-900" />
+          <div className="h-20 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
         ) : createdLaunches.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-800 p-10 text-center text-sm text-zinc-500">
-            You haven&apos;t launched any tokens.{" "}
-            <Link href="/create" className="text-emerald-400 hover:underline">
-              Launch one →
-            </Link>
+          <div className="rounded-[10px] border border-[#24262e] p-6 text-center text-xs text-zinc-500 bg-[#141519]">
+            No tokens created under this address
           </div>
         ) : (
-          <ul className="space-y-2">
+          <div className="space-y-2">
             {createdLaunches.map((l, i) => {
               const earned = earningsQueries.data?.[i]?.result as
                 | bigint
                 | undefined;
               return (
-                <li
+                <div
                   key={l.curve}
-                  className="flex items-center justify-between rounded-xl border border-zinc-800 bg-zinc-900 px-4 py-3"
+                  className="flex items-center justify-between rounded-[8px] border border-[#24262e] bg-[#141519] px-4 py-3"
                 >
-                  <span className="font-semibold">{l.symbol}</span>
-                  <span className="flex items-center gap-4">
-                    <span className="font-mono text-sm tabular-nums text-emerald-400">
+                  <div className="flex items-center gap-2.5">
+                    <span className="font-bold text-white">${l.symbol}</span>
+                    <span className="text-xs text-zinc-500">{l.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-3.5">
+                    <span className="text-sm font-bold text-[#db9d6a]">
                       {earned !== undefined ? formatUsd(earned) : "—"}
                     </span>
                     <button
@@ -442,48 +466,17 @@ function PortfolioBody({
                         claimingCurve === l.curve
                       }
                       onClick={() => claim(l.curve as Address)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
-                        earned === undefined ||
-                        earned === 0n ||
-                        claimingCurve === l.curve
-                          ? "cursor-not-allowed bg-zinc-800 text-zinc-500"
-                          : "bg-emerald-500 text-emerald-950 hover:bg-emerald-400"
-                      }`}
+                      className="rounded-[4px] bg-[#db9d6a] px-3 py-1 text-xs font-bold text-[#0e0f12] transition hover:bg-[#e5ab7a] disabled:opacity-40 disabled:cursor-not-allowed uppercase"
                     >
                       {claimingCurve === l.curve ? "Claiming…" : "Claim"}
                     </button>
-                  </span>
-                </li>
+                  </div>
+                </div>
               );
             })}
-          </ul>
+          </div>
         )}
-        <p className="mt-2 text-xs text-zinc-600">
-          Creators earn 0.25% of every trade on their token&apos;s bonding
-          curve, claimable any time.
-        </p>
       </section>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-}) {
-  return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div
-        className={`mt-1 font-mono text-xl tabular-nums ${tone ?? "text-zinc-100"}`}
-      >
-        {value}
-      </div>
     </div>
   );
 }

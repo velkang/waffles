@@ -8,7 +8,10 @@ import {
   useReadBondingCurveTotalSupply,
   useReadBondingCurveVirtualUsdc,
 } from "@/generated/contracts-generated";
-import { formatUsd } from "@/lib/format";
+
+const EMERALD = "#4ade80";
+const COPPER = "#db9d6a";
+const BORDER = "#24262e";
 
 const W = 600;
 const H = 220;
@@ -16,11 +19,6 @@ const PAD_X = 8;
 const PAD_TOP = 14;
 const PAD_BOTTOM = 22;
 
-/**
- * The real bonding-curve market-cap trajectory, derived from on-chain
- * constants: with X = v_x + raised and conservation X·Y = k,
- * market cap = X² · totalSupply / k.
- */
 export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
   const { data: k } = useReadBondingCurveK({ address: curveAddress });
   const { data: virtualUsdc } = useReadBondingCurveVirtualUsdc({
@@ -39,16 +37,14 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
     const Vx = Number(virtualUsdc);
     const T = Number(totalSupply);
 
-    // raised needed to reach a given mcap: X = sqrt(mcap * k / T)
     const xAt = (mcap: number) => Math.sqrt((mcap * K) / T);
     const mcapAt = (raised: number) => {
       const X = Vx + raised;
       return (X * X * T) / K;
     };
 
-    // domain: up to the raise where mcap hits ~1.15x of a sensible ceiling
     const startMcap = mcapAt(0);
-    const ceiling = Math.max(startMcap * 25, startMcap * 1.05); // full curve range
+    const ceiling = Math.max(startMcap * 25, startMcap * 1.05);
     const raisedMax = xAt(ceiling) - Vx;
 
     const points: Array<[number, number]> = [];
@@ -69,11 +65,8 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
     const path = points
       .map(([r, m], i) => `${i === 0 ? "M" : "L"}${sx(r)},${sy(m)}`)
       .join(" ");
-    const area = `${path} L${sx(raisedMax)},${H - PAD_BOTTOM} L${sx(0)},${
-      H - PAD_BOTTOM
-    } Z`;
 
-    return { path, area, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T };
+    return { path, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T };
   }, [k, virtualUsdc, totalSupply]);
 
   const { data: graduated } = useReadBondingCurveGraduated({
@@ -88,42 +81,46 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
   }, [chart, reserveUsdc]);
 
   return (
-    <figure>
+    <figure className="w-full">
       <svg
         viewBox={`0 0 ${W} ${H}`}
-        className="w-full"
+        className="w-full select-none"
         role="img"
         aria-label="Bonding curve market cap trajectory"
       >
-        <defs>
-          <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#34d399" stopOpacity="0.18" />
-            <stop offset="100%" stopColor="#34d399" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-
-        {/* baseline */}
+        {/* Baseline */}
         <line
           x1={PAD_X}
           y1={H - PAD_BOTTOM}
           x2={W - PAD_X}
           y2={H - PAD_BOTTOM}
-          stroke="#27272a"
+          stroke={BORDER}
           strokeWidth="1"
+        />
+
+        {/* Graduation Threshold Target Line */}
+        <line
+          x1={W - PAD_X}
+          y1={PAD_TOP}
+          x2={W - PAD_X}
+          y2={H - PAD_BOTTOM}
+          stroke={EMERALD}
+          strokeWidth="1"
+          strokeDasharray="4 3"
+          opacity="0.8"
         />
 
         {chart && (
           <>
-            <path d={chart.area} fill="url(#curveFill)" />
             <path
               d={chart.path}
               fill="none"
-              stroke="#34d399"
-              strokeWidth="2"
+              stroke={COPPER}
+              strokeWidth="2.5"
               strokeLinecap="round"
             />
 
-            {/* current position */}
+            {/* Current Position Marker (Solid flat) */}
             {reserveUsdc !== undefined &&
               now &&
               isFinite(now.x) &&
@@ -134,20 +131,12 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
                     y1={now.y}
                     x2={now.x}
                     y2={H - PAD_BOTTOM}
-                    stroke="#34d399"
-                    strokeOpacity="0.35"
-                    strokeDasharray="3 4"
+                    stroke={COPPER}
+                    strokeOpacity="0.7"
+                    strokeDasharray="3 3"
                   />
-                  <circle cx={now.x} cy={now.y} r="5" fill="#34d399">
-                    {!graduated && (
-                      <animate
-                        attributeName="r"
-                        values="4;6;4"
-                        dur="2s"
-                        repeatCount="indefinite"
-                      />
-                    )}
-                  </circle>
+                  <circle cx={now.x} cy={now.y} r="5" fill={COPPER} />
+                  <circle cx={now.x} cy={now.y} r="8" fill="none" stroke={COPPER} strokeWidth="1" opacity="0.6" />
                 </g>
               )}
           </>
@@ -158,33 +147,23 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
           y={H - 6}
           fontSize="10"
           fill="#71717a"
-          fontFamily="var(--font-geist-mono)"
+          fontFamily="monospace"
+          fontWeight="500"
         >
-          $0 raised
+          $0 RAISED
         </text>
         <text
           x={W - PAD_X}
           y={H - 6}
           fontSize="10"
-          fill="#71717a"
+          fill="#4ade80"
           textAnchor="end"
-          fontFamily="var(--font-geist-mono)"
+          fontFamily="monospace"
+          fontWeight="700"
         >
-          {chart
-            ? `${formatUsd(
-                BigInt(
-                  Math.round(
-                    ((chart.Vx + chart.raisedMax) ** 2 * chart.T) / chart.K,
-                  ),
-                ),
-              )} raised`
-            : ""}
+          $50,000 GRADUATION TARGET
         </text>
       </svg>
-      <figcaption className="mt-1 text-center text-xs text-zinc-600">
-        Market cap as a function of USDC raised — the live curve, not a price
-        history
-      </figcaption>
     </figure>
   );
 }

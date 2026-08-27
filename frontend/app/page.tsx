@@ -2,308 +2,372 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { formatUnits } from "viem";
-import { useReadContracts } from "wagmi";
-import {
-  launchFactoryAbi,
-  memeTokenAbi,
-  useReadBondingCurveGraduationProgressBps,
-  useReadLaunchFactoryAllTokensLength,
-} from "@/generated/contracts-generated";
-import { FACTORY_ADDRESS } from "@/lib/wagmi";
-import { useVenuePrice } from "@/lib/use-venue-price";
+import { formatPrice, formatToken, formatUsd, shortAddress } from "@/lib/format";
+import { getOptimizedImageUrl } from "@/lib/image";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { TrendingCarousel } from "@/components/explore/TrendingCarousel";
 
-type Address = `0x${string}`;
-
-type ApiLaunch = {
-  token: string;
-  curve: string;
-  creator: string;
+type TokenItem = {
+  token: `0x${string}`;
+  curve: `0x${string}`;
+  creator: `0x${string}`;
   name: string;
   symbol: string;
-  imageUri?: string;
+  description: string;
+  imageUri: string;
+  website: string;
+  twitter: string;
+  telegram: string;
+  createdAt: number;
   graduated?: boolean;
-  createdAt: string;
+  mcap?: string;
+  price?: string;
   volume24h?: string;
+  progressBps?: number;
 };
 
-function formatUsd(raw: bigint | undefined) {
-  if (raw === undefined) return "—";
-  const n = Number(formatUnits(raw, 6));
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  if (n >= 1_000) return `$${(n / 1_000).toFixed(1)}K`;
-  return `$${n.toFixed(2)}`;
-}
+const CATEGORIES = [
+  { id: "movers", label: "🌟 Movers" },
+  { id: "mayhem", label: "🔥 Mayhem" },
+  { id: "new", label: "🌱 New" },
+  { id: "charities", label: "💖 Charities" },
+  { id: "live", label: "🎬 Live" },
+  { id: "mcap", label: "💰 Market cap" },
+  { id: "agents", label: "🤖 Agents" },
+  { id: "oldest", label: "🪐 Oldest" },
+  { id: "last_trade", label: "💥 Last trade" },
+] as const;
 
-function formatVolume(raw: string | undefined) {
-  if (!raw || raw === "0") return undefined;
-  const n = Number(raw);
-  if (Number.isNaN(n)) return undefined;
-  return formatUsd(BigInt(Math.round(n)));
-}
-
-function TokenRow({
-  token,
-  curve,
-  symbol,
-  imageUri,
-  volume24h,
-}: {
-  token: Address;
-  curve: Address;
-  symbol?: string;
-  imageUri?: string;
-  volume24h?: string;
-}) {
-  const venue = useVenuePrice(token, curve);
-  const { data: progressBps } = useReadBondingCurveGraduationProgressBps({
-    address: curve,
-  });
-  const { data: chainSymbol } = useReadContracts({
-    contracts: [
-      {
-        address: token,
-        abi: memeTokenAbi,
-        functionName: "symbol" as const,
-      },
-    ],
-    query: { enabled: !symbol },
-  });
-  const resolvedSymbol =
-    symbol ??
-    ((chainSymbol?.[0]?.result as string | undefined) ?? "");
-
-  const progress = progressBps !== undefined ? Number(progressBps) / 100 : 0;
-  const vol = formatVolume(volume24h);
-
-  return (
-    <Link
-      href={`/token/${token}`}
-      className="block rounded-xl border border-zinc-800 bg-zinc-900 p-4 transition hover:border-emerald-500/50"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {imageUri ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imageUri}
-              alt=""
-              className="h-10 w-10 rounded-full border border-zinc-800 object-cover"
-            />
-          ) : (
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-600 font-bold text-zinc-950">
-              {(resolvedSymbol || "?").slice(0, 2)}
-            </div>
-          )}
-          <div>
-            <div className="font-semibold">
-              {resolvedSymbol || "…"}
-              <span className="text-zinc-500"> / USDC</span>
-            </div>
-            <div className="font-mono text-xs text-zinc-500">
-              {token.slice(0, 6)}…{token.slice(-4)}
-            </div>
-          </div>
-        </div>
-        <div className="text-right">
-          <div className="font-mono">{formatUsd(venue.mcap)}</div>
-          <div className="text-xs text-zinc-500">
-            MC{vol ? ` · ${vol} 24h` : ""}
-          </div>
-        </div>
-      </div>
-      <div className="mt-3">
-        <div className="h-1.5 overflow-hidden rounded-full bg-zinc-800">
-          <div
-            className={`h-full rounded-full ${
-              venue.graduated ? "bg-violet-400" : "bg-emerald-400"
-            }`}
-            style={{ width: `${Math.min(progress, 100)}%` }}
-          />
-        </div>
-        <div className="mt-1 flex justify-between text-xs text-zinc-500">
-          <span>{venue.graduated ? "Graduated" : `Bonding curve ${progress.toFixed(1)}%`}</span>
-          <span>{venue.graduated ? "Trades on DEX" : "Graduates at $50K MC"}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-/// Polls the indexer's launch index; null while unavailable.
-function useApiLaunches(sort: "new" | "volume") {
-  const [state, setState] = useState<{
-    launches: ApiLaunch[] | null;
-    available: boolean;
-  }>({ launches: null, available: true });
+export default function ExplorePage() {
+  const [tokens, setTokens] = useState<TokenItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>("movers");
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
 
   useEffect(() => {
     let cancelled = false;
 
-    async function poll() {
+    async function load() {
       try {
-        const res = await fetch(`/api/launches?sort=${sort}&limit=100`);
+        const res = await fetch(`/api/launches?limit=100`);
         if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { launches: ApiLaunch[] };
-        if (!cancelled)
-          setState({ launches: data.launches ?? [], available: true });
-      } catch {
-        if (!cancelled) setState((s) => ({ ...s, available: false }));
+        const data = await res.json();
+        if (!cancelled && data.launches) {
+          setTokens(data.launches);
+        }
+      } catch (err) {
+        console.error("Failed to load launches:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
     }
 
-    poll();
-    const id = setInterval(poll, 15_000);
+    load();
+    const id = setInterval(load, 10000);
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [sort]);
+  }, []);
 
-  return state;
-}
+  // Filter & Sort based on active category
+  const filteredTokens = useMemo(() => {
+    const list = [...tokens];
+    switch (selectedCategory) {
+      case "new":
+        return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+      case "oldest":
+        return list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      case "mcap":
+        return list.sort((a, b) => Number(BigInt(b.mcap || 0) - BigInt(a.mcap || 0)));
+      case "mayhem":
+      case "last_trade":
+        return list.sort(
+          (a, b) => Number(BigInt(b.volume24h || 0) - BigInt(a.volume24h || 0))
+        );
+      case "live":
+        return list.filter((t) => (t.progressBps ?? 0) >= 5000);
+      case "movers":
+      default:
+        return list.sort((a, b) => (b.progressBps ?? 0) - (a.progressBps ?? 0));
+    }
+  }, [tokens, selectedCategory]);
 
-export default function Home() {
-  const [sort, setSort] = useState<"new" | "volume">("new");
-  const api = useApiLaunches(sort);
-
-  // ---- fallback path: read everything from the chain ----
-  const { data: length } = useReadLaunchFactoryAllTokensLength({
-    address: FACTORY_ADDRESS,
-  });
-
-  const indices = useMemo(() => {
-    const n = Number(length ?? 0);
-    return Array.from({ length: n }, (_, i) => BigInt(n - 1 - i));
-  }, [length]);
-
-  const tokensQuery = useReadContracts({
-    contracts: indices.map((i) => ({
-      address: FACTORY_ADDRESS,
-      abi: launchFactoryAbi,
-      functionName: "allTokens" as const,
-      args: [i] as const,
-    })),
-    query: { enabled: indices.length > 0 && !api.available },
-  });
-
-  const tokenAddresses = useMemo(
-    () =>
-      (tokensQuery.data ?? [])
-        .map((r) => r.result as Address | undefined)
-        .filter((a): a is Address => Boolean(a)),
-    [tokensQuery.data],
-  );
-
-  const launchesQuery = useReadContracts({
-    contracts: tokenAddresses.map((token) => ({
-      address: FACTORY_ADDRESS,
-      abi: launchFactoryAbi,
-      functionName: "launchOfToken" as const,
-      args: [token] as const,
-    })),
-    query: { enabled: tokenAddresses.length > 0 && !api.available },
-  });
-
-  const chainLaunches = useMemo(() => {
-    return (launchesQuery.data ?? [])
-      .map((r) =>
-        r.result as readonly [
-          Address,
-          Address,
-          Address,
-          ...unknown[],
-        ]
-        | undefined,
-      )
-      .filter(
-        (l): l is readonly [Address, Address, Address, ...unknown[]] =>
-          Boolean(l),
-      )
-      .map((l) => ({ token: l[0], curve: l[1] }));
-  }, [launchesQuery.data]);
-
-  if (!FACTORY_ADDRESS) {
-    return (
-      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-6 text-amber-300">
-        Factory address not configured. Set{" "}
-        <code className="font-mono">NEXT_PUBLIC_FACTORY_ADDRESS</code> in{" "}
-        <code className="font-mono">.env.local</code> and deploy the contracts.
-      </div>
-    );
-  }
-
-  const usingApi = api.available && api.launches !== null && api.launches.length > 0;
+  // Trending tokens for top carousel (top 6 by mcap or volume)
+  const trendingTokens = useMemo(() => {
+    return [...tokens]
+      .sort((a, b) => Number(BigInt(b.mcap || 0) - BigInt(a.mcap || 0)))
+      .slice(0, 8);
+  }, [tokens]);
 
   return (
-    <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold">
-          {sort === "new" ? "Live on Arc" : "Trending on Arc"}
-        </h1>
-        <div className="flex gap-1 rounded-lg bg-zinc-900 p-1">
-          {(["new", "volume"] as const).map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => setSort(s)}
-              aria-pressed={sort === s}
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                sort === s
-                  ? "bg-zinc-700 text-white"
-                  : "text-zinc-500 hover:text-zinc-300"
-              }`}
-            >
-              {s === "new" ? "New" : "Trending"}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {!usingApi && !api.available && (
-        <p className="mb-4 rounded-lg bg-zinc-900 px-3 py-2 text-xs text-zinc-600">
-          Indexer offline — showing on-chain launch registry without volumes.
-        </p>
+    <div className="space-y-6">
+      {/* 1. Trending Now Carousel */}
+      {trendingTokens.length > 0 && (
+        <TrendingCarousel tokens={trendingTokens} />
       )}
 
-      {usingApi ? (
-        api.launches!.length === 0 ? (
-          <EmptyState />
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {api.launches!.map((l) => (
-              <TokenRow
-                key={l.token}
-                token={l.token as Address}
-                curve={l.curve as Address}
-                symbol={l.symbol}
-                imageUri={l.imageUri || undefined}
-                volume24h={l.volume24h}
+      {/* 2. Explore Coins Section */}
+      <section className="space-y-4">
+        {/* Section Heading & Category Filter Ribbon */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h1 className="text-lg font-bold text-white tracking-wide">
+              Explore coins
+            </h1>
+            
+            {/* View Mode Switcher */}
+            <div className="flex items-center gap-1 rounded-[6px] border border-[#24262e] bg-[#141519] p-0.5 text-xs font-mono">
+              <button
+                type="button"
+                onClick={() => setViewMode("grid")}
+                className={`flex items-center gap-1 rounded-[4px] px-2.5 py-1 font-bold transition ${
+                  viewMode === "grid"
+                    ? "bg-[#db9d6a] text-[#0e0f12]"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+                title="Grid view"
+              >
+                <span>▦</span> Grid
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("table")}
+                className={`flex items-center gap-1 rounded-[4px] px-2.5 py-1 font-bold transition ${
+                  viewMode === "table"
+                    ? "bg-[#db9d6a] text-[#0e0f12]"
+                    : "text-zinc-400 hover:text-white"
+                }`}
+                title="Table view"
+              >
+                <span>☰</span> Table
+              </button>
+            </div>
+          </div>
+
+          {/* Horizontal Scrollable Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {CATEGORIES.map((cat) => {
+              const active = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setSelectedCategory(cat.id)}
+                  className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition ${
+                    active
+                      ? "bg-[#db9d6a] text-[#0e0f12] font-bold"
+                      : "bg-[#141519] text-zinc-400 hover:text-white border border-[#24262e] hover:border-[#383a45]"
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 3. Tokens Content (Grid or Table View) */}
+        {loading ? (
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {[...Array(12)].map((_, i) => (
+              <div
+                key={i}
+                className="aspect-square rounded-[10px] bg-[#141519] border border-[#24262e] animate-pulse"
               />
             ))}
           </div>
-        )
-      ) : chainLaunches.length === 0 ? (
-        <EmptyState />
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {chainLaunches.map((l) => (
-            <TokenRow key={l.token} token={l.token} curve={l.curve} />
-          ))}
-        </div>
-      )}
+        ) : filteredTokens.length === 0 ? (
+          <div className="rounded-[10px] border border-[#24262e] bg-[#141519] p-12 text-center text-xs text-zinc-400">
+            No tokens found in this category. Be the first to deploy!
+          </div>
+        ) : viewMode === "grid" ? (
+          /* Media-Forward Grid Cards (Pump.fun style) */
+          <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            {filteredTokens.map((t) => {
+              const progress = (t.progressBps ?? 0) / 100;
+              const isLive = progress >= 50;
+
+              return (
+                <Link
+                  key={t.token}
+                  href={`/token/${t.token}`}
+                  className={`group flex flex-col rounded-[10px] bg-[#141519] border overflow-hidden transition hover:border-[#db9d6a] ${
+                    isLive ? "border-[#4ade80]/40" : "border-[#24262e]"
+                  }`}
+                >
+                  {/* Square Token Image */}
+                  <div className="relative aspect-square w-full bg-[#1a1b21] overflow-hidden">
+                    {t.imageUri ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={getOptimizedImageUrl(t.imageUri, {
+                          width: 300,
+                          height: 300,
+                          quality: 75,
+                        })}
+                        alt={t.name}
+                        className="h-full w-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center font-black text-2xl text-[#db9d6a]">
+                        ${t.symbol.slice(0, 3)}
+                      </div>
+                    )}
+
+                    {/* Live Stream Indicator Badge */}
+                    {isLive && (
+                      <span className="absolute top-2 right-2 rounded-[4px] bg-[#14291e]/90 border border-[#4ade80] px-1.5 py-0.5 text-[9px] font-bold text-[#4ade80] flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Token Info Stack */}
+                  <div className="p-2.5 flex flex-col flex-1 justify-between gap-1.5">
+                    <div>
+                      <div className="font-bold text-white text-sm truncate">
+                        {t.name}
+                      </div>
+                      <div className="text-xs text-zinc-400 truncate">
+                        ${t.symbol}
+                      </div>
+                    </div>
+
+                    <div className="text-xs font-black text-white">
+                      {formatUsd(BigInt(t.mcap || 0))} <span className="text-[10px] font-normal text-zinc-400">MC</span>
+                    </div>
+
+                    {/* Creator Tag */}
+                    <div className="flex items-center gap-1 text-[11px] text-zinc-400 truncate">
+                      <span className="truncate">{shortAddress(t.creator)}</span>
+                      <span>🌿</span>
+                      <span>{t.createdAt ? timeAgo(t.createdAt) : "now"}</span>
+                    </div>
+
+                    {/* Description Snippet */}
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-tight">
+                      {t.description || "Fair launch token on Arc L1."}
+                    </p>
+
+                    {/* Bottom Progress Bar */}
+                    <div className="pt-1">
+                      <ProgressBar progress={progress} graduated={t.graduated} size="sm" showTicks={false} />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ) : (
+          /* Dense Table View */
+          <div className="overflow-x-auto rounded-[10px] border border-[#24262e] bg-[#141519]">
+            <table className="w-full text-left text-xs font-mono">
+              <thead>
+                <tr className="border-b border-[#24262e] bg-[#101114] text-[10px] font-bold uppercase text-zinc-400">
+                  <th className="px-4 py-3">TOKEN</th>
+                  <th className="px-4 py-3">STATUS</th>
+                  <th className="px-4 py-3 text-right">PRICE (USDC)</th>
+                  <th className="px-4 py-3 text-right">MARKET CAP</th>
+                  <th className="px-4 py-3 text-right">24H VOLUME</th>
+                  <th className="px-4 py-3 text-right">CURVE PROGRESS</th>
+                  <th className="px-4 py-3 text-right">ACTION</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#1a1b22]">
+                {filteredTokens.map((t) => {
+                  const progress = (t.progressBps ?? 0) / 100;
+                  return (
+                    <tr
+                      key={t.token}
+                      className="transition hover:bg-[#1a1b21]"
+                    >
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/token/${t.token}`}
+                          className="flex items-center gap-2.5 group"
+                        >
+                          {t.imageUri ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={getOptimizedImageUrl(t.imageUri, {
+                                width: 64,
+                                height: 64,
+                                quality: 75,
+                              })}
+                              alt=""
+                              className="h-8 w-8 rounded-[6px] object-cover bg-[#0e0f12]"
+                            />
+                          ) : (
+                            <div className="flex h-8 w-8 items-center justify-center rounded-[6px] bg-[#1a1b21] border border-[#24262e] font-bold text-xs text-[#db9d6a]">
+                              {t.symbol.slice(0, 3)}
+                            </div>
+                          )}
+                          <div>
+                            <div className="font-bold text-white group-hover:text-[#db9d6a] transition-colors">
+                              ${t.symbol}
+                            </div>
+                            <div className="text-[11px] text-zinc-400 font-sans truncate max-w-[120px]">
+                              {t.name}
+                            </div>
+                          </div>
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3">
+                        <StatusBadge
+                          graduated={t.graduated}
+                          progress={progress}
+                          size="xs"
+                        />
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-white">
+                        {t.price ? formatPrice(BigInt(t.price)) : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-[#db9d6a]">
+                        {formatUsd(BigInt(t.mcap || 0))}
+                      </td>
+                      <td className="px-4 py-3 text-right text-zinc-300">
+                        {formatUsd(BigInt(t.volume24h || 0))}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="inline-flex flex-col items-end gap-1 w-24">
+                          <span className="text-[10px] text-zinc-400">
+                            {progress.toFixed(1)}%
+                          </span>
+                          <ProgressBar
+                            progress={progress}
+                            graduated={t.graduated}
+                            size="sm"
+                            showTicks={false}
+                          />
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <Link
+                          href={`/token/${t.token}`}
+                          className="rounded-[4px] bg-[#db9d6a] px-3 py-1 text-xs font-bold text-[#0e0f12] hover:bg-[#e5ab7a] transition"
+                        >
+                          Trade
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function EmptyState() {
-  return (
-    <div className="rounded-xl border border-dashed border-zinc-800 p-12 text-center text-zinc-500">
-      No tokens yet. Be the first —{" "}
-      <Link href="/create" className="text-emerald-400 hover:underline">
-        create one
-      </Link>
-      .
-    </div>
-  );
+function timeAgo(timestamp: number): string {
+  const s = Math.max(0, Math.floor(Date.now() / 1000 - timestamp));
+  if (s < 60) return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h`;
+  return `${Math.floor(s / 86400)}d`;
 }

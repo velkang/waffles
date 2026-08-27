@@ -2,9 +2,15 @@ import { ImageResponse } from "next/og";
 import { getAddress } from "viem";
 import { getTokenSummary } from "@/lib/server/chain";
 
-export const alt = "Token card on arc.fun";
+export const alt = "Token on arc.fun";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+
+const CYAN = "#00b4d8";
+const EMERALD = "#00e599";
+const AMBER = "#ffb703";
+const TEXT_WHITE = "#ffffff";
+const TEXT_MUTED = "#94a3b8";
 
 function fmtUsd(raw: bigint | undefined): string {
   if (raw === undefined) return "—";
@@ -32,7 +38,7 @@ export default async function OgImage({
   try {
     token = await getTokenSummary(getAddress(address));
   } catch {
-    // fall through to generic render
+    // fall through
   }
 
   if (!token || !token.symbol) {
@@ -45,17 +51,19 @@ export default async function OgImage({
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            background: "#09090b",
-            color: "#f4f4f5",
+            background: "#080b11",
+            color: TEXT_WHITE,
             padding: 64,
             fontSize: 48,
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline" }}>
-            <span style={{ fontWeight: 900 }}>arc</span>
-            <span style={{ fontWeight: 900, color: "#34d399" }}>.fun</span>
+            <span style={{ fontWeight: 700 }}>arc</span>
+            <span style={{ fontWeight: 700, color: CYAN }}>.fun</span>
           </div>
-          <div style={{ color: "#71717a", fontSize: 28 }}>Launch tokens on Arc</div>
+          <div style={{ color: TEXT_MUTED, fontSize: 28 }}>
+            Permissionless Token Launchpad on Arc L1
+          </div>
         </div>
       ),
       size,
@@ -63,7 +71,7 @@ export default async function OgImage({
   }
 
   const progressPct = Math.min(token.progressBps / 100, 100);
-  const initials = token.symbol.slice(0, 2).toUpperCase();
+  const initials = token.symbol.slice(0, 3).toUpperCase();
 
   return new ImageResponse(
     (
@@ -74,13 +82,12 @@ export default async function OgImage({
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
-          background:
-            "linear-gradient(135deg, #09090b 0%, #0c1512 55%, #071410 100%)",
+          background: "#080b11",
           padding: 64,
-          color: "#f4f4f5",
+          color: TEXT_WHITE,
         }}
       >
-        {/* header */}
+        {/* Header */}
         <div
           style={{
             display: "flex",
@@ -91,16 +98,17 @@ export default async function OgImage({
           <div style={{ display: "flex", alignItems: "center", gap: 24 }}>
             <div
               style={{
-                width: 96,
-                height: 96,
-                borderRadius: 9999,
-                background: "linear-gradient(135deg, #34d399, #0891b2)",
+                width: 88,
+                height: 88,
+                borderRadius: 4,
+                border: "2px solid #581c87",
+                background: "#2e1065",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 40,
-                fontWeight: 900,
-                color: "#09090b",
+                fontSize: 36,
+                fontWeight: 700,
+                color: "#c084fc",
               }}
             >
               {initials}
@@ -115,42 +123,40 @@ export default async function OgImage({
                   alignItems: "baseline",
                 }}
               >
-                {token.symbol} <span style={{ color: "#71717a" }}>/ USDC</span>
+                {token.symbol} <span style={{ color: CYAN, marginLeft: 8 }}>/ USDC</span>
               </div>
-              <div style={{ fontSize: 24, color: "#a1a1aa" }}>
-                {token.name}
-              </div>
+              <div style={{ fontSize: 24, color: TEXT_MUTED }}>{token.name}</div>
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", fontSize: 36 }}>
-            <span style={{ fontWeight: 900 }}>arc</span>
-            <span style={{ fontWeight: 900, color: "#34d399" }}>.fun</span>
+            <span style={{ fontWeight: 700 }}>arc</span>
+            <span style={{ fontWeight: 700, color: CYAN }}>.fun</span>
           </div>
         </div>
 
-        {/* middle: price + mcap */}
+        {/* Middle Stats */}
         <div style={{ display: "flex", flexDirection: "row", gap: 64 }}>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 26, color: "#71717a" }}>Price</div>
+            <div style={{ fontSize: 22, color: TEXT_MUTED }}>Price</div>
             <div
               style={{
-                fontSize: 84,
-                fontWeight: 700,
-                fontVariantNumeric: "tabular-nums",
+                fontSize: 72,
+                fontWeight: 800,
                 letterSpacing: "-0.02em",
+                color: TEXT_WHITE,
               }}
             >
               {fmtPrice(token.priceRaw)}
             </div>
           </div>
           <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ fontSize: 26, color: "#71717a" }}>Market cap</div>
+            <div style={{ fontSize: 22, color: TEXT_MUTED }}>Market Cap</div>
             <div
               style={{
-                fontSize: 84,
-                fontWeight: 700,
-                fontVariantNumeric: "tabular-nums",
+                fontSize: 72,
+                fontWeight: 800,
                 letterSpacing: "-0.02em",
+                color: CYAN,
               }}
             >
               {fmtUsd(token.mcapRaw)}
@@ -162,58 +168,58 @@ export default async function OgImage({
                 display: "flex",
                 alignItems: "center",
                 alignSelf: "flex-end",
-                marginBottom: 18,
-                padding: "8px 20px",
-                borderRadius: 9999,
-                background: "rgba(139,92,246,0.2)",
-                color: "#c4b5fd",
-                fontSize: 26,
-                fontWeight: 600,
+                marginBottom: 16,
+                padding: "8px 16px",
+                borderRadius: 4,
+                background: "#003824",
+                color: EMERALD,
+                border: `1px solid ${EMERALD}`,
+                fontSize: 20,
+                fontWeight: 700,
               }}
             >
-              🎓 Graduated
+              GRADUATED TO DEX
             </div>
           )}
         </div>
 
-        {/* footer: curve progress */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        {/* Footer: Progress */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
-              fontSize: 24,
-              color: "#a1a1aa",
+              fontSize: 20,
+              color: TEXT_MUTED,
             }}
           >
-            <span>Bonding curve</span>
-            <span>{progressPct.toFixed(1)}%</span>
+            <span>Bonding Curve Progress</span>
+            <span style={{ color: token.graduated ? EMERALD : CYAN, fontWeight: 700 }}>
+              {token.graduated ? "100%" : `${progressPct.toFixed(1)}%`}
+            </span>
           </div>
           <div
             style={{
               width: "100%",
-              height: 12,
-              background: "#18181b",
-              borderRadius: 9999,
+              height: 10,
+              borderRadius: 4,
+              background: "#1a2333",
               display: "flex",
+              overflow: "hidden",
             }}
           >
             <div
               style={{
                 width: `${progressPct}%`,
                 height: "100%",
-                background: token.graduated ? "#a78bfa" : "#34d399",
-                borderRadius: 9999,
+                background: token.graduated ? EMERALD : CYAN,
+                borderRadius: 4,
               }}
             />
           </div>
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span style={{ fontSize: 22, color: "#52525b" }}>
-              Trade with USDC on Arc — every number in dollars.
-            </span>
-            <span style={{ fontSize: 22, color: "#52525b" }}>
-              Graduates at $50K market cap
-            </span>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 18, color: "#64748b" }}>
+            <span>Circle USDC-Native Token on Arc L1</span>
+            <span style={{ color: AMBER }}>$50,000 Graduation Target</span>
           </div>
         </div>
       </div>
