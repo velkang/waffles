@@ -7,15 +7,15 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ILiquidityMigrator} from "./interfaces/ILiquidityMigrator.sol";
 
-/// @notice Virtual constant-product bonding curve quoted in USDC.
+/// @notice Virtual constant-product bonding curve quoted in USDC for waffles.meme.
 ///         (x + v_x)(y + v_y) = k, where x/y are real reserves held by this
 ///         contract and v_x/v_y are virtual reserves fixed at deployment.
 ///         The entire token supply is held here, but `reserveTokens` of it is
-///         never sellable (pump.fun-style): the reserve, any unsold balance,
+///         never sellable: the reserve, any unsold balance,
 ///         and the raised USDC together seed DEX liquidity at graduation.
 ///         When market cap reaches the graduation threshold the remaining
 ///         assets are handed to an ILiquidityMigrator and the curve closes.
-contract BondingCurve is ReentrancyGuard {
+contract WafflesBondingCurve is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOM = 10_000;
@@ -35,7 +35,6 @@ contract BondingCurve is ReentrancyGuard {
     uint256 public immutable graduationMcap; // raw quote units
     uint256 public immutable feeBps; // total trade fee, e.g. 100 = 1%
     uint256 public immutable protocolFeeBps; // share of fee to treasury
-    // remainder of fee goes to creator
 
     uint256 public reserveUsdc; // real quote reserves (net of fees)
     bool public graduated;
@@ -51,7 +50,8 @@ contract BondingCurve is ReentrancyGuard {
         uint256 usdcAmount,
         uint256 tokenAmount,
         uint256 priceAfter,
-        uint256 mcapAfter
+        uint256 mcapAfter,
+        uint256 progressBpsAfter
     );
     event Graduated(address pool);
     event CreatorFeesClaimed(address indexed creator, uint256 amount);
@@ -137,8 +137,6 @@ contract BondingCurve is ReentrancyGuard {
     }
 
     /// @notice Quote tokens received for spending `usdcIn` (fee-inclusive).
-    ///         Capped at the sellable balance: a draining buy only consumes
-    ///         the USDC needed to complete the curve.
     function quoteBuy(uint256 usdcIn) public view returns (uint256) {
         if (graduated) revert CurveClosed();
         uint256 netIn = usdcIn - (usdcIn * feeBps) / BPS_DENOM;
@@ -208,7 +206,8 @@ contract BondingCurve is ReentrancyGuard {
             usdcAmount: consumed,
             tokenAmount: tokensOut,
             priceAfter: priceAfter,
-            mcapAfter: mcapAfter
+            mcapAfter: mcapAfter,
+            progressBpsAfter: graduationProgressBps()
         });
         _settleGraduation();
         return tokensOut;
@@ -241,7 +240,8 @@ contract BondingCurve is ReentrancyGuard {
             usdcAmount: grossOut,
             tokenAmount: tokensIn,
             priceAfter: currentPrice(),
-            mcapAfter: marketCap()
+            mcapAfter: marketCap(),
+            progressBpsAfter: graduationProgressBps()
         });
         return netOut;
     }
@@ -252,8 +252,6 @@ contract BondingCurve is ReentrancyGuard {
         return !graduated && marketCap() >= graduationMcap;
     }
 
-    /// @notice Permissionless once the threshold is reached; also called
-    ///         automatically after a crossing buy.
     function graduate() external nonReentrant returns (address pool) {
         if (!canGraduate()) revert ThresholdNotReached();
         return _graduate();

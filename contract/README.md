@@ -1,6 +1,6 @@
-# ArcFun Contracts
+# waffles.meme Contracts
 
-Foundry workspace for the ArcFun launch factory, bonding curve, graduation AMM,
+Foundry workspace for the waffles.meme launch factory, bonding curve, graduation AMM,
 router, deployment scripts, and Solidity tests.
 
 ## Dependencies
@@ -52,14 +52,6 @@ Broadcast after the dry run succeeds:
 
 ```shell
 forge script script/Deploy.s.sol:Deploy --rpc-url "$ARC_TESTNET_RPC" --account "$FOUNDRY_ACCOUNT" --broadcast
-```
-
-To add the safe router to an existing deployment, set `AMM_FACTORY_ADDRESS` and
-run:
-
-```shell
-export AMM_FACTORY_ADDRESS=0xYourExistingAmmFactory
-forge script script/DeployRouter.s.sol:DeployRouter --rpc-url "$ARC_TESTNET_RPC" --account "$FOUNDRY_ACCOUNT" --broadcast
 ```
 
 For a local deployment, start Anvil and use its unlocked default account without

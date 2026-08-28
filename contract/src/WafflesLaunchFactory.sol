@@ -3,11 +3,11 @@ pragma solidity ^0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {MemeToken} from "./MemeToken.sol";
-import {BondingCurve} from "./BondingCurve.sol";
+import {WafflesMemeToken} from "./WafflesMemeToken.sol";
+import {WafflesBondingCurve} from "./WafflesBondingCurve.sol";
 
-/// @notice Deploys MemeToken + BondingCurve pairs and records launches.
-contract LaunchFactory {
+/// @notice Deploys WafflesMemeToken + WafflesBondingCurve pairs and records launches for waffles.meme.
+contract WafflesLaunchFactory {
     using SafeERC20 for IERC20;
 
     address public owner;
@@ -32,7 +32,7 @@ contract LaunchFactory {
 
     address public immutable usdc;
     address public immutable treasury;
-    address public migrator;
+    address public immutable migrator;
     uint256 public creationFee; // raw USDC, 0 = free
 
     // Curve economics applied to every launch
@@ -43,11 +43,11 @@ contract LaunchFactory {
     uint256 public protocolFeeBps;
 
     mapping(address => Launch) public launchOfToken;
+    mapping(address => address) public tokenOfCurve;
     address[] public allTokens;
 
     event TokenCreated(address indexed token, address indexed curve, address indexed creator, uint256 creationFeePaid);
     event CreationFeeUpdated(uint256 previousFee, uint256 newFee);
-    event MigratorUpdated(address indexed previousMigrator, address indexed newMigrator);
     event OwnershipTransferStarted(address indexed previousOwner, address indexed pendingOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
@@ -98,9 +98,9 @@ contract LaunchFactory {
             IERC20(usdc).safeTransferFrom(msg.sender, treasury, fee);
         }
 
-        MemeToken tokenContract = new MemeToken(name, symbol, 1_000_000_000 ether, address(this));
+        WafflesMemeToken tokenContract = new WafflesMemeToken(name, symbol, 1_000_000_000 ether, address(this));
         uint256 supply = tokenContract.totalSupply();
-        BondingCurve curveContract = new BondingCurve(
+        WafflesBondingCurve curveContract = new WafflesBondingCurve(
             address(tokenContract),
             usdc,
             msg.sender,
@@ -130,6 +130,7 @@ contract LaunchFactory {
             telegram: telegram,
             createdAt: uint64(block.timestamp)
         });
+        tokenOfCurve[curve] = token;
         allTokens.push(token);
 
         emit TokenCreated(token, curve, msg.sender, fee);
@@ -142,12 +143,6 @@ contract LaunchFactory {
     function setCreationFee(uint256 fee) external onlyOwner {
         emit CreationFeeUpdated(creationFee, fee);
         creationFee = fee;
-    }
-
-    function setMigrator(address migrator_) external onlyOwner {
-        if (migrator_ == address(0)) revert InvalidAddress();
-        emit MigratorUpdated(migrator, migrator_);
-        migrator = migrator_;
     }
 
     function transferOwnership(address newOwner) external onlyOwner {
@@ -164,10 +159,5 @@ contract LaunchFactory {
         emit OwnershipTransferred(previousOwner, msg.sender);
     }
 
-    /// @notice 20% of supply is a non-sellable reserve on the curve; it is
-    ///         never purchasable and seeds migration liquidity together with
-    ///         the unsold balance and raised USDC at graduation (pump.fun's
-    ///         793.1M sellable / 206.9M reserve pattern). The other 80% is
-    ///         sellable on the curve.
     uint256 public constant CURVE_RESERVE = 200_000_000 ether;
 }

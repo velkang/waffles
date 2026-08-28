@@ -5,10 +5,10 @@ import {Script} from "forge-std/Script.sol";
 import {console2} from "forge-std/console2.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
-import {AmmFactory} from "../src/amm/AmmFactory.sol";
-import {AmmMigrator} from "../src/amm/AmmMigrator.sol";
-import {AmmRouter} from "../src/amm/AmmRouter.sol";
-import {LaunchFactory} from "../src/LaunchFactory.sol";
+import {WafflesAmmFactory} from "../src/amm/WafflesAmmFactory.sol";
+import {WafflesAmmMigrator} from "../src/amm/WafflesAmmMigrator.sol";
+import {WafflesAmmRouter} from "../src/amm/WafflesAmmRouter.sol";
+import {WafflesLaunchFactory} from "../src/WafflesLaunchFactory.sol";
 
 contract BroadcasterFinder {
     address public immutable BROADCASTER;
@@ -18,7 +18,7 @@ contract BroadcasterFinder {
     }
 }
 
-/// @notice Deploys the complete ArcFun launchpad on a supported network.
+/// @notice Deploys the complete waffles.meme launchpad on a supported network.
 contract Deploy is Script {
     uint256 internal constant ARC_TESTNET_CHAIN_ID = 5_042_002;
     uint256 internal constant ANVIL_CHAIN_ID = 31_337;
@@ -60,7 +60,7 @@ contract Deploy is Script {
     function run() external {
         NetworkConfig memory config = getDeploymentConfig();
 
-        console2.log("=== ArcFun Deployment ===");
+        console2.log("=== waffles.meme Deployment ===");
         console2.log("Network:", config.networkName);
         console2.log("Chain ID:", block.chainid);
 
@@ -78,10 +78,10 @@ contract Deploy is Script {
             usdc = address(new MockUSDC());
         }
 
-        AmmFactory ammFactory = new AmmFactory();
-        AmmMigrator migrator = new AmmMigrator(ammFactory, IERC20(usdc));
-        AmmRouter router = new AmmRouter(ammFactory);
-        LaunchFactory factory = new LaunchFactory(
+        WafflesAmmFactory ammFactory = new WafflesAmmFactory();
+        WafflesAmmMigrator migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
+        WafflesAmmRouter router = new WafflesAmmRouter(ammFactory);
+        WafflesLaunchFactory factory = new WafflesLaunchFactory(
             usdc,
             treasury,
             address(migrator),
@@ -92,6 +92,8 @@ contract Deploy is Script {
             FEE_BPS,
             PROTOCOL_FEE_BPS
         );
+        ammFactory.setPairCreator(address(migrator));
+        migrator.setLaunchFactory(address(factory));
         vm.stopBroadcast();
 
         logDeployment(
