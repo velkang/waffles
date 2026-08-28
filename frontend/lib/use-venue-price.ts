@@ -1,14 +1,14 @@
 "use client";
 
 import {
-  useReadAmmFactoryGetPair,
-  useReadAmmMigratorFactory,
-  useReadAmmPairGetReserves,
-  useReadAmmPairToken0,
-  useReadBondingCurveCurrentPrice,
-  useReadBondingCurveGraduated,
-  useReadBondingCurveMarketCap,
-  useReadLaunchFactoryMigrator,
+  useReadWafflesAmmFactoryGetPair,
+  useReadWafflesAmmMigratorFactory,
+  useReadWafflesAmmPairGetReserves,
+  useReadWafflesAmmPairToken0,
+  useReadWafflesBondingCurveCurrentPrice,
+  useReadWafflesBondingCurveGraduated,
+  useReadWafflesBondingCurveMarketCap,
+  useReadWafflesLaunchFactoryMigrator,
 } from "@/generated/contracts-generated";
 import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
 
@@ -33,39 +33,39 @@ export function poolPriceFromReserves(
 /// Resolves price from the venue that currently owns price discovery:
 /// the bonding curve before graduation and AMM reserves afterwards.
 export function useVenuePrice(token: Address, curve: Address | undefined) {
-  const graduatedQuery = useReadBondingCurveGraduated({
+  const graduatedQuery = useReadWafflesBondingCurveGraduated({
     address: curve,
     query: { enabled: Boolean(curve) },
   });
-  const curvePrice = useReadBondingCurveCurrentPrice({
+  const curvePrice = useReadWafflesBondingCurveCurrentPrice({
     address: curve,
     query: { enabled: Boolean(curve && !graduatedQuery.data) },
   });
-  const curveMcap = useReadBondingCurveMarketCap({
+  const curveMcap = useReadWafflesBondingCurveMarketCap({
     address: curve,
     query: { enabled: Boolean(curve && !graduatedQuery.data) },
   });
 
-  const migrator = useReadLaunchFactoryMigrator({
+  const migrator = useReadWafflesLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
     query: { enabled: Boolean(graduatedQuery.data) },
   });
-  const ammFactory = useReadAmmMigratorFactory({
+  const ammFactory = useReadWafflesAmmMigratorFactory({
     address: migrator.data,
     query: { enabled: Boolean(migrator.data && graduatedQuery.data) },
   });
-  const pair = useReadAmmFactoryGetPair({
+  const pair = useReadWafflesAmmFactoryGetPair({
     address: ammFactory.data,
     args: [token, USDC_ADDRESS],
     query: { enabled: Boolean(ammFactory.data && graduatedQuery.data) },
   });
   const pool =
     pair.data && pair.data !== ZERO_ADDRESS ? (pair.data as Address) : undefined;
-  const token0 = useReadAmmPairToken0({
+  const token0 = useReadWafflesAmmPairToken0({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
   });
-  const reserves = useReadAmmPairGetReserves({
+  const reserves = useReadWafflesAmmPairGetReserves({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
   });

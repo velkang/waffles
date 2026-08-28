@@ -13,10 +13,8 @@ interface TokenResult {
 }
 
 export function CommandPalette({
-  isOpen,
   onClose,
 }: {
-  isOpen: boolean;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -26,35 +24,30 @@ export function CommandPalette({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 50);
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-      setQuery("");
-    }
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 50);
+    document.body.style.overflow = "hidden";
     return () => {
+      window.clearTimeout(focusTimer);
       document.body.style.overflow = "";
     };
-  }, [isOpen]);
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        if (isOpen) onClose();
+        onClose();
       }
-      if (e.key === "Escape" && isOpen) {
+      if (e.key === "Escape") {
         onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [onClose]);
 
   // Fetch search results from launches api
   useEffect(() => {
-    if (!isOpen) return;
     let cancelled = false;
 
     async function search() {
@@ -89,9 +82,7 @@ export function CommandPalette({
       cancelled = true;
       clearTimeout(t);
     };
-  }, [query, isOpen]);
-
-  if (!isOpen) return null;
+  }, [query]);
 
   return (
     <div

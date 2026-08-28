@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { usePublicClient } from "wagmi";
 import {
-  launchFactoryAbi,
-  useReadLaunchFactoryCreationFee,
-  useWriteLaunchFactoryCreateToken,
+  wafflesLaunchFactoryAbi,
+  useReadWafflesLaunchFactoryCreationFee,
+  useWriteWafflesLaunchFactoryCreateToken,
   useWriteMockUsdcApprove,
 } from "@/generated/contracts-generated";
 import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
@@ -23,12 +23,12 @@ export default function CreatePage() {
   const router = useRouter();
   const publicClient = usePublicClient();
 
-  const { data: creationFee } = useReadLaunchFactoryCreationFee({
+  const { data: creationFee } = useReadWafflesLaunchFactoryCreationFee({
     address: FACTORY_ADDRESS,
   });
 
   const approveAsync = useWriteMockUsdcApprove().writeContractAsync;
-  const createAsync = useWriteLaunchFactoryCreateToken().writeContractAsync;
+  const createAsync = useWriteWafflesLaunchFactoryCreateToken().writeContractAsync;
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -84,7 +84,7 @@ export default function CreatePage() {
       for (const log of receipt.logs) {
         try {
           const ev = {
-            abi: launchFactoryAbi,
+            abi: wafflesLaunchFactoryAbi,
             data: log.data,
             topics: log.topics,
           } as const;
@@ -112,7 +112,7 @@ export default function CreatePage() {
     <div className="mx-auto max-w-4xl space-y-5">
       <div>
         <h1 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
-          Deploy token on <span className="text-[#db9d6a]">Arc Network</span>
+          Deploy token on <span className="text-[#db9d6a]">waffles.meme</span>
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
           Fair launch on virtual USDC constant-product curve • Zero team pre-allocations • Instant trading.

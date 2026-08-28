@@ -33,12 +33,12 @@ export function Header() {
             )}
 
             <Link href="/" className="flex items-center gap-2 group">
-              <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#db9d6a] text-[#0e0f12] font-black text-sm transition-transform group-hover:scale-105">
-                ▲
+              <div className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-[#db9d6a] text-[#0e0f12] font-black text-base transition-transform group-hover:scale-105 select-none shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]">
+                🧇
               </div>
               <div className="flex items-baseline gap-1 font-mono">
                 <span className="text-lg font-black tracking-tight text-white group-hover:text-[#db9d6a] transition-colors">
-                  arc<span className="text-[#db9d6a]">.fun</span>
+                  waffles<span className="text-[#db9d6a]">.meme</span>
                 </span>
               </div>
             </Link>
@@ -62,7 +62,7 @@ export function Header() {
                   <circle cx="11" cy="11" r="8" />
                   <path d="m21 21-4.3-4.3" />
                 </svg>
-                <span className="hidden sm:inline">Search for coins and users...</span>
+                <span className="hidden sm:inline">Search for coins and creators on waffles...</span>
                 <span className="sm:hidden">Search coins...</span>
               </div>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-zinc-500 bg-[#1a1b21] border border-[#24262e] rounded-[4px]">
@@ -114,7 +114,7 @@ export function Header() {
         </div>
       </header>
 
-      <CommandPalette isOpen={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      {paletteOpen && <CommandPalette onClose={() => setPaletteOpen(false)} />}
     </>
   );
 }

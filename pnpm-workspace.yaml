@@ -3,6 +3,9 @@ packages:
   - indexer
 
 onlyBuiltDependencies:
-  - "@reown/appkit"
+  - '@reown/appkit'
+  - bufferutil
   - esbuild
+  - keccak
   - unrs-resolver
+  - utf-8-validate

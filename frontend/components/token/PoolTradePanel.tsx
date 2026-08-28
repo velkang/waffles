@@ -4,27 +4,26 @@ import { useMemo, useState } from "react";
 import { formatUnits, parseUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 import {
-  useReadAmmFactoryGetPair,
-  useReadAmmMigratorFactory,
-  useReadAmmPairGetReserves,
-  useReadAmmPairToken0,
-  useReadLaunchFactoryMigrator,
-  useReadMemeTokenAllowance,
-  useReadMemeTokenBalanceOf,
+  useReadWafflesAmmFactoryGetPair,
+  useReadWafflesAmmMigratorFactory,
+  useReadWafflesAmmPairGetReserves,
+  useReadWafflesAmmPairToken0,
+  useReadWafflesLaunchFactoryMigrator,
+  useReadWafflesMemeTokenAllowance,
+  useReadWafflesMemeTokenBalanceOf,
   useReadMockUsdcAllowance,
   useReadMockUsdcBalanceOf,
-  useWriteAmmRouterSwapExactTokensForTokens,
-  useWriteMemeTokenApprove,
+  useWriteWafflesAmmRouterSwapExactTokensForTokens,
+  useWriteWafflesMemeTokenApprove,
   useWriteMockUsdcApprove,
 } from "@/generated/contracts-generated";
-import { formatPrice, formatToken, formatUsd } from "@/lib/format";
+import { formatToken, formatUsd } from "@/lib/format";
 import { FACTORY_ADDRESS, ROUTER_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 
 type Address = `0x${string}`;
 type Mode = "buy" | "sell";
 
-const SLIPPAGE_OPTIONS = [50, 100, 300] as const;
 const BUY_PRESETS = [25, 100, 250] as const;
 const SELL_PRESETS = [25, 50, 100] as const;
 const BPS_DENOM = 10_000n;
@@ -42,29 +41,29 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
 
   const [mode, setMode] = useState<Mode>("buy");
   const [amount, setAmount] = useState("");
-  const [slippageBps, setSlippageBps] = useState<number>(100);
+  const slippageBps = 100;
   const [phase, setPhase] = useState<"idle" | "approve" | "swap">("idle");
   const [error, setError] = useState("");
 
-  const { data: migrator } = useReadLaunchFactoryMigrator({
+  const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
   });
-  const { data: ammFactory } = useReadAmmMigratorFactory({
+  const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
     address: migrator,
     query: { enabled: Boolean(migrator) },
   });
-  const { data: rawPool, isLoading: poolLoading } = useReadAmmFactoryGetPair({
+  const { data: rawPool, isLoading: poolLoading } = useReadWafflesAmmFactoryGetPair({
     address: ammFactory,
     args: [tokenAddress, USDC_ADDRESS],
     query: { enabled: Boolean(ammFactory) },
   });
   const pool = rawPool && rawPool !== ZERO_ADDRESS ? rawPool : undefined;
 
-  const { data: token0 } = useReadAmmPairToken0({
+  const { data: token0 } = useReadWafflesAmmPairToken0({
     address: pool,
     query: { enabled: Boolean(pool) },
   });
-  const reservesQuery = useReadAmmPairGetReserves({
+  const reservesQuery = useReadWafflesAmmPairGetReserves({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
   });
@@ -75,17 +74,12 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   const [r0, r1] = reservesQuery.data ?? [];
   const rUsdc = tokenIsToken0 ? r1 : r0;
   const rToken = tokenIsToken0 ? r0 : r1;
-  const poolPrice =
-    rUsdc !== undefined && rToken !== undefined && rToken > 0n
-      ? (rUsdc * 10n ** 18n) / rToken
-      : undefined;
-
   const usdcBalance = useReadMockUsdcBalanceOf({
     address: USDC_ADDRESS,
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
   });
-  const tokenBalance = useReadMemeTokenBalanceOf({
+  const tokenBalance = useReadWafflesMemeTokenBalanceOf({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
@@ -95,7 +89,7 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
     query: { enabled: Boolean(account && ROUTER_ADDRESS) },
   });
-  const tokenAllowance = useReadMemeTokenAllowance({
+  const tokenAllowance = useReadWafflesMemeTokenAllowance({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
     query: { enabled: Boolean(account && ROUTER_ADDRESS) },
@@ -133,8 +127,8 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       : undefined;
 
   const approveUsdcAsync = useWriteMockUsdcApprove().writeContractAsync;
-  const approveTokenAsync = useWriteMemeTokenApprove().writeContractAsync;
-  const swapAsync = useWriteAmmRouterSwapExactTokensForTokens().writeContractAsync;
+  const approveTokenAsync = useWriteWafflesMemeTokenApprove().writeContractAsync;
+  const swapAsync = useWriteWafflesAmmRouterSwapExactTokensForTokens().writeContractAsync;
 
   function refetchAll() {
     reservesQuery.refetch();

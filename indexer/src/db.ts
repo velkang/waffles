@@ -48,6 +48,9 @@ export interface LaunchDoc {
   graduationBlock?: number;
   graduationTxHash?: string;
   pool?: string; // DEX pool the curve migrated into (lowercase)
+  price?: string;
+  mcap?: string;
+  progressBps?: number;
 }
 
 export interface TradeDoc {
@@ -59,7 +62,9 @@ export interface TradeDoc {
   feeAmount?: string;
   tokenAmount: string; // raw, 18dp
   priceAfter: string; // raw quote units per whole token
+  executionPrice?: string; // average quote paid/received per whole token
   mcapAfter: string; // raw quote units
+  progressBpsAfter?: number;
   blockNumber: number;
   logIndex: number;
   txHash: string;

@@ -1,13 +1,12 @@
-# arc.fun
+# waffles.meme
 
-Permissionless token launchpad on Arc (Circle's USDC-native L1). See
-[PRODUCT.md](PRODUCT.md) for the product spec.
+Permissionless token launchpad on Arc, Circle's USDC-native L1.
 
 ## Layout
 
 - `contract/` — Foundry workspace: `LaunchFactory`, `BondingCurve`, `MemeToken`,
   tests, and the deploy script.
-- `frontend/` — Next.js App Router dApp (wagmi v3 + Reown AppKit).
+- `frontend/` — Next.js App Router dApp (wagmi v2 + Reown AppKit).
 - `indexer/` — TypeScript event indexer (viem → MongoDB).
 
 ## Commands
@@ -23,12 +22,6 @@ cast wallet list               # choose a configured Foundry keystore
 FOUNDRY_ACCOUNT=your-account-name
 export ARC_TESTNET_RPC=https://rpc.testnet.arc.network
 forge script script/Deploy.s.sol:Deploy \
-  --rpc-url "$ARC_TESTNET_RPC" \
-  --account "$FOUNDRY_ACCOUNT" \
-  --broadcast
-# Existing installation: deploy only the safe router against its AMM factory
-export AMM_FACTORY_ADDRESS=0xYourExistingAmmFactory
-forge script script/DeployRouter.s.sol:DeployRouter \
   --rpc-url "$ARC_TESTNET_RPC" \
   --account "$FOUNDRY_ACCOUNT" \
   --broadcast

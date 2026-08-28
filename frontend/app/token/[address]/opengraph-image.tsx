@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { getAddress } from "viem";
 import { getTokenSummary } from "@/lib/server/chain";
 
-export const alt = "Token on arc.fun";
+export const alt = "Token on waffles.meme";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -58,8 +58,8 @@ export default async function OgImage({
           }}
         >
           <div style={{ display: "flex", alignItems: "baseline" }}>
-            <span style={{ fontWeight: 700 }}>arc</span>
-            <span style={{ fontWeight: 700, color: CYAN }}>.fun</span>
+            <span style={{ fontWeight: 700 }}>waffles</span>
+            <span style={{ fontWeight: 700, color: AMBER }}>.meme</span>
           </div>
           <div style={{ color: TEXT_MUTED, fontSize: 28 }}>
             Permissionless Token Launchpad on Arc L1
@@ -129,8 +129,8 @@ export default async function OgImage({
             </div>
           </div>
           <div style={{ display: "flex", alignItems: "baseline", fontSize: 36 }}>
-            <span style={{ fontWeight: 700 }}>arc</span>
-            <span style={{ fontWeight: 700, color: CYAN }}>.fun</span>
+            <span style={{ fontWeight: 700 }}>waffles</span>
+            <span style={{ fontWeight: 700, color: AMBER }}>.meme</span>
           </div>
         </div>
 

@@ -5,11 +5,11 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAccount, usePublicClient, useReadContracts } from "wagmi";
 import {
-  ammFactoryAbi,
-  ammPairAbi,
-  useReadAmmMigratorFactory,
-  useReadLaunchFactoryMigrator,
-  useWriteBondingCurveClaimCreatorFees,
+  wafflesAmmFactoryAbi,
+  wafflesAmmPairAbi,
+  useReadWafflesAmmMigratorFactory,
+  useReadWafflesLaunchFactoryMigrator,
+  useWriteWafflesBondingCurveClaimCreatorFees,
 } from "@/generated/contracts-generated";
 import { formatToken, formatUsd } from "@/lib/format";
 import { poolPriceFromReserves } from "@/lib/use-venue-price";
@@ -142,7 +142,7 @@ function PortfolioBody({
   onClaimed: () => void;
 }) {
   const publicClient = usePublicClient();
-  const claimAsync = useWriteBondingCurveClaimCreatorFees().writeContractAsync;
+  const claimAsync = useWriteWafflesBondingCurveClaimCreatorFees().writeContractAsync;
   const [claimingCurve, setClaimingCurve] = useState<string | null>(null);
 
   const activePositions = useMemo(
@@ -189,18 +189,18 @@ function PortfolioBody({
     query: { enabled: activePositions.length > 0 },
   });
 
-  const { data: migrator } = useReadLaunchFactoryMigrator({
+  const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
     query: { enabled: activePositions.some((p) => p.launch.graduated) },
   });
-  const { data: ammFactory } = useReadAmmMigratorFactory({
+  const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
     address: migrator,
     query: { enabled: Boolean(migrator) },
   });
   const pairQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
       address: ammFactory ?? ZERO,
-      abi: ammFactoryAbi,
+      abi: wafflesAmmFactoryAbi,
       functionName: "getPair" as const,
       args: [p.launch.token as Address, USDC_ADDRESS] as const,
     })),
@@ -218,7 +218,7 @@ function PortfolioBody({
   const token0Queries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
       address: pair,
-      abi: ammPairAbi,
+      abi: wafflesAmmPairAbi,
       functionName: "token0" as const,
     })),
     query: {
@@ -229,7 +229,7 @@ function PortfolioBody({
   const reserveQueries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
       address: pair,
-      abi: ammPairAbi,
+      abi: wafflesAmmPairAbi,
       functionName: "getReserves" as const,
     })),
     query: {

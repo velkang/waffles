@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import type { Db } from "mongodb";
 import { getDb } from "@/lib/mongo";
+import type { LaunchSummary } from "@/lib/types/launch";
 
 export const dynamic = "force-dynamic";
 
@@ -9,26 +11,101 @@ type LaunchDoc = {
   creator?: string;
   name?: string;
   symbol?: string;
+  description?: string;
   imageUri?: string;
+  website?: string;
+  twitter?: string;
+  telegram?: string;
   graduated?: boolean;
   pool?: string | null;
   createdAt?: Date;
+  price?: string;
+  mcap?: string;
+  progressBps?: number;
 };
 
-function mapLaunch(d: LaunchDoc & { volume24h?: string; mcap?: string }) {
+type TradeMetrics = {
+  price?: string;
+  mcap?: string;
+  volume24h?: string;
+  progressBps?: number;
+};
+
+function mapLaunch(d: LaunchDoc, metrics: TradeMetrics = {}): LaunchSummary {
   return {
     token: d.token,
     curve: d.curve,
-    creator: d.creator,
-    name: d.name,
-    symbol: d.symbol,
-    imageUri: d.imageUri,
-    graduated: d.graduated,
+    creator: d.creator ?? "",
+    name: d.name ?? "",
+    symbol: d.symbol ?? "",
+    description: d.description ?? "",
+    imageUri: d.imageUri ?? "",
+    website: d.website ?? "",
+    twitter: d.twitter ?? "",
+    telegram: d.telegram ?? "",
+    graduated: d.graduated ?? false,
     pool: d.pool ?? null,
-    createdAt: d.createdAt,
-    volume24h: d.volume24h ?? "0",
-    mcap: d.mcap ?? undefined,
+    createdAt: d.createdAt ? d.createdAt.toISOString() : null,
+    price: metrics.price ?? d.price ?? "0",
+    mcap: metrics.mcap ?? d.mcap ?? "0",
+    volume24h: metrics.volume24h ?? "0",
+    progressBps: d.graduated
+      ? 10_000
+      : (metrics.progressBps ?? d.progressBps ?? 0),
   };
+}
+
+async function enrichLaunches(db: Db, docs: LaunchDoc[]): Promise<LaunchSummary[]> {
+  if (docs.length === 0) return [];
+  const curves = docs.map((d) => d.curve);
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+  const [volumes, latest] = await Promise.all([
+    db.collection("trades").aggregate([
+      { $match: { curveAddress: { $in: curves }, timestamp: { $gte: since } } },
+      {
+        $group: {
+          _id: "$curveAddress",
+          volume24h: {
+            $sum: {
+              $toDecimal: { $ifNull: ["$usdcGrossAmount", "$usdcAmount"] },
+            },
+          },
+        },
+      },
+    ]).toArray(),
+    db.collection("trades").aggregate([
+      { $match: { curveAddress: { $in: curves } } },
+      { $sort: { blockNumber: 1, logIndex: 1 } },
+      {
+        $group: {
+          _id: "$curveAddress",
+          price: { $last: "$priceAfter" },
+          mcap: { $last: "$mcapAfter" },
+          progressBps: { $last: "$progressBpsAfter" },
+        },
+      },
+    ]).toArray(),
+  ]);
+
+  const metricsByCurve = new Map<string, TradeMetrics>();
+  for (const row of latest) {
+    metricsByCurve.set(String(row._id), {
+      price: row.price?.toString(),
+      mcap: row.mcap?.toString(),
+      progressBps:
+        row.progressBps === undefined ? undefined : Number(row.progressBps),
+    });
+  }
+  for (const row of volumes) {
+    const curve = String(row._id);
+    metricsByCurve.set(curve, {
+      ...metricsByCurve.get(curve),
+      volume24h: row.volume24h?.toString() ?? "0",
+    });
+  }
+
+  return docs.map((doc) => mapLaunch(doc, metricsByCurve.get(doc.curve)));
 }
 
 function boundedLimit(value: string | null): number {
@@ -53,56 +130,13 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: "invalid token" }, { status: 400 });
       }
       const launch = await launches.findOne({ token });
-      return NextResponse.json({ launch: launch ? mapLaunch(launch) : null });
+      const [summary] = launch ? await enrichLaunches(db, [launch]) : [];
+      return NextResponse.json({ launch: summary ?? null });
     }
 
     if (sort === "volume" || sort === "mcap") {
-      // aggregate latest trade per curve for mcap, and 24h volume
-      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-      const pipeline = [
-        { $sort: { blockNumber: 1, logIndex: 1 } },
-        {
-          $group: {
-            _id: "$curveAddress",
-            volume24h: {
-              $sum: {
-                $toDecimal: { $ifNull: ["$usdcGrossAmount", "$usdcAmount"] },
-              },
-            },
-            lastMcap: { $last: "$mcapAfter" },
-            lastBlock: { $max: "$blockNumber" },
-          },
-        },
-      ];
-      // volume over all trades in the window
-      const volPipeline = [
-        { $match: { timestamp: { $gte: since } } },
-        ...pipeline,
-      ];
-      const [vols, mcaps] = await Promise.all([
-        db.collection("trades").aggregate(volPipeline).toArray(),
-        sort === "mcap"
-          ? db.collection("trades").aggregate(pipeline).toArray()
-          : Promise.resolve([]),
-      ]);
-      const volByCurve = new Map(
-        vols.map((v) => [v._id as string, v.volume24h?.toString() ?? "0"]),
-      );
-      const mcapByCurve = new Map(
-        mcaps.map((m) => [m._id as string, m.lastMcap?.toString() ?? "0"]),
-      );
-
       const docs = await launches.find().limit(500).toArray();
-      const enriched = docs.map((d) =>
-        mapLaunch({
-          ...d,
-          volume24h: volByCurve.get(d.curve) ?? "0",
-          mcap:
-            sort === "mcap"
-              ? (mcapByCurve.get(d.curve) ?? "0")
-              : undefined,
-        }),
-      );
+      const enriched = await enrichLaunches(db, docs);
 
       enriched.sort((a, b) =>
         sort === "mcap"
@@ -120,9 +154,7 @@ export async function GET(request: Request) {
       .limit(limit)
       .toArray();
 
-    return NextResponse.json({
-      launches: docs.map((d) => mapLaunch(d)),
-    });
+    return NextResponse.json({ launches: await enrichLaunches(db, docs) });
   } catch (err) {
     console.error("GET /api/launches failed:", err);
     return NextResponse.json(

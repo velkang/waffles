@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -15,26 +16,28 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "arc.fun — Fair Launchpad on Arc L1",
+  title: "waffles.meme — Fair Token Launchpad on Arc L1",
   description:
-    "Permissionless token launchpad on Arc: create tokens in seconds, trade on Circle USDC bonding curves, and graduate automatically to permanent DEX liquidity.",
+    "Fair launch tokens on waffles.meme: virtual USDC bonding curves, instant trading, and automatic DEX liquidity graduation on Arc L1.",
   icons: {
     icon: "/favicon.ico",
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookies = (await headers()).get("cookie");
+
   return (
     <html
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased dark`}
     >
       <body className="flex min-h-full flex-col bg-[#0e0f12] text-[#fafafa] selection:bg-[#db9d6a] selection:text-[#0e0f12]">
-        <Providers>
+        <Providers cookies={cookies}>
           <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
             {children}
@@ -43,10 +46,10 @@ export default function RootLayout({
             <div className="mx-auto max-w-7xl px-4 flex flex-col sm:flex-row items-center justify-between gap-3 font-mono">
               <div className="flex items-center gap-2">
                 <span className="font-bold text-white">
-                  arc<span className="text-[#db9d6a]">.fun</span>
+                  waffles<span className="text-[#db9d6a]">.meme</span>
                 </span>
                 <span className="text-zinc-600">|</span>
-                <span>USDC-Native Launchpad on Arc L1</span>
+                <span>USDC-Native Fair Launchpad on Arc L1</span>
               </div>
               <div className="flex items-center gap-4 text-zinc-500">
                 <span>Verified Contracts</span>

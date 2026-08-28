@@ -4,21 +4,18 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
-  useReadBondingCurveCreator,
-  useReadBondingCurveGraduationMcap,
-  useReadBondingCurveGraduationProgressBps,
-  useReadLaunchFactoryLaunchOfToken,
-  useReadMemeTokenName,
-  useReadMemeTokenSymbol,
+  useReadWafflesBondingCurveGraduationProgressBps,
+  useReadWafflesLaunchFactoryLaunchOfToken,
+  useReadWafflesMemeTokenName,
+  useReadWafflesMemeTokenSymbol,
 } from "@/generated/contracts-generated";
 import { PriceChart } from "@/components/token/PriceChart";
 import { TradePanel } from "@/components/token/TradePanel";
-import { HoldersTable } from "@/components/token/HoldersTable";
-import { ThreadComments } from "@/components/token/ThreadComments";
+import { TradeFeed } from "@/components/token/TradeFeed";
 import { StatusBadge } from "@/components/ui/StatusBadge";
-import { formatPrice, formatUsd, shortAddress } from "@/lib/format";
+import { formatUsd, shortAddress } from "@/lib/format";
 import { getOptimizedImageUrl } from "@/lib/image";
-import { FACTORY_ADDRESS, arcTestnet } from "@/lib/wagmi";
+import { FACTORY_ADDRESS } from "@/lib/wagmi";
 import { useVenuePrice } from "@/lib/use-venue-price";
 
 type Address = `0x${string}`;
@@ -27,7 +24,7 @@ export default function TokenPage() {
   const { address } = useParams<{ address: string }>();
   const token = address as Address;
 
-  const launchQuery = useReadLaunchFactoryLaunchOfToken({
+  const launchQuery = useReadWafflesLaunchFactoryLaunchOfToken({
     address: FACTORY_ADDRESS,
     args: [token],
     query: { enabled: Boolean(FACTORY_ADDRESS) },
@@ -38,19 +35,15 @@ export default function TokenPage() {
   const curve = launch?.[1];
 
   const venue = useVenuePrice(token, curve);
-  const { data: progressBps } = useReadBondingCurveGraduationProgressBps({
+  const { data: progressBps } = useReadWafflesBondingCurveGraduationProgressBps({
     address: curve,
     query: { enabled: Boolean(curve) },
   });
-  const { data: creator } = useReadBondingCurveCreator({
-    address: curve,
-    query: { enabled: Boolean(curve) },
-  });
-  const { data: tokenName } = useReadMemeTokenName({
+  const { data: tokenName } = useReadWafflesMemeTokenName({
     address: token,
     query: { enabled: Boolean(token) },
   });
-  const { data: tokenSymbol } = useReadMemeTokenSymbol({
+  const { data: tokenSymbol } = useReadWafflesMemeTokenSymbol({
     address: token,
     query: { enabled: Boolean(token) },
   });
@@ -58,7 +51,7 @@ export default function TokenPage() {
   const progress =
     progressBps !== undefined ? Number(progressBps) / 100 : undefined;
 
-  const { graduated, price, mcap } = venue;
+  const { graduated, mcap } = venue;
 
   const [copied, setCopied] = useState(false);
   const copyAddress = () => {
@@ -72,7 +65,7 @@ export default function TokenPage() {
       <div className="mx-auto max-w-lg rounded-[10px] border border-[#24262e] bg-[#141519] p-8 text-center font-mono">
         <h1 className="text-lg font-bold text-white">TOKEN NOT FOUND</h1>
         <p className="mt-2 text-xs text-zinc-400">
-          This token contract was not found on the Arc Launch Factory.
+          This token contract was not found on the Waffles Launch Factory.
         </p>
         <Link
           href="/create"
@@ -122,8 +115,6 @@ export default function TokenPage() {
               <span className="text-zinc-300 font-medium">{tokenName || "Arc Token"}</span>
               <span>•</span>
               <span className="text-zinc-400">🌿 {createdAt ? timeAgo(Number(createdAt)) : "now"}</span>
-              <span>•</span>
-              <span className="text-zinc-400">1,007 holders</span>
             </div>
           </div>
         </div>
@@ -195,14 +186,8 @@ export default function TokenPage() {
             <div className="h-80 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
           )}
 
-          {/* Bottom Community Split Sub-Grid */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            {/* Left: Holders Ledger */}
-            <HoldersTable tokenAddress={token} />
-
-            {/* Right: Callouts / Trades Comments Thread */}
-            <ThreadComments tokenAddress={token} />
-          </div>
+          {/* Real Live Transaction History Feed */}
+          <TradeFeed token={token} />
         </div>
 
         {/* Right Column: Order Execution & Stats Rail */}

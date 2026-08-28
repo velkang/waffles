@@ -2,11 +2,10 @@
 
 import { useMemo } from "react";
 import {
-  useReadBondingCurveGraduated,
-  useReadBondingCurveK,
-  useReadBondingCurveReserveUsdc,
-  useReadBondingCurveTotalSupply,
-  useReadBondingCurveVirtualUsdc,
+  useReadWafflesBondingCurveK,
+  useReadWafflesBondingCurveReserveUsdc,
+  useReadWafflesBondingCurveTotalSupply,
+  useReadWafflesBondingCurveVirtualUsdc,
 } from "@/generated/contracts-generated";
 
 const EMERALD = "#4ade80";
@@ -20,14 +19,14 @@ const PAD_TOP = 14;
 const PAD_BOTTOM = 22;
 
 export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
-  const { data: k } = useReadBondingCurveK({ address: curveAddress });
-  const { data: virtualUsdc } = useReadBondingCurveVirtualUsdc({
+  const { data: k } = useReadWafflesBondingCurveK({ address: curveAddress });
+  const { data: virtualUsdc } = useReadWafflesBondingCurveVirtualUsdc({
     address: curveAddress,
   });
-  const { data: totalSupply } = useReadBondingCurveTotalSupply({
+  const { data: totalSupply } = useReadWafflesBondingCurveTotalSupply({
     address: curveAddress,
   });
-  const { data: reserveUsdc } = useReadBondingCurveReserveUsdc({
+  const { data: reserveUsdc } = useReadWafflesBondingCurveReserveUsdc({
     address: curveAddress,
   });
 
@@ -68,10 +67,6 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
 
     return { path, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T };
   }, [k, virtualUsdc, totalSupply]);
-
-  const { data: graduated } = useReadBondingCurveGraduated({
-    address: curveAddress,
-  });
 
   const now = useMemo(() => {
     if (!chart || reserveUsdc === undefined) return undefined;

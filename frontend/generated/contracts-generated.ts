@@ -6,10 +6,183 @@ import {
 } from 'wagmi/codegen'
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AmmFactory
+// MockUSDC
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const ammFactoryAbi = [
+export const mockUsdcAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'spender', internalType: 'address', type: 'address' },
+    ],
+    name: 'allowance',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'approve',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
+    name: 'balanceOf',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'decimals',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'pure',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'amount', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'mint',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'name',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'symbol',
+    outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'totalSupply',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transfer',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'transferFrom',
+    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'owner',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'spender',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Approval',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      { name: 'from', internalType: 'address', type: 'address', indexed: true },
+      { name: 'to', internalType: 'address', type: 'address', indexed: true },
+      {
+        name: 'value',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'Transfer',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'spender', internalType: 'address', type: 'address' },
+      { name: 'allowance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientAllowance',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'sender', internalType: 'address', type: 'address' },
+      { name: 'balance', internalType: 'uint256', type: 'uint256' },
+      { name: 'needed', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'ERC20InsufficientBalance',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidApprover',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidReceiver',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSender',
+  },
+  {
+    type: 'error',
+    inputs: [{ name: 'spender', internalType: 'address', type: 'address' }],
+    name: 'ERC20InvalidSpender',
+  },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// WafflesAmmFactory
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const wafflesAmmFactoryAbi = [
+  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -47,12 +220,35 @@ export const ammFactoryAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'pairCreator',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'parameters',
     outputs: [
       { name: '', internalType: 'address', type: 'address' },
       { name: '', internalType: 'address', type: 'address' },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'pairCreator_', internalType: 'address', type: 'address' },
+    ],
+    name: 'setPairCreator',
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'event',
@@ -85,22 +281,24 @@ export const ammFactoryAbi = [
     ],
     name: 'PairCreated',
   },
+  { type: 'error', inputs: [], name: 'AlreadyConfigured' },
   { type: 'error', inputs: [], name: 'IdenticalAddresses' },
   { type: 'error', inputs: [], name: 'PairExists' },
+  { type: 'error', inputs: [], name: 'Unauthorized' },
   { type: 'error', inputs: [], name: 'ZeroAddress' },
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AmmMigrator
+// WafflesAmmMigrator
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const ammMigratorAbi = [
+export const wafflesAmmMigratorAbi = [
   {
     type: 'constructor',
     inputs: [
       {
         name: 'factory_',
-        internalType: 'contract AmmFactory',
+        internalType: 'contract WafflesAmmFactory',
         type: 'address',
       },
       { name: 'usdc_', internalType: 'contract IERC20', type: 'address' },
@@ -119,8 +317,15 @@ export const ammMigratorAbi = [
     inputs: [],
     name: 'factory',
     outputs: [
-      { name: '', internalType: 'contract AmmFactory', type: 'address' },
+      { name: '', internalType: 'contract WafflesAmmFactory', type: 'address' },
     ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'launchFactory',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -137,22 +342,43 @@ export const ammMigratorAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'owner',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'launchFactory_', internalType: 'address', type: 'address' },
+    ],
+    name: 'setLaunchFactory',
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'usdc',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
     stateMutability: 'view',
   },
+  { type: 'error', inputs: [], name: 'AlreadyConfigured' },
+  { type: 'error', inputs: [], name: 'InvalidAddress' },
+  { type: 'error', inputs: [], name: 'InvalidAmounts' },
+  { type: 'error', inputs: [], name: 'PairAlreadyExists' },
   {
     type: 'error',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
     name: 'SafeERC20FailedOperation',
   },
+  { type: 'error', inputs: [], name: 'Unauthorized' },
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AmmPair
+// WafflesAmmPair
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const ammPairAbi = [
+export const wafflesAmmPairAbi = [
   { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
   {
     type: 'function',
@@ -526,16 +752,16 @@ export const ammPairAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// AmmRouter
+// WafflesAmmRouter
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const ammRouterAbi = [
+export const wafflesAmmRouterAbi = [
   {
     type: 'constructor',
     inputs: [
       {
         name: 'factory_',
-        internalType: 'contract AmmFactory',
+        internalType: 'contract WafflesAmmFactory',
         type: 'address',
       },
     ],
@@ -560,7 +786,7 @@ export const ammRouterAbi = [
     inputs: [],
     name: 'factory',
     outputs: [
-      { name: '', internalType: 'contract AmmFactory', type: 'address' },
+      { name: '', internalType: 'contract WafflesAmmFactory', type: 'address' },
     ],
     stateMutability: 'view',
   },
@@ -637,10 +863,10 @@ export const ammRouterAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// BondingCurve
+// WafflesBondingCurve
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const bondingCurveAbi = [
+export const wafflesBondingCurveAbi = [
   {
     type: 'constructor',
     inputs: [
@@ -962,6 +1188,12 @@ export const bondingCurveAbi = [
         type: 'uint256',
         indexed: false,
       },
+      {
+        name: 'progressBpsAfter',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
     ],
     name: 'Traded',
   },
@@ -981,10 +1213,10 @@ export const bondingCurveAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// LaunchFactory
+// WafflesLaunchFactory
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const launchFactoryAbi = [
+export const wafflesLaunchFactoryAbi = [
   {
     type: 'constructor',
     inputs: [
@@ -1121,10 +1353,10 @@ export const launchFactoryAbi = [
   },
   {
     type: 'function',
-    inputs: [{ name: 'migrator_', internalType: 'address', type: 'address' }],
-    name: 'setMigrator',
-    outputs: [],
-    stateMutability: 'nonpayable',
+    inputs: [{ name: '', internalType: 'address', type: 'address' }],
+    name: 'tokenOfCurve',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -1179,25 +1411,6 @@ export const launchFactoryAbi = [
       },
     ],
     name: 'CreationFeeUpdated',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'previousMigrator',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'newMigrator',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-    ],
-    name: 'MigratorUpdated',
   },
   {
     type: 'event',
@@ -1278,10 +1491,10 @@ export const launchFactoryAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MemeToken
+// WafflesMemeToken
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-export const memeTokenAbi = [
+export const wafflesMemeTokenAbi = [
   {
     type: 'constructor',
     inputs: [
@@ -1449,1532 +1662,8 @@ export const memeTokenAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// MockUSDC
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-export const mockUsdcAbi = [
-  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'owner', internalType: 'address', type: 'address' },
-      { name: 'spender', internalType: 'address', type: 'address' },
-    ],
-    name: 'allowance',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'spender', internalType: 'address', type: 'address' },
-      { name: 'value', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'approve',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [{ name: 'account', internalType: 'address', type: 'address' }],
-    name: 'balanceOf',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'decimals',
-    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
-    stateMutability: 'pure',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'amount', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'mint',
-    outputs: [],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'name',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'symbol',
-    outputs: [{ name: '', internalType: 'string', type: 'string' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'totalSupply',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'value', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'transfer',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'function',
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address' },
-      { name: 'to', internalType: 'address', type: 'address' },
-      { name: 'value', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'transferFrom',
-    outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'nonpayable',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      {
-        name: 'owner',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'spender',
-        internalType: 'address',
-        type: 'address',
-        indexed: true,
-      },
-      {
-        name: 'value',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Approval',
-  },
-  {
-    type: 'event',
-    anonymous: false,
-    inputs: [
-      { name: 'from', internalType: 'address', type: 'address', indexed: true },
-      { name: 'to', internalType: 'address', type: 'address', indexed: true },
-      {
-        name: 'value',
-        internalType: 'uint256',
-        type: 'uint256',
-        indexed: false,
-      },
-    ],
-    name: 'Transfer',
-  },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'spender', internalType: 'address', type: 'address' },
-      { name: 'allowance', internalType: 'uint256', type: 'uint256' },
-      { name: 'needed', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'ERC20InsufficientAllowance',
-  },
-  {
-    type: 'error',
-    inputs: [
-      { name: 'sender', internalType: 'address', type: 'address' },
-      { name: 'balance', internalType: 'uint256', type: 'uint256' },
-      { name: 'needed', internalType: 'uint256', type: 'uint256' },
-    ],
-    name: 'ERC20InsufficientBalance',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'approver', internalType: 'address', type: 'address' }],
-    name: 'ERC20InvalidApprover',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'receiver', internalType: 'address', type: 'address' }],
-    name: 'ERC20InvalidReceiver',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'sender', internalType: 'address', type: 'address' }],
-    name: 'ERC20InvalidSender',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'spender', internalType: 'address', type: 'address' }],
-    name: 'ERC20InvalidSpender',
-  },
-] as const
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // React
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__
- */
-export const useReadAmmFactory = /*#__PURE__*/ createUseReadContract({
-  abi: ammFactoryAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"allPairs"`
- */
-export const useReadAmmFactoryAllPairs = /*#__PURE__*/ createUseReadContract({
-  abi: ammFactoryAbi,
-  functionName: 'allPairs',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"allPairsLength"`
- */
-export const useReadAmmFactoryAllPairsLength =
-  /*#__PURE__*/ createUseReadContract({
-    abi: ammFactoryAbi,
-    functionName: 'allPairsLength',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"getPair"`
- */
-export const useReadAmmFactoryGetPair = /*#__PURE__*/ createUseReadContract({
-  abi: ammFactoryAbi,
-  functionName: 'getPair',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"parameters"`
- */
-export const useReadAmmFactoryParameters = /*#__PURE__*/ createUseReadContract({
-  abi: ammFactoryAbi,
-  functionName: 'parameters',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammFactoryAbi}__
- */
-export const useWriteAmmFactory = /*#__PURE__*/ createUseWriteContract({
-  abi: ammFactoryAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"createPair"`
- */
-export const useWriteAmmFactoryCreatePair =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: ammFactoryAbi,
-    functionName: 'createPair',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammFactoryAbi}__
- */
-export const useSimulateAmmFactory = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammFactoryAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammFactoryAbi}__ and `functionName` set to `"createPair"`
- */
-export const useSimulateAmmFactoryCreatePair =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammFactoryAbi,
-    functionName: 'createPair',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammFactoryAbi}__
- */
-export const useWatchAmmFactoryEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: ammFactoryAbi })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammFactoryAbi}__ and `eventName` set to `"PairCreated"`
- */
-export const useWatchAmmFactoryPairCreatedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammFactoryAbi,
-    eventName: 'PairCreated',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__
- */
-export const useReadAmmMigrator = /*#__PURE__*/ createUseReadContract({
-  abi: ammMigratorAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"DEAD_ADDRESS"`
- */
-export const useReadAmmMigratorDeadAddress =
-  /*#__PURE__*/ createUseReadContract({
-    abi: ammMigratorAbi,
-    functionName: 'DEAD_ADDRESS',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"factory"`
- */
-export const useReadAmmMigratorFactory = /*#__PURE__*/ createUseReadContract({
-  abi: ammMigratorAbi,
-  functionName: 'factory',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"usdc"`
- */
-export const useReadAmmMigratorUsdc = /*#__PURE__*/ createUseReadContract({
-  abi: ammMigratorAbi,
-  functionName: 'usdc',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammMigratorAbi}__
- */
-export const useWriteAmmMigrator = /*#__PURE__*/ createUseWriteContract({
-  abi: ammMigratorAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"migrate"`
- */
-export const useWriteAmmMigratorMigrate = /*#__PURE__*/ createUseWriteContract({
-  abi: ammMigratorAbi,
-  functionName: 'migrate',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammMigratorAbi}__
- */
-export const useSimulateAmmMigrator = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammMigratorAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammMigratorAbi}__ and `functionName` set to `"migrate"`
- */
-export const useSimulateAmmMigratorMigrate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammMigratorAbi,
-    functionName: 'migrate',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__
- */
-export const useReadAmmPair = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"BPS_DENOM"`
- */
-export const useReadAmmPairBpsDenom = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'BPS_DENOM',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"FEE_BPS"`
- */
-export const useReadAmmPairFeeBps = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'FEE_BPS',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"MINIMUM_LIQUIDITY"`
- */
-export const useReadAmmPairMinimumLiquidity =
-  /*#__PURE__*/ createUseReadContract({
-    abi: ammPairAbi,
-    functionName: 'MINIMUM_LIQUIDITY',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"allowance"`
- */
-export const useReadAmmPairAllowance = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'allowance',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"balanceOf"`
- */
-export const useReadAmmPairBalanceOf = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'balanceOf',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"decimals"`
- */
-export const useReadAmmPairDecimals = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'decimals',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"factory"`
- */
-export const useReadAmmPairFactory = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'factory',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"getReserves"`
- */
-export const useReadAmmPairGetReserves = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'getReserves',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"name"`
- */
-export const useReadAmmPairName = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'name',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"symbol"`
- */
-export const useReadAmmPairSymbol = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'symbol',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"token0"`
- */
-export const useReadAmmPairToken0 = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'token0',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"token1"`
- */
-export const useReadAmmPairToken1 = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'token1',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"totalSupply"`
- */
-export const useReadAmmPairTotalSupply = /*#__PURE__*/ createUseReadContract({
-  abi: ammPairAbi,
-  functionName: 'totalSupply',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__
- */
-export const useWriteAmmPair = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"approve"`
- */
-export const useWriteAmmPairApprove = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'approve',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"burn"`
- */
-export const useWriteAmmPairBurn = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'burn',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"mint"`
- */
-export const useWriteAmmPairMint = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'mint',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"skim"`
- */
-export const useWriteAmmPairSkim = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'skim',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"swap"`
- */
-export const useWriteAmmPairSwap = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'swap',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"sync"`
- */
-export const useWriteAmmPairSync = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'sync',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transfer"`
- */
-export const useWriteAmmPairTransfer = /*#__PURE__*/ createUseWriteContract({
-  abi: ammPairAbi,
-  functionName: 'transfer',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transferFrom"`
- */
-export const useWriteAmmPairTransferFrom = /*#__PURE__*/ createUseWriteContract(
-  { abi: ammPairAbi, functionName: 'transferFrom' },
-)
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__
- */
-export const useSimulateAmmPair = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"approve"`
- */
-export const useSimulateAmmPairApprove =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammPairAbi,
-    functionName: 'approve',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"burn"`
- */
-export const useSimulateAmmPairBurn = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-  functionName: 'burn',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"mint"`
- */
-export const useSimulateAmmPairMint = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-  functionName: 'mint',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"skim"`
- */
-export const useSimulateAmmPairSkim = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-  functionName: 'skim',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"swap"`
- */
-export const useSimulateAmmPairSwap = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-  functionName: 'swap',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"sync"`
- */
-export const useSimulateAmmPairSync = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammPairAbi,
-  functionName: 'sync',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transfer"`
- */
-export const useSimulateAmmPairTransfer =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammPairAbi,
-    functionName: 'transfer',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammPairAbi}__ and `functionName` set to `"transferFrom"`
- */
-export const useSimulateAmmPairTransferFrom =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammPairAbi,
-    functionName: 'transferFrom',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__
- */
-export const useWatchAmmPairEvent = /*#__PURE__*/ createUseWatchContractEvent({
-  abi: ammPairAbi,
-})
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Approval"`
- */
-export const useWatchAmmPairApprovalEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Approval',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Burn"`
- */
-export const useWatchAmmPairBurnEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Burn',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Mint"`
- */
-export const useWatchAmmPairMintEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Mint',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Swap"`
- */
-export const useWatchAmmPairSwapEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Swap',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Sync"`
- */
-export const useWatchAmmPairSyncEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Sync',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammPairAbi}__ and `eventName` set to `"Transfer"`
- */
-export const useWatchAmmPairTransferEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammPairAbi,
-    eventName: 'Transfer',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__
- */
-export const useReadAmmRouter = /*#__PURE__*/ createUseReadContract({
-  abi: ammRouterAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"BPS_DENOM"`
- */
-export const useReadAmmRouterBpsDenom = /*#__PURE__*/ createUseReadContract({
-  abi: ammRouterAbi,
-  functionName: 'BPS_DENOM',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"FEE_NUM"`
- */
-export const useReadAmmRouterFeeNum = /*#__PURE__*/ createUseReadContract({
-  abi: ammRouterAbi,
-  functionName: 'FEE_NUM',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"factory"`
- */
-export const useReadAmmRouterFactory = /*#__PURE__*/ createUseReadContract({
-  abi: ammRouterAbi,
-  functionName: 'factory',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"quoteExactInput"`
- */
-export const useReadAmmRouterQuoteExactInput =
-  /*#__PURE__*/ createUseReadContract({
-    abi: ammRouterAbi,
-    functionName: 'quoteExactInput',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammRouterAbi}__
- */
-export const useWriteAmmRouter = /*#__PURE__*/ createUseWriteContract({
-  abi: ammRouterAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
- */
-export const useWriteAmmRouterSwapExactTokensForTokens =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: ammRouterAbi,
-    functionName: 'swapExactTokensForTokens',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammRouterAbi}__
- */
-export const useSimulateAmmRouter = /*#__PURE__*/ createUseSimulateContract({
-  abi: ammRouterAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link ammRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
- */
-export const useSimulateAmmRouterSwapExactTokensForTokens =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: ammRouterAbi,
-    functionName: 'swapExactTokensForTokens',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammRouterAbi}__
- */
-export const useWatchAmmRouterEvent = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: ammRouterAbi },
-)
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link ammRouterAbi}__ and `eventName` set to `"SwapExactIn"`
- */
-export const useWatchAmmRouterSwapExactInEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: ammRouterAbi,
-    eventName: 'SwapExactIn',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__
- */
-export const useReadBondingCurve = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"BPS_DENOM"`
- */
-export const useReadBondingCurveBpsDenom = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'BPS_DENOM',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"canGraduate"`
- */
-export const useReadBondingCurveCanGraduate =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'canGraduate',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"creator"`
- */
-export const useReadBondingCurveCreator = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'creator',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"creatorEarnings"`
- */
-export const useReadBondingCurveCreatorEarnings =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'creatorEarnings',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"currentPrice"`
- */
-export const useReadBondingCurveCurrentPrice =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'currentPrice',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"feeBps"`
- */
-export const useReadBondingCurveFeeBps = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'feeBps',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduated"`
- */
-export const useReadBondingCurveGraduated = /*#__PURE__*/ createUseReadContract(
-  { abi: bondingCurveAbi, functionName: 'graduated' },
-)
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationMarketCap"`
- */
-export const useReadBondingCurveGraduationMarketCap =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduationMarketCap',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationMcap"`
- */
-export const useReadBondingCurveGraduationMcap =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduationMcap',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationPool"`
- */
-export const useReadBondingCurveGraduationPool =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduationPool',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationPrice"`
- */
-export const useReadBondingCurveGraduationPrice =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduationPrice',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduationProgressBps"`
- */
-export const useReadBondingCurveGraduationProgressBps =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduationProgressBps',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"initialCurveSupply"`
- */
-export const useReadBondingCurveInitialCurveSupply =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'initialCurveSupply',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"k"`
- */
-export const useReadBondingCurveK = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'k',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"marketCap"`
- */
-export const useReadBondingCurveMarketCap = /*#__PURE__*/ createUseReadContract(
-  { abi: bondingCurveAbi, functionName: 'marketCap' },
-)
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"migrator"`
- */
-export const useReadBondingCurveMigrator = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'migrator',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"protocolFeeBps"`
- */
-export const useReadBondingCurveProtocolFeeBps =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'protocolFeeBps',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"quoteBuy"`
- */
-export const useReadBondingCurveQuoteBuy = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'quoteBuy',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"quoteSell"`
- */
-export const useReadBondingCurveQuoteSell = /*#__PURE__*/ createUseReadContract(
-  { abi: bondingCurveAbi, functionName: 'quoteSell' },
-)
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"reserveTokens"`
- */
-export const useReadBondingCurveReserveTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'reserveTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"reserveUsdc"`
- */
-export const useReadBondingCurveReserveUsdc =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'reserveUsdc',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sellableTokens"`
- */
-export const useReadBondingCurveSellableTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'sellableTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"token"`
- */
-export const useReadBondingCurveToken = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'token',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"totalSupply_"`
- */
-export const useReadBondingCurveTotalSupply =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'totalSupply_',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"treasury"`
- */
-export const useReadBondingCurveTreasury = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'treasury',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"usdc"`
- */
-export const useReadBondingCurveUsdc = /*#__PURE__*/ createUseReadContract({
-  abi: bondingCurveAbi,
-  functionName: 'usdc',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"virtualTokens"`
- */
-export const useReadBondingCurveVirtualTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'virtualTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"virtualUsdc"`
- */
-export const useReadBondingCurveVirtualUsdc =
-  /*#__PURE__*/ createUseReadContract({
-    abi: bondingCurveAbi,
-    functionName: 'virtualUsdc',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__
- */
-export const useWriteBondingCurve = /*#__PURE__*/ createUseWriteContract({
-  abi: bondingCurveAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"buy"`
- */
-export const useWriteBondingCurveBuy = /*#__PURE__*/ createUseWriteContract({
-  abi: bondingCurveAbi,
-  functionName: 'buy',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
- */
-export const useWriteBondingCurveClaimCreatorFees =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: bondingCurveAbi,
-    functionName: 'claimCreatorFees',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduate"`
- */
-export const useWriteBondingCurveGraduate =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduate',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sell"`
- */
-export const useWriteBondingCurveSell = /*#__PURE__*/ createUseWriteContract({
-  abi: bondingCurveAbi,
-  functionName: 'sell',
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__
- */
-export const useSimulateBondingCurve = /*#__PURE__*/ createUseSimulateContract({
-  abi: bondingCurveAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"buy"`
- */
-export const useSimulateBondingCurveBuy =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: bondingCurveAbi,
-    functionName: 'buy',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
- */
-export const useSimulateBondingCurveClaimCreatorFees =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: bondingCurveAbi,
-    functionName: 'claimCreatorFees',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"graduate"`
- */
-export const useSimulateBondingCurveGraduate =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: bondingCurveAbi,
-    functionName: 'graduate',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link bondingCurveAbi}__ and `functionName` set to `"sell"`
- */
-export const useSimulateBondingCurveSell =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: bondingCurveAbi,
-    functionName: 'sell',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__
- */
-export const useWatchBondingCurveEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: bondingCurveAbi })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"CreatorFeesClaimed"`
- */
-export const useWatchBondingCurveCreatorFeesClaimedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: bondingCurveAbi,
-    eventName: 'CreatorFeesClaimed',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"Graduated"`
- */
-export const useWatchBondingCurveGraduatedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: bondingCurveAbi,
-    eventName: 'Graduated',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link bondingCurveAbi}__ and `eventName` set to `"Traded"`
- */
-export const useWatchBondingCurveTradedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: bondingCurveAbi,
-    eventName: 'Traded',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__
- */
-export const useReadLaunchFactory = /*#__PURE__*/ createUseReadContract({
-  abi: launchFactoryAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"CURVE_RESERVE"`
- */
-export const useReadLaunchFactoryCurveReserve =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'CURVE_RESERVE',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"allTokens"`
- */
-export const useReadLaunchFactoryAllTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'allTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"allTokensLength"`
- */
-export const useReadLaunchFactoryAllTokensLength =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'allTokensLength',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"creationFee"`
- */
-export const useReadLaunchFactoryCreationFee =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'creationFee',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"feeBps"`
- */
-export const useReadLaunchFactoryFeeBps = /*#__PURE__*/ createUseReadContract({
-  abi: launchFactoryAbi,
-  functionName: 'feeBps',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"graduationMcap"`
- */
-export const useReadLaunchFactoryGraduationMcap =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'graduationMcap',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"launchOfToken"`
- */
-export const useReadLaunchFactoryLaunchOfToken =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'launchOfToken',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"migrator"`
- */
-export const useReadLaunchFactoryMigrator = /*#__PURE__*/ createUseReadContract(
-  { abi: launchFactoryAbi, functionName: 'migrator' },
-)
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"owner"`
- */
-export const useReadLaunchFactoryOwner = /*#__PURE__*/ createUseReadContract({
-  abi: launchFactoryAbi,
-  functionName: 'owner',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"pendingOwner"`
- */
-export const useReadLaunchFactoryPendingOwner =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'pendingOwner',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"protocolFeeBps"`
- */
-export const useReadLaunchFactoryProtocolFeeBps =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'protocolFeeBps',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"treasury"`
- */
-export const useReadLaunchFactoryTreasury = /*#__PURE__*/ createUseReadContract(
-  { abi: launchFactoryAbi, functionName: 'treasury' },
-)
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"usdc"`
- */
-export const useReadLaunchFactoryUsdc = /*#__PURE__*/ createUseReadContract({
-  abi: launchFactoryAbi,
-  functionName: 'usdc',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"virtualTokens"`
- */
-export const useReadLaunchFactoryVirtualTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'virtualTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"virtualUsdc"`
- */
-export const useReadLaunchFactoryVirtualUsdc =
-  /*#__PURE__*/ createUseReadContract({
-    abi: launchFactoryAbi,
-    functionName: 'virtualUsdc',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__
- */
-export const useWriteLaunchFactory = /*#__PURE__*/ createUseWriteContract({
-  abi: launchFactoryAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
- */
-export const useWriteLaunchFactoryAcceptOwnership =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: launchFactoryAbi,
-    functionName: 'acceptOwnership',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"createToken"`
- */
-export const useWriteLaunchFactoryCreateToken =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: launchFactoryAbi,
-    functionName: 'createToken',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
- */
-export const useWriteLaunchFactorySetCreationFee =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: launchFactoryAbi,
-    functionName: 'setCreationFee',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setMigrator"`
- */
-export const useWriteLaunchFactorySetMigrator =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: launchFactoryAbi,
-    functionName: 'setMigrator',
-  })
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
- */
-export const useWriteLaunchFactoryTransferOwnership =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: launchFactoryAbi,
-    functionName: 'transferOwnership',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__
- */
-export const useSimulateLaunchFactory = /*#__PURE__*/ createUseSimulateContract(
-  { abi: launchFactoryAbi },
-)
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
- */
-export const useSimulateLaunchFactoryAcceptOwnership =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: launchFactoryAbi,
-    functionName: 'acceptOwnership',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"createToken"`
- */
-export const useSimulateLaunchFactoryCreateToken =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: launchFactoryAbi,
-    functionName: 'createToken',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
- */
-export const useSimulateLaunchFactorySetCreationFee =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: launchFactoryAbi,
-    functionName: 'setCreationFee',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"setMigrator"`
- */
-export const useSimulateLaunchFactorySetMigrator =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: launchFactoryAbi,
-    functionName: 'setMigrator',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link launchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
- */
-export const useSimulateLaunchFactoryTransferOwnership =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: launchFactoryAbi,
-    functionName: 'transferOwnership',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__
- */
-export const useWatchLaunchFactoryEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({ abi: launchFactoryAbi })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"CreationFeeUpdated"`
- */
-export const useWatchLaunchFactoryCreationFeeUpdatedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: launchFactoryAbi,
-    eventName: 'CreationFeeUpdated',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"MigratorUpdated"`
- */
-export const useWatchLaunchFactoryMigratorUpdatedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: launchFactoryAbi,
-    eventName: 'MigratorUpdated',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"OwnershipTransferStarted"`
- */
-export const useWatchLaunchFactoryOwnershipTransferStartedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: launchFactoryAbi,
-    eventName: 'OwnershipTransferStarted',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"OwnershipTransferred"`
- */
-export const useWatchLaunchFactoryOwnershipTransferredEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: launchFactoryAbi,
-    eventName: 'OwnershipTransferred',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link launchFactoryAbi}__ and `eventName` set to `"TokenCreated"`
- */
-export const useWatchLaunchFactoryTokenCreatedEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: launchFactoryAbi,
-    eventName: 'TokenCreated',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__
- */
-export const useReadMemeToken = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"allowance"`
- */
-export const useReadMemeTokenAllowance = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'allowance',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"balanceOf"`
- */
-export const useReadMemeTokenBalanceOf = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'balanceOf',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"decimals"`
- */
-export const useReadMemeTokenDecimals = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'decimals',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"name"`
- */
-export const useReadMemeTokenName = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'name',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"symbol"`
- */
-export const useReadMemeTokenSymbol = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'symbol',
-})
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"totalSupply"`
- */
-export const useReadMemeTokenTotalSupply = /*#__PURE__*/ createUseReadContract({
-  abi: memeTokenAbi,
-  functionName: 'totalSupply',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__
- */
-export const useWriteMemeToken = /*#__PURE__*/ createUseWriteContract({
-  abi: memeTokenAbi,
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"approve"`
- */
-export const useWriteMemeTokenApprove = /*#__PURE__*/ createUseWriteContract({
-  abi: memeTokenAbi,
-  functionName: 'approve',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transfer"`
- */
-export const useWriteMemeTokenTransfer = /*#__PURE__*/ createUseWriteContract({
-  abi: memeTokenAbi,
-  functionName: 'transfer',
-})
-
-/**
- * Wraps __{@link useWriteContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transferFrom"`
- */
-export const useWriteMemeTokenTransferFrom =
-  /*#__PURE__*/ createUseWriteContract({
-    abi: memeTokenAbi,
-    functionName: 'transferFrom',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__
- */
-export const useSimulateMemeToken = /*#__PURE__*/ createUseSimulateContract({
-  abi: memeTokenAbi,
-})
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"approve"`
- */
-export const useSimulateMemeTokenApprove =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: memeTokenAbi,
-    functionName: 'approve',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transfer"`
- */
-export const useSimulateMemeTokenTransfer =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: memeTokenAbi,
-    functionName: 'transfer',
-  })
-
-/**
- * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link memeTokenAbi}__ and `functionName` set to `"transferFrom"`
- */
-export const useSimulateMemeTokenTransferFrom =
-  /*#__PURE__*/ createUseSimulateContract({
-    abi: memeTokenAbi,
-    functionName: 'transferFrom',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__
- */
-export const useWatchMemeTokenEvent = /*#__PURE__*/ createUseWatchContractEvent(
-  { abi: memeTokenAbi },
-)
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__ and `eventName` set to `"Approval"`
- */
-export const useWatchMemeTokenApprovalEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: memeTokenAbi,
-    eventName: 'Approval',
-  })
-
-/**
- * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link memeTokenAbi}__ and `eventName` set to `"Transfer"`
- */
-export const useWatchMemeTokenTransferEvent =
-  /*#__PURE__*/ createUseWatchContractEvent({
-    abi: memeTokenAbi,
-    eventName: 'Transfer',
-  })
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link mockUsdcAbi}__
@@ -3135,5 +1824,1453 @@ export const useWatchMockUsdcApprovalEvent =
 export const useWatchMockUsdcTransferEvent =
   /*#__PURE__*/ createUseWatchContractEvent({
     abi: mockUsdcAbi,
+    eventName: 'Transfer',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__
+ */
+export const useReadWafflesAmmFactory = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"allPairs"`
+ */
+export const useReadWafflesAmmFactoryAllPairs =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'allPairs',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"allPairsLength"`
+ */
+export const useReadWafflesAmmFactoryAllPairsLength =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'allPairsLength',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"getPair"`
+ */
+export const useReadWafflesAmmFactoryGetPair =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'getPair',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useReadWafflesAmmFactoryOwner =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'owner',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"pairCreator"`
+ */
+export const useReadWafflesAmmFactoryPairCreator =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'pairCreator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"parameters"`
+ */
+export const useReadWafflesAmmFactoryParameters =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'parameters',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__
+ */
+export const useWriteWafflesAmmFactory = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"createPair"`
+ */
+export const useWriteWafflesAmmFactoryCreatePair =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'createPair',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"setPairCreator"`
+ */
+export const useWriteWafflesAmmFactorySetPairCreator =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'setPairCreator',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__
+ */
+export const useSimulateWafflesAmmFactory =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesAmmFactoryAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"createPair"`
+ */
+export const useSimulateWafflesAmmFactoryCreatePair =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'createPair',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"setPairCreator"`
+ */
+export const useSimulateWafflesAmmFactorySetPairCreator =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'setPairCreator',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__
+ */
+export const useWatchWafflesAmmFactoryEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesAmmFactoryAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `eventName` set to `"PairCreated"`
+ */
+export const useWatchWafflesAmmFactoryPairCreatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmFactoryAbi,
+    eventName: 'PairCreated',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__
+ */
+export const useReadWafflesAmmMigrator = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmMigratorAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"DEAD_ADDRESS"`
+ */
+export const useReadWafflesAmmMigratorDeadAddress =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'DEAD_ADDRESS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadWafflesAmmMigratorFactory =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'factory',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"launchFactory"`
+ */
+export const useReadWafflesAmmMigratorLaunchFactory =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'launchFactory',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"owner"`
+ */
+export const useReadWafflesAmmMigratorOwner =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'owner',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadWafflesAmmMigratorUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'usdc',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__
+ */
+export const useWriteWafflesAmmMigrator = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmMigratorAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"migrate"`
+ */
+export const useWriteWafflesAmmMigratorMigrate =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'migrate',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"setLaunchFactory"`
+ */
+export const useWriteWafflesAmmMigratorSetLaunchFactory =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'setLaunchFactory',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__
+ */
+export const useSimulateWafflesAmmMigrator =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesAmmMigratorAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"migrate"`
+ */
+export const useSimulateWafflesAmmMigratorMigrate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'migrate',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"setLaunchFactory"`
+ */
+export const useSimulateWafflesAmmMigratorSetLaunchFactory =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'setLaunchFactory',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__
+ */
+export const useReadWafflesAmmPair = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadWafflesAmmPairBpsDenom =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'BPS_DENOM',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"FEE_BPS"`
+ */
+export const useReadWafflesAmmPairFeeBps = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'FEE_BPS',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"MINIMUM_LIQUIDITY"`
+ */
+export const useReadWafflesAmmPairMinimumLiquidity =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'MINIMUM_LIQUIDITY',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"allowance"`
+ */
+export const useReadWafflesAmmPairAllowance =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'allowance',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useReadWafflesAmmPairBalanceOf =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'balanceOf',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"decimals"`
+ */
+export const useReadWafflesAmmPairDecimals =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'decimals',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadWafflesAmmPairFactory = /*#__PURE__*/ createUseReadContract(
+  { abi: wafflesAmmPairAbi, functionName: 'factory' },
+)
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"getReserves"`
+ */
+export const useReadWafflesAmmPairGetReserves =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'getReserves',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"name"`
+ */
+export const useReadWafflesAmmPairName = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'name',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useReadWafflesAmmPairSymbol = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'symbol',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"token0"`
+ */
+export const useReadWafflesAmmPairToken0 = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'token0',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"token1"`
+ */
+export const useReadWafflesAmmPairToken1 = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'token1',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useReadWafflesAmmPairTotalSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'totalSupply',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__
+ */
+export const useWriteWafflesAmmPair = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"approve"`
+ */
+export const useWriteWafflesAmmPairApprove =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"burn"`
+ */
+export const useWriteWafflesAmmPairBurn = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'burn',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"mint"`
+ */
+export const useWriteWafflesAmmPairMint = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'mint',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"skim"`
+ */
+export const useWriteWafflesAmmPairSkim = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'skim',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"swap"`
+ */
+export const useWriteWafflesAmmPairSwap = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'swap',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"sync"`
+ */
+export const useWriteWafflesAmmPairSync = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'sync',
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useWriteWafflesAmmPairTransfer =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useWriteWafflesAmmPairTransferFrom =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__
+ */
+export const useSimulateWafflesAmmPair =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesAmmPairAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"approve"`
+ */
+export const useSimulateWafflesAmmPairApprove =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"burn"`
+ */
+export const useSimulateWafflesAmmPairBurn =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'burn',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"mint"`
+ */
+export const useSimulateWafflesAmmPairMint =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'mint',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"skim"`
+ */
+export const useSimulateWafflesAmmPairSkim =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'skim',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"swap"`
+ */
+export const useSimulateWafflesAmmPairSwap =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'swap',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"sync"`
+ */
+export const useSimulateWafflesAmmPairSync =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'sync',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useSimulateWafflesAmmPairTransfer =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useSimulateWafflesAmmPairTransferFrom =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__
+ */
+export const useWatchWafflesAmmPairEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesAmmPairAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useWatchWafflesAmmPairApprovalEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Approval',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Burn"`
+ */
+export const useWatchWafflesAmmPairBurnEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Burn',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Mint"`
+ */
+export const useWatchWafflesAmmPairMintEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Mint',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Swap"`
+ */
+export const useWatchWafflesAmmPairSwapEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Swap',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Sync"`
+ */
+export const useWatchWafflesAmmPairSyncEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Sync',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useWatchWafflesAmmPairTransferEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'Transfer',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__
+ */
+export const useReadWafflesAmmRouter = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmRouterAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadWafflesAmmRouterBpsDenom =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'BPS_DENOM',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"FEE_NUM"`
+ */
+export const useReadWafflesAmmRouterFeeNum =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'FEE_NUM',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"factory"`
+ */
+export const useReadWafflesAmmRouterFactory =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'factory',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"quoteExactInput"`
+ */
+export const useReadWafflesAmmRouterQuoteExactInput =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'quoteExactInput',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__
+ */
+export const useWriteWafflesAmmRouter = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesAmmRouterAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
+ */
+export const useWriteWafflesAmmRouterSwapExactTokensForTokens =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'swapExactTokensForTokens',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__
+ */
+export const useSimulateWafflesAmmRouter =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesAmmRouterAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"swapExactTokensForTokens"`
+ */
+export const useSimulateWafflesAmmRouterSwapExactTokensForTokens =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'swapExactTokensForTokens',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmRouterAbi}__
+ */
+export const useWatchWafflesAmmRouterEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesAmmRouterAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `eventName` set to `"SwapExactIn"`
+ */
+export const useWatchWafflesAmmRouterSwapExactInEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmRouterAbi,
+    eventName: 'SwapExactIn',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__
+ */
+export const useReadWafflesBondingCurve = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesBondingCurveAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"BPS_DENOM"`
+ */
+export const useReadWafflesBondingCurveBpsDenom =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'BPS_DENOM',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"canGraduate"`
+ */
+export const useReadWafflesBondingCurveCanGraduate =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'canGraduate',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"creator"`
+ */
+export const useReadWafflesBondingCurveCreator =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'creator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"creatorEarnings"`
+ */
+export const useReadWafflesBondingCurveCreatorEarnings =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'creatorEarnings',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"currentPrice"`
+ */
+export const useReadWafflesBondingCurveCurrentPrice =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'currentPrice',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"feeBps"`
+ */
+export const useReadWafflesBondingCurveFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'feeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduated"`
+ */
+export const useReadWafflesBondingCurveGraduated =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduated',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationMarketCap"`
+ */
+export const useReadWafflesBondingCurveGraduationMarketCap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduationMarketCap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationMcap"`
+ */
+export const useReadWafflesBondingCurveGraduationMcap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduationMcap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationPool"`
+ */
+export const useReadWafflesBondingCurveGraduationPool =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduationPool',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationPrice"`
+ */
+export const useReadWafflesBondingCurveGraduationPrice =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduationPrice',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationProgressBps"`
+ */
+export const useReadWafflesBondingCurveGraduationProgressBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduationProgressBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"initialCurveSupply"`
+ */
+export const useReadWafflesBondingCurveInitialCurveSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'initialCurveSupply',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"k"`
+ */
+export const useReadWafflesBondingCurveK = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesBondingCurveAbi,
+  functionName: 'k',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"marketCap"`
+ */
+export const useReadWafflesBondingCurveMarketCap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'marketCap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"migrator"`
+ */
+export const useReadWafflesBondingCurveMigrator =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'migrator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"protocolFeeBps"`
+ */
+export const useReadWafflesBondingCurveProtocolFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'protocolFeeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"quoteBuy"`
+ */
+export const useReadWafflesBondingCurveQuoteBuy =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'quoteBuy',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"quoteSell"`
+ */
+export const useReadWafflesBondingCurveQuoteSell =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'quoteSell',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"reserveTokens"`
+ */
+export const useReadWafflesBondingCurveReserveTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'reserveTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"reserveUsdc"`
+ */
+export const useReadWafflesBondingCurveReserveUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'reserveUsdc',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"sellableTokens"`
+ */
+export const useReadWafflesBondingCurveSellableTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'sellableTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"token"`
+ */
+export const useReadWafflesBondingCurveToken =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'token',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"totalSupply_"`
+ */
+export const useReadWafflesBondingCurveTotalSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'totalSupply_',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadWafflesBondingCurveTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'treasury',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadWafflesBondingCurveUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'usdc',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualTokens"`
+ */
+export const useReadWafflesBondingCurveVirtualTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'virtualTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualUsdc"`
+ */
+export const useReadWafflesBondingCurveVirtualUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'virtualUsdc',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__
+ */
+export const useWriteWafflesBondingCurve = /*#__PURE__*/ createUseWriteContract(
+  { abi: wafflesBondingCurveAbi },
+)
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"buy"`
+ */
+export const useWriteWafflesBondingCurveBuy =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'buy',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
+ */
+export const useWriteWafflesBondingCurveClaimCreatorFees =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'claimCreatorFees',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduate"`
+ */
+export const useWriteWafflesBondingCurveGraduate =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduate',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"sell"`
+ */
+export const useWriteWafflesBondingCurveSell =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'sell',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__
+ */
+export const useSimulateWafflesBondingCurve =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesBondingCurveAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"buy"`
+ */
+export const useSimulateWafflesBondingCurveBuy =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'buy',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"claimCreatorFees"`
+ */
+export const useSimulateWafflesBondingCurveClaimCreatorFees =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'claimCreatorFees',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduate"`
+ */
+export const useSimulateWafflesBondingCurveGraduate =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'graduate',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"sell"`
+ */
+export const useSimulateWafflesBondingCurveSell =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'sell',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__
+ */
+export const useWatchWafflesBondingCurveEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesBondingCurveAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `eventName` set to `"CreatorFeesClaimed"`
+ */
+export const useWatchWafflesBondingCurveCreatorFeesClaimedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesBondingCurveAbi,
+    eventName: 'CreatorFeesClaimed',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `eventName` set to `"Graduated"`
+ */
+export const useWatchWafflesBondingCurveGraduatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesBondingCurveAbi,
+    eventName: 'Graduated',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `eventName` set to `"Traded"`
+ */
+export const useWatchWafflesBondingCurveTradedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesBondingCurveAbi,
+    eventName: 'Traded',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__
+ */
+export const useReadWafflesLaunchFactory = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesLaunchFactoryAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"CURVE_RESERVE"`
+ */
+export const useReadWafflesLaunchFactoryCurveReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'CURVE_RESERVE',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"allTokens"`
+ */
+export const useReadWafflesLaunchFactoryAllTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'allTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"allTokensLength"`
+ */
+export const useReadWafflesLaunchFactoryAllTokensLength =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'allTokensLength',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"creationFee"`
+ */
+export const useReadWafflesLaunchFactoryCreationFee =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'creationFee',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"feeBps"`
+ */
+export const useReadWafflesLaunchFactoryFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'feeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"graduationMcap"`
+ */
+export const useReadWafflesLaunchFactoryGraduationMcap =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'graduationMcap',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"launchOfToken"`
+ */
+export const useReadWafflesLaunchFactoryLaunchOfToken =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'launchOfToken',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"migrator"`
+ */
+export const useReadWafflesLaunchFactoryMigrator =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'migrator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"owner"`
+ */
+export const useReadWafflesLaunchFactoryOwner =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'owner',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"pendingOwner"`
+ */
+export const useReadWafflesLaunchFactoryPendingOwner =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'pendingOwner',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"protocolFeeBps"`
+ */
+export const useReadWafflesLaunchFactoryProtocolFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'protocolFeeBps',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"tokenOfCurve"`
+ */
+export const useReadWafflesLaunchFactoryTokenOfCurve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'tokenOfCurve',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadWafflesLaunchFactoryTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'treasury',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadWafflesLaunchFactoryUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'usdc',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"virtualTokens"`
+ */
+export const useReadWafflesLaunchFactoryVirtualTokens =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'virtualTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"virtualUsdc"`
+ */
+export const useReadWafflesLaunchFactoryVirtualUsdc =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'virtualUsdc',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__
+ */
+export const useWriteWafflesLaunchFactory =
+  /*#__PURE__*/ createUseWriteContract({ abi: wafflesLaunchFactoryAbi })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
+ */
+export const useWriteWafflesLaunchFactoryAcceptOwnership =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'acceptOwnership',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"createToken"`
+ */
+export const useWriteWafflesLaunchFactoryCreateToken =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'createToken',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
+ */
+export const useWriteWafflesLaunchFactorySetCreationFee =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'setCreationFee',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useWriteWafflesLaunchFactoryTransferOwnership =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'transferOwnership',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__
+ */
+export const useSimulateWafflesLaunchFactory =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesLaunchFactoryAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"acceptOwnership"`
+ */
+export const useSimulateWafflesLaunchFactoryAcceptOwnership =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'acceptOwnership',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"createToken"`
+ */
+export const useSimulateWafflesLaunchFactoryCreateToken =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'createToken',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
+ */
+export const useSimulateWafflesLaunchFactorySetCreationFee =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'setCreationFee',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"transferOwnership"`
+ */
+export const useSimulateWafflesLaunchFactoryTransferOwnership =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'transferOwnership',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__
+ */
+export const useWatchWafflesLaunchFactoryEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesLaunchFactoryAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `eventName` set to `"CreationFeeUpdated"`
+ */
+export const useWatchWafflesLaunchFactoryCreationFeeUpdatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesLaunchFactoryAbi,
+    eventName: 'CreationFeeUpdated',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `eventName` set to `"OwnershipTransferStarted"`
+ */
+export const useWatchWafflesLaunchFactoryOwnershipTransferStartedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesLaunchFactoryAbi,
+    eventName: 'OwnershipTransferStarted',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `eventName` set to `"OwnershipTransferred"`
+ */
+export const useWatchWafflesLaunchFactoryOwnershipTransferredEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesLaunchFactoryAbi,
+    eventName: 'OwnershipTransferred',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `eventName` set to `"TokenCreated"`
+ */
+export const useWatchWafflesLaunchFactoryTokenCreatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesLaunchFactoryAbi,
+    eventName: 'TokenCreated',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__
+ */
+export const useReadWafflesMemeToken = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesMemeTokenAbi,
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"allowance"`
+ */
+export const useReadWafflesMemeTokenAllowance =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'allowance',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"balanceOf"`
+ */
+export const useReadWafflesMemeTokenBalanceOf =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'balanceOf',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"decimals"`
+ */
+export const useReadWafflesMemeTokenDecimals =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'decimals',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"name"`
+ */
+export const useReadWafflesMemeTokenName = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesMemeTokenAbi,
+  functionName: 'name',
+})
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"symbol"`
+ */
+export const useReadWafflesMemeTokenSymbol =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'symbol',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"totalSupply"`
+ */
+export const useReadWafflesMemeTokenTotalSupply =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'totalSupply',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__
+ */
+export const useWriteWafflesMemeToken = /*#__PURE__*/ createUseWriteContract({
+  abi: wafflesMemeTokenAbi,
+})
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"approve"`
+ */
+export const useWriteWafflesMemeTokenApprove =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useWriteWafflesMemeTokenTransfer =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useWriteWafflesMemeTokenTransferFrom =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__
+ */
+export const useSimulateWafflesMemeToken =
+  /*#__PURE__*/ createUseSimulateContract({ abi: wafflesMemeTokenAbi })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"approve"`
+ */
+export const useSimulateWafflesMemeTokenApprove =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'approve',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"transfer"`
+ */
+export const useSimulateWafflesMemeTokenTransfer =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'transfer',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `functionName` set to `"transferFrom"`
+ */
+export const useSimulateWafflesMemeTokenTransferFrom =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesMemeTokenAbi,
+    functionName: 'transferFrom',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesMemeTokenAbi}__
+ */
+export const useWatchWafflesMemeTokenEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesMemeTokenAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `eventName` set to `"Approval"`
+ */
+export const useWatchWafflesMemeTokenApprovalEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesMemeTokenAbi,
+    eventName: 'Approval',
+  })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesMemeTokenAbi}__ and `eventName` set to `"Transfer"`
+ */
+export const useWatchWafflesMemeTokenTransferEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesMemeTokenAbi,
     eventName: 'Transfer',
   })

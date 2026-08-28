@@ -2,6 +2,7 @@ import { createPublicClient, http, type Address, decodeEventLog, getAbiItem } fr
 import { config } from "./config.js";
 import { getDb, type LaunchDoc, type TradeDoc } from "./db.js";
 import { normalizeCurveUsdcAmounts } from "./normalization.js";
+import { executionPrice, spotPriceFromReserves } from "./pool-pricing.js";
 
 const factoryAbi = [
   {
@@ -49,6 +50,7 @@ const curveAbi = [
       { name: "tokenAmount", type: "uint256", indexed: false },
       { name: "priceAfter", type: "uint256", indexed: false },
       { name: "mcapAfter", type: "uint256", indexed: false },
+      { name: "progressBpsAfter", type: "uint256", indexed: false },
     ],
   },
   {
@@ -78,12 +80,21 @@ const ammPairAbi = [
       { name: "amount1Out", type: "uint256", indexed: false },
     ],
   },
+  {
+    type: "event",
+    name: "Sync",
+    inputs: [
+      { name: "reserve0", type: "uint256", indexed: false },
+      { name: "reserve1", type: "uint256", indexed: false },
+    ],
+  },
   { type: "function", name: "token0", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
 ] as const;
 
 export const tradedEvent = getAbiItem({ abi: curveAbi, name: "Traded" });
 export const graduatedEvent = getAbiItem({ abi: curveAbi, name: "Graduated" });
 export const poolSwapEvent = getAbiItem({ abi: ammPairAbi, name: "Swap" });
+export const poolSyncEvent = getAbiItem({ abi: ammPairAbi, name: "Sync" });
 
 export function createClient() {
   return createPublicClient({ transport: http(config.rpcUrl) });
@@ -217,6 +228,7 @@ async function syncTrades(
         tokenAmount: String(tokenAmount),
         priceAfter: String(priceAfter),
         mcapAfter: String(mcapAfter),
+        progressBpsAfter: Number(log.args.progressBpsAfter ?? 0n),
         blockNumber: Number(log.blockNumber),
         logIndex: log.logIndex,
         txHash: log.transactionHash,
@@ -236,6 +248,27 @@ async function syncTrades(
       };
     });
     await trades.bulkWrite(ops, { ordered: false });
+
+    const latestByCurve = new Map<
+      string,
+      { price: string; mcap: string; progressBps: number }
+    >();
+    for (const log of tradedLogs) {
+      latestByCurve.set(String(log.address).toLowerCase(), {
+        price: String(log.args.priceAfter ?? 0n),
+        mcap: String(log.args.mcapAfter ?? 0n),
+        progressBps: Number(log.args.progressBpsAfter ?? 0n),
+      });
+    }
+    await launches.bulkWrite(
+      [...latestByCurve].map(([curve, metrics]) => ({
+        updateOne: {
+          filter: { curve },
+          update: { $set: metrics },
+        },
+      })),
+      { ordered: false },
+    );
     console.log(`trades indexed: ${ops.length} (${fromBlock}-${toBlock})`);
   }
 
@@ -269,7 +302,7 @@ async function syncTrades(
 /// Index post-graduation swaps on the AMM pools of graduated launches, so
 /// the trade feed, candles, and volume keep flowing after the curve closes.
 /// Pool swaps are stored under the launch's curve address with source=pool;
-/// priceAfter/mcapAfter use the swap's execution price (1B supply).
+/// priceAfter/mcapAfter use the exact post-swap reserves emitted by Sync.
 async function syncPoolSwaps(
   client: PublicClient,
   db: Awaited<ReturnType<typeof getDb>>,
@@ -295,6 +328,20 @@ async function syncPoolSwaps(
     toBlock: BigInt(toBlock),
   });
   if (logs.length === 0) return;
+
+  const syncLogs = await client.getLogs({
+    address: pools,
+    event: poolSyncEvent,
+    fromBlock: BigInt(fromBlock),
+    toBlock: BigInt(toBlock),
+  });
+  const reservesBySwap = new Map<string, { reserve0: bigint; reserve1: bigint }>();
+  for (const log of syncLogs) {
+    reservesBySwap.set(`${log.transactionHash}:${Number(log.logIndex) + 1}`, {
+      reserve0: log.args.reserve0 ?? 0n,
+      reserve1: log.args.reserve1 ?? 0n,
+    });
+  }
 
   const token0Cache = new Map<string, boolean>(); // pool -> token is token0
   for (const log of logs) {
@@ -322,7 +369,8 @@ async function syncPoolSwaps(
   );
 
   const trades = db.collection<TradeDoc>("trades");
-  const ops = logs.map((log) => {
+  const latestByCurve = new Map<string, { price: string; mcap: string }>();
+  const ops = logs.flatMap((log) => {
     const pool = String(log.address).toLowerCase();
     const tokenIsToken0 = token0Cache.get(pool) ?? false;
     const { to, amount0In, amount1In, amount0Out, amount1Out } = log.args;
@@ -344,21 +392,31 @@ async function syncPoolSwaps(
         ? amount1Out!
         : amount1In!;
 
-    const priceAfter =
-      tokenLeg > 0n ? (usdcLeg * 10n ** 18n) / tokenLeg : 0n;
-    const mcapAfter =
-      tokenLeg > 0n ? (usdcLeg * 10n ** 27n) / tokenLeg : 0n; // 1B supply, raw 18dp
+    const reserves = reservesBySwap.get(`${log.transactionHash}:${Number(log.logIndex)}`);
+    if (!reserves) {
+      console.warn(`pool swap skipped without matching Sync: ${log.transactionHash}:${log.logIndex}`);
+      return [];
+    }
+    const spot = spotPriceFromReserves(tokenIsToken0, reserves.reserve0, reserves.reserve1);
+    const averagePrice = executionPrice(usdcLeg, tokenLeg);
+    const curveAddress = curveByPool.get(pool)!;
+    latestByCurve.set(curveAddress, {
+      price: String(spot.price),
+      mcap: String(spot.marketCap),
+    });
 
     const doc: TradeDoc = {
-      curveAddress: curveByPool.get(pool)!,
+      curveAddress,
       trader: String(to).toLowerCase(),
       isBuy,
       usdcAmount: String(usdcLeg),
       usdcGrossAmount: String(usdcLeg),
       feeAmount: "0",
       tokenAmount: String(tokenLeg),
-      priceAfter: String(priceAfter),
-      mcapAfter: String(mcapAfter),
+      priceAfter: String(spot.price),
+      executionPrice: String(averagePrice),
+      mcapAfter: String(spot.marketCap),
+      progressBpsAfter: 10_000,
       blockNumber: Number(log.blockNumber),
       logIndex: log.logIndex,
       txHash: log.transactionHash,
@@ -377,7 +435,18 @@ async function syncPoolSwaps(
       },
     };
   });
-  await trades.bulkWrite(ops, { ordered: false });
+  if (ops.length > 0) await trades.bulkWrite(ops, { ordered: false });
+  if (latestByCurve.size > 0) {
+    await db.collection("launches").bulkWrite(
+      [...latestByCurve].map(([curve, metrics]) => ({
+        updateOne: {
+          filter: { curve },
+          update: { $set: metrics },
+        },
+      })),
+      { ordered: false },
+    );
+  }
   console.log(`pool swaps indexed: ${ops.length} (${fromBlock}-${toBlock})`);
 }
 
