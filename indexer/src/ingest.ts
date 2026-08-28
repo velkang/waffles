@@ -139,6 +139,7 @@ async function syncLaunches(
     const doc: LaunchDoc = {
       token: token.toLowerCase(),
       curve: curve.toLowerCase(),
+      factory: config.factoryAddress.toLowerCase(),
       creator: creator.toLowerCase(),
       name: String(name),
       symbol: String(symbol),

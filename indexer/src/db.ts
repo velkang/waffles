@@ -12,6 +12,7 @@ export async function getDb(): Promise<Db> {
 
   await db.collection("launches").createIndex({ token: 1 }, { unique: true });
   await db.collection("launches").createIndex({ curve: 1 }, { unique: true });
+  await db.collection("launches").createIndex({ factory: 1, createdAt: -1 });
   await db.collection("launches").createIndex({ createdAt: -1 });
 
   await db.collection("trades").createIndex(
@@ -32,6 +33,7 @@ export async function closeDb(): Promise<void> {
 export interface LaunchDoc {
   token: string;
   curve: string;
+  factory?: string;
   creator: string;
   name: string;
   symbol: string;

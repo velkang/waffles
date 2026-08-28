@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 type LaunchDoc = {
   token: string;
   curve: string;
+  factory?: string;
   creator?: string;
   name?: string;
   symbol?: string;
@@ -120,6 +121,8 @@ export async function GET(request: Request) {
   const sort = url.searchParams.get("sort") ?? "new";
   const limit = boundedLimit(url.searchParams.get("limit"));
   const token = url.searchParams.get("token")?.toLowerCase();
+  const factory = process.env.NEXT_PUBLIC_FACTORY_ADDRESS?.toLowerCase();
+  const filter: Record<string, unknown> = factory ? { factory } : {};
 
   try {
     const db = await getDb();
@@ -129,13 +132,13 @@ export async function GET(request: Request) {
       if (!/^0x[0-9a-f]{40}$/.test(token)) {
         return NextResponse.json({ error: "invalid token" }, { status: 400 });
       }
-      const launch = await launches.findOne({ token });
+      const launch = await launches.findOne({ token, ...filter });
       const [summary] = launch ? await enrichLaunches(db, [launch]) : [];
       return NextResponse.json({ launch: summary ?? null });
     }
 
     if (sort === "volume" || sort === "mcap") {
-      const docs = await launches.find().limit(500).toArray();
+      const docs = await launches.find(filter).limit(500).toArray();
       const enriched = await enrichLaunches(db, docs);
 
       enriched.sort((a, b) =>
@@ -149,7 +152,7 @@ export async function GET(request: Request) {
 
     // default: newest first
     const docs = await launches
-      .find()
+      .find(filter)
       .sort({ createdAt: -1 })
       .limit(limit)
       .toArray();

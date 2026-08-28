@@ -1,6 +1,7 @@
 import { arcTestnet } from 'viem/chains'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { cookieStorage, createStorage, http } from 'wagmi'
+import type { AppKitNetwork } from '@reown/appkit/networks'
 
 const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ?? 'https://rpc.testnet.arc.network'
@@ -20,7 +21,7 @@ export const ROUTER_ADDRESS = (process.env.NEXT_PUBLIC_ROUTER_ADDRESS ??
 export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS ??
   '0x3600000000000000000000000000000000000000') as `0x${string}`
 
-export const networks = [arcTestnet] as [typeof arcTestnet]
+export const networks = [arcTestnet] as [AppKitNetwork, ...AppKitNetwork[]]
 
 export const wagmiAdapter = new WagmiAdapter({
   networks,

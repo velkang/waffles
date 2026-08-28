@@ -3,13 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useAppKit } from "@reown/appkit/react";
-import { useAccount } from "wagmi";
+import { AppKitButton } from "@reown/appkit/react";
 import { CommandPalette } from "./ui/CommandPalette";
 
 export function Header() {
-  const { open } = useAppKit();
-  const { address, isConnected } = useAccount();
   const pathname = usePathname();
   const router = useRouter();
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -92,24 +89,7 @@ export function Header() {
               Portfolio
             </Link>
 
-            {isConnected && address ? (
-              <button
-                onClick={() => open()}
-                type="button"
-                className="flex items-center gap-1.5 rounded-[6px] border border-[#24262e] bg-[#141519] px-3 py-1.5 text-xs font-mono font-bold text-zinc-200 hover:border-[#db9d6a] hover:bg-[#1a1b21] transition"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80]" />
-                <span>{address.slice(0, 6)}…{address.slice(-4)}</span>
-              </button>
-            ) : (
-              <button
-                onClick={() => open()}
-                type="button"
-                className="rounded-[6px] bg-[#db9d6a] px-3.5 py-1.5 text-xs font-bold text-[#0e0f12] hover:bg-[#e5ab7a] transition active:scale-98"
-              >
-                Connect
-              </button>
-            )}
+            <AppKitButton balance="hide" />
           </div>
         </div>
       </header>

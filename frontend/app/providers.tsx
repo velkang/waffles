@@ -5,21 +5,31 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createAppKit } from '@reown/appkit/react'
 import { cookieToInitialState, WagmiProvider } from 'wagmi'
 import { networks, projectId, wagmiAdapter, wagmiConfig } from '@/lib/wagmi'
-import { arcTestnet } from 'viem/chains'
 
 const metadata = {
   name: 'waffles.meme',
   description: 'Fair Token Launchpad on Arc L1',
-  url: 'https://waffles.meme',
+  url:
+    typeof window !== 'undefined'
+      ? window.location.origin
+      : 'https://waffles.meme',
   icons: ['https://waffles.meme/favicon.ico'],
 }
 
-createAppKit({
+// Created once at module load (outside React) as AppKit requires.
+export const modal = createAppKit({
   adapters: [wagmiAdapter],
-  networks,
-  defaultNetwork: arcTestnet,
-  metadata,
   projectId,
+  networks,
+  defaultNetwork: networks[0],
+  metadata,
+  themeMode: 'dark',
+  themeVariables: {
+    '--w3m-accent': '#db9d6a',
+    '--w3m-color-mix': '#141519',
+    '--w3m-color-mix-strength': 20,
+    '--w3m-border-radius-master': '2px',
+  },
   features: {
     analytics: false,
     email: false,
