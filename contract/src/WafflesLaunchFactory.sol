@@ -46,7 +46,20 @@ contract WafflesLaunchFactory {
     mapping(address => address) public tokenOfCurve;
     address[] public allTokens;
 
-    event TokenCreated(address indexed token, address indexed curve, address indexed creator, uint256 creationFeePaid);
+    event TokenCreated(
+        address indexed token,
+        address indexed curve,
+        address indexed creator,
+        string name,
+        string symbol,
+        string description,
+        string imageUri,
+        string website,
+        string twitter,
+        string telegram,
+        uint256 feeBps,
+        uint256 creationFeePaid
+    );
     event CreationFeeUpdated(uint256 previousFee, uint256 newFee);
     event OwnershipTransferStarted(address indexed previousOwner, address indexed pendingOwner);
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -133,7 +146,20 @@ contract WafflesLaunchFactory {
         tokenOfCurve[curve] = token;
         allTokens.push(token);
 
-        emit TokenCreated(token, curve, msg.sender, fee);
+        emit TokenCreated(
+            token,
+            curve,
+            msg.sender,
+            name,
+            symbol,
+            description,
+            imageUri,
+            website,
+            twitter,
+            telegram,
+            feeBps,
+            fee
+        );
     }
 
     function allTokensLength() external view returns (uint256) {

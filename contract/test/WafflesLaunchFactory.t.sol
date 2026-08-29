@@ -29,7 +29,39 @@ contract WafflesLaunchFactoryTest is Test {
         usdc.approve(address(factory), type(uint256).max);
     }
 
+    event TokenCreated(
+        address indexed token,
+        address indexed curve,
+        address indexed creator,
+        string name,
+        string symbol,
+        string description,
+        string imageUri,
+        string website,
+        string twitter,
+        string telegram,
+        uint256 feeBps,
+        uint256 creationFeePaid
+    );
+
     function test_CreateToken() public {
+        address expectedToken = vm.computeCreateAddress(address(factory), 1);
+        address expectedCurve = vm.computeCreateAddress(address(factory), 2);
+        vm.expectEmit(true, true, true, true, address(factory));
+        emit TokenCreated(
+            expectedToken,
+            expectedCurve,
+            creator,
+            "Ghost",
+            "GHOST",
+            "spooky",
+            "ipfs://img",
+            "https://x",
+            "@x",
+            "t.me/x",
+            100,
+            CREATION_FEE
+        );
         vm.prank(creator);
         (address token, address curve) =
             factory.createToken("Ghost", "GHOST", "spooky", "ipfs://img", "https://x", "@x", "t.me/x");

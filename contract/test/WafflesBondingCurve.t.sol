@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
+import {Vm} from "forge-std/Vm.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {MockMigrator} from "../src/mocks/MockMigrator.sol";
@@ -145,6 +146,7 @@ contract WafflesBondingCurveTest is Test {
     }
 
     function test_GraduationOnCrossingBuy() public {
+        vm.recordLogs();
         vm.prank(trader);
         curve.buy(100_000e6, 0);
 
@@ -152,6 +154,23 @@ contract WafflesBondingCurveTest is Test {
         assertEq(curve.graduationPool(), address(0));
         assertGt(curve.graduationPrice(), 0);
         assertGt(curve.graduationMarketCap(), 0);
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 signature = keccak256("Graduated(address,address,uint256,uint256)");
+        bool found;
+        for (uint256 i; i < logs.length; ++i) {
+            if (logs[i].topics.length == 3 && logs[i].topics[0] == signature) {
+                assertEq(logs[i].emitter, address(curve));
+                assertEq(logs[i].topics[1], bytes32(0));
+                assertEq(logs[i].topics[2], bytes32(uint256(uint160(address(token)))));
+                (uint256 price, uint256 marketCap) = abi.decode(logs[i].data, (uint256, uint256));
+                assertEq(price, curve.graduationPrice());
+                assertEq(marketCap, curve.graduationMarketCap());
+                found = true;
+                break;
+            }
+        }
+        assertTrue(found, "enriched Graduated event not emitted");
     }
 
     function test_ClaimCreatorFees() public {

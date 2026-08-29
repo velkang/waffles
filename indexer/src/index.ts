@@ -1,6 +1,8 @@
 import { config } from "./config.js";
 import { getDb } from "./db.js";
 import { createClient, syncRange } from "./ingest.js";
+import { startWebhookServer } from "./webhook.js";
+import { startCircleMonitorReconciler } from "./circle-monitors.js";
 
 type SyncDoc = {
   _id: string;
@@ -14,6 +16,11 @@ async function main() {
   const sync = db.collection<SyncDoc>("sync");
   const syncId = config.factoryAddress.toLowerCase();
 
+  // 1. Start real-time Circle Webhook receiver
+  const monitorReconciler = startCircleMonitorReconciler(db);
+  startWebhookServer(db, config.port, monitorReconciler?.reconcileNow);
+
+  // 2. Setup poller safety net
   const chainHead = Number(await client.getBlockNumber());
   const initialFromBlock = Math.max(config.startBlock, chainHead - 10_000);
   const saved = await sync.findOne({ _id: syncId });
@@ -25,9 +32,10 @@ async function main() {
   }
 
   console.log(
-    `indexer starting: factory=${config.factoryAddress} next=${lastBlock + 1} head=${chainHead} confirmations=${config.confirmations}`,
+    `⚡ waffles indexer running: webhook port=${config.port} | poller factory=${config.factoryAddress} next=${lastBlock + 1} head=${chainHead} confirmations=${config.confirmations}`,
   );
 
+  // Background safety-net poller
   for (;;) {
     try {
       if (lastBlock >= config.startBlock && lastBlockHash) {
@@ -76,13 +84,13 @@ async function main() {
         );
       }
     } catch (err) {
-      console.error("sync error:", err instanceof Error ? err.message : err);
+      console.error("safety-net sync error:", err instanceof Error ? err.message : err);
     }
     await new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs));
   }
 }
 
 main().catch((err) => {
-  console.error(err);
+  console.error("fatal indexer error:", err);
   process.exit(1);
 });

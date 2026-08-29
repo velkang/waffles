@@ -4,7 +4,7 @@ import { getDb, type LaunchDoc, type TradeDoc } from "./db.js";
 import { normalizeCurveUsdcAmounts } from "./normalization.js";
 import { executionPrice, spotPriceFromReserves } from "./pool-pricing.js";
 
-const factoryAbi = [
+export const factoryAbi = [
   {
     type: "event",
     name: "TokenCreated",
@@ -12,34 +12,20 @@ const factoryAbi = [
       { name: "token", type: "address", indexed: true },
       { name: "curve", type: "address", indexed: true },
       { name: "creator", type: "address", indexed: true },
+      { name: "name", type: "string", indexed: false },
+      { name: "symbol", type: "string", indexed: false },
+      { name: "description", type: "string", indexed: false },
+      { name: "imageUri", type: "string", indexed: false },
+      { name: "website", type: "string", indexed: false },
+      { name: "twitter", type: "string", indexed: false },
+      { name: "telegram", type: "string", indexed: false },
+      { name: "feeBps", type: "uint256", indexed: false },
       { name: "creationFeePaid", type: "uint256", indexed: false },
     ],
   },
-  {
-    type: "function",
-    name: "launchOfToken",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "address" }],
-    outputs: [
-      { name: "", type: "address" },
-      { name: "", type: "address" },
-      { name: "", type: "address" },
-      { name: "", type: "string" },
-      { name: "", type: "string" },
-      { name: "", type: "string" },
-      { name: "", type: "string" },
-      { name: "", type: "string" },
-      { name: "", type: "uint64" },
-    ],
-  },
 ] as const;
 
-const tokenAbi = [
-  { type: "function", name: "name", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
-  { type: "function", name: "symbol", stateMutability: "view", inputs: [], outputs: [{ type: "string" }] },
-] as const;
-
-const curveAbi = [
+export const curveAbi = [
   {
     type: "event",
     name: "Traded",
@@ -56,18 +42,16 @@ const curveAbi = [
   {
     type: "event",
     name: "Graduated",
-    inputs: [{ name: "pool", type: "address", indexed: false }],
-  },
-  {
-    type: "function",
-    name: "feeBps",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
+    inputs: [
+      { name: "pool", type: "address", indexed: true },
+      { name: "token", type: "address", indexed: true },
+      { name: "graduationPrice", type: "uint256", indexed: false },
+      { name: "graduationMarketCap", type: "uint256", indexed: false },
+    ],
   },
 ] as const;
 
-const ammPairAbi = [
+export const ammPairAbi = [
   {
     type: "event",
     name: "Swap",
@@ -88,19 +72,105 @@ const ammPairAbi = [
       { name: "reserve1", type: "uint256", indexed: false },
     ],
   },
-  { type: "function", name: "token0", stateMutability: "view", inputs: [], outputs: [{ type: "address" }] },
 ] as const;
 
+export const tokenCreatedEvent = getAbiItem({ abi: factoryAbi, name: "TokenCreated" });
 export const tradedEvent = getAbiItem({ abi: curveAbi, name: "Traded" });
 export const graduatedEvent = getAbiItem({ abi: curveAbi, name: "Graduated" });
 export const poolSwapEvent = getAbiItem({ abi: ammPairAbi, name: "Swap" });
 export const poolSyncEvent = getAbiItem({ abi: ammPairAbi, name: "Sync" });
 
 export function createClient() {
-  return createPublicClient({ transport: http(config.rpcUrl) });
+  const client = createPublicClient({ transport: http(config.rpcUrl) });
+  const limiter = new RpcRateLimiter(config.rpcMaxRequestsPerSecond);
+  return new Proxy(client, {
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value !== "function") return value;
+      const method = value as (...args: unknown[]) => Promise<unknown>;
+      return (...args: unknown[]) => limiter.schedule(() => method.apply(target, args));
+    },
+  });
 }
 
-type PublicClient = ReturnType<typeof createClient>;
+class RpcRateLimiter {
+  private queue: Promise<unknown> = Promise.resolve();
+  private readonly intervalMs: number;
+  private nextStart = 0;
+
+  constructor(maxRequestsPerSecond: number) {
+    this.intervalMs = Math.ceil(1_000 / maxRequestsPerSecond);
+  }
+
+  schedule<T>(request: () => Promise<T>): Promise<T> {
+    const result = this.queue.then(async () => {
+      const waitMs = Math.max(0, this.nextStart - Date.now());
+      if (waitMs > 0) await new Promise((resolve) => setTimeout(resolve, waitMs));
+      this.nextStart = Date.now() + this.intervalMs;
+      return request();
+    });
+    this.queue = result.catch(() => undefined);
+    return result;
+  }
+}
+
+export type PublicClient = ReturnType<typeof createClient>;
+
+export async function processTokenCreatedLog(
+  db: Awaited<ReturnType<typeof getDb>>,
+  log: {
+    address: string;
+    args: {
+      token?: `0x${string}`;
+      curve?: `0x${string}`;
+      creator?: `0x${string}`;
+      name?: string;
+      symbol?: string;
+      description?: string;
+      imageUri?: string;
+      website?: string;
+      twitter?: string;
+      telegram?: string;
+      feeBps?: bigint;
+    };
+    blockNumber: bigint | number;
+    transactionHash: `0x${string}` | string;
+    timestamp?: Date;
+  },
+): Promise<Address | null> {
+  const { token, curve, creator, name, symbol, description, imageUri, website, twitter, telegram, feeBps } = log.args;
+  if (!token || !curve || !creator) return null;
+
+  const launches = db.collection<LaunchDoc>("launches");
+  const doc: LaunchDoc = {
+    token: token.toLowerCase(),
+    curve: curve.toLowerCase(),
+    factory: config.factoryAddress.toLowerCase(),
+    creator: creator.toLowerCase(),
+    name: String(name ?? ""),
+    symbol: String(symbol ?? ""),
+    description: description || undefined,
+    imageUri: imageUri || undefined,
+    website: website || undefined,
+    twitter: twitter || undefined,
+    telegram: telegram || undefined,
+    feeBps: feeBps === undefined ? 100 : Number(feeBps),
+    token0IsToken: token.toLowerCase() < config.usdcAddress,
+    createdAt: log.timestamp ?? new Date(),
+    createdBlock: Number(log.blockNumber),
+    txHash: log.transactionHash,
+    graduated: false,
+  };
+
+  const { graduated: _graduated, ...metadata } = doc;
+  await launches.updateOne(
+    { token: doc.token },
+    { $set: metadata, $setOnInsert: { graduated: false } },
+    { upsert: true },
+  );
+  console.log(`launch indexed: ${doc.symbol} ${doc.token} (curve ${doc.curve})`);
+  return curve as Address;
+}
 
 async function syncLaunches(
   client: PublicClient,
@@ -110,60 +180,31 @@ async function syncLaunches(
 ): Promise<Address[]> {
   const logs = await client.getLogs({
     address: config.factoryAddress,
-    event: getAbiItem({ abi: factoryAbi, name: "TokenCreated" }),
+    event: tokenCreatedEvent,
     fromBlock: BigInt(fromBlock),
     toBlock: BigInt(toBlock),
   });
 
   const newCurves: Address[] = [];
-  const launches = db.collection<LaunchDoc>("launches");
+  if (logs.length === 0) return newCurves;
+
+  const blockNums = [...new Set(logs.map((l) => Number(l.blockNumber)))];
+  const blocks = await Promise.all(
+    blockNums.map((n) => client.getBlock({ blockNumber: BigInt(n) })),
+  );
+  const tsByBlock = new Map(
+    blocks.map((b) => [Number(b.number), new Date(Number(b.timestamp) * 1000)]),
+  );
 
   for (const log of logs) {
-    const { token, curve, creator } = log.args;
-    if (!token || !curve || !creator) continue;
-
-    // Read metadata + token name/symbol
-    const [launch, name, symbol] = await Promise.all([
-      client.readContract({
-        address: config.factoryAddress,
-        abi: factoryAbi,
-        functionName: "launchOfToken",
-        args: [token],
-      }).catch(() => null),
-      client.readContract({ address: token, abi: tokenAbi, functionName: "name" }).catch(() => ""),
-      client.readContract({ address: token, abi: tokenAbi, functionName: "symbol" }).catch(() => ""),
-    ]);
-
-    const block = await client.getBlock({ blockNumber: log.blockNumber });
-
-    const doc: LaunchDoc = {
-      token: token.toLowerCase(),
-      curve: curve.toLowerCase(),
-      factory: config.factoryAddress.toLowerCase(),
-      creator: creator.toLowerCase(),
-      name: String(name),
-      symbol: String(symbol),
-      createdAt: new Date(Number(block.timestamp) * 1000),
-      createdBlock: Number(log.blockNumber),
-      txHash: log.transactionHash,
-      graduated: false,
-    };
-    if (launch) {
-      doc.description = launch[3];
-      doc.imageUri = launch[4];
-      doc.website = launch[5];
-      doc.twitter = launch[6];
-      doc.telegram = launch[7];
-    }
-
-    const { graduated: _graduated, ...metadata } = doc;
-    await launches.updateOne(
-      { token: doc.token },
-      { $set: metadata, $setOnInsert: { graduated: false } },
-      { upsert: true },
-    );
-    console.log(`launch indexed: ${doc.symbol} ${doc.token}`);
-    newCurves.push(curve);
+    const curve = await processTokenCreatedLog(db, {
+      address: log.address,
+      args: log.args,
+      blockNumber: log.blockNumber,
+      transactionHash: log.transactionHash,
+      timestamp: tsByBlock.get(Number(log.blockNumber)) ?? new Date(),
+    });
+    if (curve) newCurves.push(curve);
   }
 
   return newCurves;
@@ -179,47 +220,43 @@ async function syncTrades(
   if (curves.length === 0) return;
 
   const trades = db.collection<TradeDoc>("trades");
-  const launches = db.collection("launches");
+  const launches = db.collection<LaunchDoc>("launches");
 
-  const feeBpsByCurve = new Map<string, bigint>();
-  await Promise.all(
-    [...new Set(curves.map((curve) => curve.toLowerCase()))].map(async (curve) => {
-      const feeBps = await client.readContract({
-        address: curve as Address,
-        abi: curveAbi,
-        functionName: "feeBps",
-      });
-      feeBpsByCurve.set(curve, feeBps);
-    }),
+  // Read feeBps directly from MongoDB instead of RPC
+  const launchDocs = await launches
+    .find({ curve: { $in: curves } }, { projection: { curve: 1, feeBps: 1 } })
+    .toArray();
+  const feeBpsByCurve = new Map<string, bigint>(
+    launchDocs.map((d) => [d.curve.toLowerCase(), BigInt(d.feeBps ?? 100)]),
   );
 
-  const tradedLogs = await client.getLogs({
+  const curveLogs = await client.getLogs({
     address: [...curves] as `0x${string}`[],
-    event: tradedEvent,
+    events: [tradedEvent, graduatedEvent],
     fromBlock: BigInt(fromBlock),
     toBlock: BigInt(toBlock),
   });
+  const tradedLogs = curveLogs.filter((log) => log.eventName === "Traded");
+  const graduatedLogs = curveLogs.filter((log) => log.eventName === "Graduated");
+
+  const blockNums = [...new Set(curveLogs.map((log) => Number(log.blockNumber)))];
+  const blocks = await Promise.all(
+    blockNums.map((number) => client.getBlock({ blockNumber: BigInt(number) })),
+  );
+  const tsByBlock = new Map(
+    blocks.map((block) => [Number(block.number), new Date(Number(block.timestamp) * 1_000)]),
+  );
 
   if (tradedLogs.length > 0) {
-    // batch-fetch block timestamps
-    const blockNums = [...new Set(tradedLogs.map((l) => Number(l.blockNumber)))];
-    const blocks = await Promise.all(
-      blockNums.map((n) => client.getBlock({ blockNumber: BigInt(n) })),
-    );
-    const tsByBlock = new Map(
-      blocks.map((b) => [Number(b.number), new Date(Number(b.timestamp) * 1000)]),
-    );
-
     const ops = tradedLogs.map((log) => {
-      const { trader, isBuy, usdcAmount, tokenAmount, priceAfter, mcapAfter } =
-        log.args;
+      const { trader, isBuy, usdcAmount, tokenAmount, priceAfter, mcapAfter } = log.args;
       const curveAddress = String(log.address).toLowerCase();
       const normalized = normalizeCurveUsdcAmounts(
         Boolean(isBuy),
         usdcAmount ?? 0n,
-        feeBpsByCurve.get(curveAddress) ?? 0n,
+        feeBpsByCurve.get(curveAddress) ?? 100n,
       );
-      const doc: TradeDoc & { curveAddressLower?: never } = {
+      const doc: TradeDoc = {
         curveAddress,
         trader: String(trader).toLowerCase(),
         isBuy: Boolean(isBuy),
@@ -273,20 +310,13 @@ async function syncTrades(
     console.log(`trades indexed: ${ops.length} (${fromBlock}-${toBlock})`);
   }
 
-  const graduatedLogs = await client.getLogs({
-    address: [...curves] as `0x${string}`[],
-    event: graduatedEvent,
-    fromBlock: BigInt(fromBlock),
-    toBlock: BigInt(toBlock),
-  });
   for (const log of graduatedLogs) {
-    const block = await client.getBlock({ blockNumber: log.blockNumber });
     const pool = log.args.pool && log.args.pool !== "0x0000000000000000000000000000000000000000"
       ? String(log.args.pool).toLowerCase()
       : undefined;
     const $set: Record<string, unknown> = {
       graduated: true,
-      graduatedAt: new Date(Number(block.timestamp) * 1000),
+      graduatedAt: tsByBlock.get(Number(log.blockNumber)) ?? new Date(),
       graduationBlock: Number(log.blockNumber),
       graduationTxHash: log.transactionHash,
     };
@@ -300,10 +330,6 @@ async function syncTrades(
   }
 }
 
-/// Index post-graduation swaps on the AMM pools of graduated launches, so
-/// the trade feed, candles, and volume keep flowing after the curve closes.
-/// Pool swaps are stored under the launch's curve address with source=pool;
-/// priceAfter/mcapAfter use the exact post-swap reserves emitted by Sync.
 async function syncPoolSwaps(
   client: PublicClient,
   db: Awaited<ReturnType<typeof getDb>>,
@@ -311,54 +337,37 @@ async function syncPoolSwaps(
   toBlock: number,
 ): Promise<void> {
   const graduatedLaunches = await db
-    .collection("launches")
-    .find({ graduated: true, pool: { $exists: true, $ne: null } }, { projection: { curve: 1, pool: 1, token: 1 } })
+    .collection<LaunchDoc>("launches")
+    .find({ graduated: true, pool: { $type: "string" } }, { projection: { curve: 1, pool: 1, token: 1 } })
     .toArray();
   if (graduatedLaunches.length === 0) return;
 
   const curveByPool = new Map<string, string>();
+  const tokenByPool = new Map<string, string>();
   for (const l of graduatedLaunches) {
-    if (typeof l.pool === "string") curveByPool.set(l.pool.toLowerCase(), l.curve);
+    if (typeof l.pool === "string") {
+      const poolLower = l.pool.toLowerCase();
+      curveByPool.set(poolLower, l.curve);
+      tokenByPool.set(poolLower, l.token.toLowerCase());
+    }
   }
   const pools = [...curveByPool.keys()] as `0x${string}`[];
 
-  const logs = await client.getLogs({
+  const poolLogs = await client.getLogs({
     address: pools,
-    event: poolSwapEvent,
+    events: [poolSwapEvent, poolSyncEvent],
     fromBlock: BigInt(fromBlock),
     toBlock: BigInt(toBlock),
   });
+  const logs = poolLogs.filter((log) => log.eventName === "Swap");
+  const syncLogs = poolLogs.filter((log) => log.eventName === "Sync");
   if (logs.length === 0) return;
-
-  const syncLogs = await client.getLogs({
-    address: pools,
-    event: poolSyncEvent,
-    fromBlock: BigInt(fromBlock),
-    toBlock: BigInt(toBlock),
-  });
   const reservesBySwap = new Map<string, { reserve0: bigint; reserve1: bigint }>();
   for (const log of syncLogs) {
     reservesBySwap.set(`${log.transactionHash}:${Number(log.logIndex) + 1}`, {
       reserve0: log.args.reserve0 ?? 0n,
       reserve1: log.args.reserve1 ?? 0n,
     });
-  }
-
-  const token0Cache = new Map<string, boolean>(); // pool -> token is token0
-  for (const log of logs) {
-    const pool = String(log.address).toLowerCase();
-    if (!token0Cache.has(pool)) {
-      const token0 = await client
-        .readContract({ address: log.address, abi: ammPairAbi, functionName: "token0" })
-        .catch(() => null);
-      const launch = graduatedLaunches.find(
-        (l) => typeof l.pool === "string" && l.pool.toLowerCase() === pool,
-      );
-      token0Cache.set(
-        pool,
-        Boolean(token0 && launch && String(token0).toLowerCase() === launch.token),
-      );
-    }
   }
 
   const blockNums = [...new Set(logs.map((l) => Number(l.blockNumber)))];
@@ -373,10 +382,11 @@ async function syncPoolSwaps(
   const latestByCurve = new Map<string, { price: string; mcap: string }>();
   const ops = logs.flatMap((log) => {
     const pool = String(log.address).toLowerCase();
-    const tokenIsToken0 = token0Cache.get(pool) ?? false;
+    const token = tokenByPool.get(pool);
+    // Offline deterministic check: pair token0 is the lexicographically smaller address
+    const tokenIsToken0 = token ? token < config.usdcAddress : false;
     const { to, amount0In, amount1In, amount0Out, amount1Out } = log.args;
 
-    // Buying = receiving the token leg.
     const isBuy = tokenIsToken0 ? amount0Out! > 0n : amount1Out! > 0n;
     const usdcLeg = tokenIsToken0
       ? isBuy
@@ -471,7 +481,6 @@ export async function syncRange(
     ).filter((c): c is string => Boolean(c));
 
     await syncLaunches(client, db, cursor, end);
-    // include any curves discovered in this very range
     const allCurves = [
       ...new Set([
         ...knownCurves,

@@ -53,7 +53,12 @@ contract WafflesBondingCurve is ReentrancyGuard {
         uint256 mcapAfter,
         uint256 progressBpsAfter
     );
-    event Graduated(address pool);
+    event Graduated(
+        address indexed pool,
+        address indexed token,
+        uint256 graduationPrice,
+        uint256 graduationMarketCap
+    );
     event CreatorFeesClaimed(address indexed creator, uint256 amount);
 
     error CurveClosed();
@@ -276,7 +281,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
             pool = migrator.migrate(address(token), tokenAmount, usdcAmount);
         }
         graduationPool = pool;
-        emit Graduated(pool);
+        emit Graduated(pool, address(token), graduationPrice, graduationMarketCap);
     }
 
     // ---------- fees ----------

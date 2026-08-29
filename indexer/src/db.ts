@@ -22,6 +22,16 @@ export async function getDb(): Promise<Db> {
   await db.collection("trades").createIndex({ curveAddress: 1, blockNumber: -1 });
   await db.collection("trades").createIndex({ timestamp: -1 });
 
+  await db.collection("webhookNotifications").createIndex({ processedAt: 1 });
+  await db.collection("pendingPoolSwaps").createIndex(
+    { expiresAt: 1 },
+    { expireAfterSeconds: 0 },
+  );
+  await db.collection("poolSyncs").createIndex(
+    { expiresAt: 1 },
+    { expireAfterSeconds: 0 },
+  );
+
   return db;
 }
 
@@ -53,6 +63,8 @@ export interface LaunchDoc {
   price?: string;
   mcap?: string;
   progressBps?: number;
+  feeBps?: number;
+  token0IsToken?: boolean;
 }
 
 export interface TradeDoc {
