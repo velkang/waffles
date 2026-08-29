@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { CurveChart } from "@/components/token/CurveChart";
 import { formatUsd } from "@/lib/format";
-
-type Candle = {
-  time: number;
-  open: string;
-  close: string;
-  high: string;
-  low: string;
-  volume: string;
-  trades: number;
-};
+import { useCandles } from "@/lib/hooks/queries";
+import { useRealtimeTopics } from "@/lib/realtime/RealtimeProvider";
+import type { Candle } from "@waffles/shared";
 
 const INTERVALS = [
   { label: "1m", seconds: 60 },
@@ -39,32 +32,10 @@ export function PriceChart({
   token: `0x${string}`;
   curve: `0x${string}`;
 }) {
+  useRealtimeTopics([`token:${token.toLowerCase()}`]);
   const [intervalSec, setIntervalSec] = useState<number>(60);
-  const [candles, setCandles] = useState<Candle[] | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function poll() {
-      try {
-        const res = await fetch(
-          `/api/candles?token=${token}&interval=${intervalSec}&limit=240`,
-        );
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { candles?: Candle[] };
-        if (!cancelled) setCandles(data.candles ?? []);
-      } catch {
-        /* silent */
-      }
-    }
-
-    poll();
-    const id = setInterval(poll, 8000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [token, intervalSec]);
+  const { data, isLoading } = useCandles(token, intervalSec, 240);
+  const candles = data?.candles ?? (isLoading ? null : []);
 
   const hasCandles = candles !== null && candles.length > 0;
 

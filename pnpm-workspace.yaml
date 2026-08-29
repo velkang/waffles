@@ -1,6 +1,8 @@
 packages:
   - frontend
   - indexer
+  - backend
+  - shared
 
 onlyBuiltDependencies:
   - '@reown/appkit'

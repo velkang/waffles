@@ -1,23 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState, useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useAccount } from "wagmi";
 import { formatToken, formatUsd, shortAddress } from "@/lib/format";
+import { useTrades } from "@/lib/hooks/queries";
+import { useRealtimeTopics } from "@/lib/realtime/RealtimeProvider";
 
-type Trade = {
-  trader: string;
-  isBuy: boolean;
-  usdcAmount: string;
-  tokenAmount: string;
-  mcapAfter?: string;
-  priceAfter?: string;
-  blockNumber: number;
-  logIndex: number;
-  txHash: string;
-  timestamp: string;
-};
-
-function timeAgo(iso: string): string {
+function timeAgo(iso: string | Date): string {
   const s = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000));
   if (s < 60) return `${s}s ago`;
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
@@ -26,38 +15,16 @@ function timeAgo(iso: string): string {
 }
 
 export function TradeFeed({ token }: { token: `0x${string}` }) {
+  useRealtimeTopics([`token:${token.toLowerCase()}`]);
   const { address: account } = useAccount();
-  const [trades, setTrades] = useState<Trade[] | null>(null);
   const [filter, setFilter] = useState<"all" | "my">("all");
-  const [offline, setOffline] = useState(false);
-  const seenTx = useRef<Set<string>>(new Set());
 
-  useEffect(() => {
-    let cancelled = false;
-    let first = true;
-
-    async function poll() {
-      try {
-        const res = await fetch(`/api/trades?token=${token}&limit=100`);
-        if (!res.ok) throw new Error(String(res.status));
-        const data = (await res.json()) as { trades: Trade[] };
-        if (cancelled) return;
-        data.trades.forEach((t) => seenTx.current.add(`${t.txHash}-${t.logIndex}`));
-        setTrades(data.trades);
-        setOffline(false);
-        first = false;
-      } catch {
-        if (!cancelled && first) setOffline(true);
-      }
-    }
-
-    poll();
-    const id = setInterval(poll, 4000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [token]);
+  const { data, isLoading, isError } = useTrades(token, 200);
+  const trades = useMemo(
+    () => data?.trades ?? (isLoading ? null : []),
+    [data, isLoading],
+  );
+  const offline = isError;
 
   const displayedTrades = useMemo(() => {
     if (!trades) return [];

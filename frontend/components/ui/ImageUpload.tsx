@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { apiClient } from "@/lib/api-client";
 
 interface ImageUploadProps {
   value: string;
@@ -29,31 +30,21 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
     }
 
     // Instant local preview while uploading
+    const previousValue = value;
     const localPreview = URL.createObjectURL(file);
     onChange(localPreview);
 
-    // Upload to /api/upload (Cloudinary)
+    // Upload directly to Cloudinary with backend signed params
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const res = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Upload failed");
-      }
-
-      const data = await res.json();
-      onChange(data.url);
+      const result = await apiClient.uploadImage(file);
+      onChange(result.url);
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "Failed to upload image.");
+      onChange(previousValue);
     } finally {
+      URL.revokeObjectURL(localPreview);
       setUploading(false);
     }
   };

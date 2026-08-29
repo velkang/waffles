@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useAccount, usePublicClient, useReadContracts } from "wagmi";
@@ -15,6 +15,8 @@ import { formatToken, formatUsd } from "@/lib/format";
 import { poolPriceFromReserves } from "@/lib/use-venue-price";
 import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
 import { StatusBadge } from "@/components/ui/StatusBadge";
+import { useLaunches, usePortfolio } from "@/lib/hooks/queries";
+import { useRealtimeTopics } from "@/lib/realtime/RealtimeProvider";
 
 type Address = `0x${string}`;
 
@@ -85,28 +87,14 @@ function PortfolioView() {
       : undefined;
   const address = validated ?? connected;
 
-  const [launches, setLaunches] = useState<ApiLaunch[] | null>(null);
-  const [positions, setPositions] = useState<Position[] | null>(null);
+  useRealtimeTopics(address ? [`portfolio:${address.toLowerCase()}`] : []);
+
+  const { data: launchData, isLoading: launchesLoading } = useLaunches({ sort: "new", limit: 200 });
+  const { data: portfolioData, isLoading: portfolioLoading } = usePortfolio(address);
+
+  const launches = useMemo(() => (launchData?.launches as ApiLaunch[]) ?? (launchesLoading ? null : []), [launchData, launchesLoading]);
+  const positions = useMemo(() => (portfolioData?.positions as Position[]) ?? (portfolioLoading ? null : []), [portfolioData, portfolioLoading]);
   const [nonce, setNonce] = useState(0);
-
-  useEffect(() => {
-    if (!address) return;
-    let cancelled = false;
-
-    Promise.all([
-      fetch("/api/launches?sort=new&limit=200").then((r) => r.json()),
-      fetch(`/api/portfolio?address=${address}`).then((r) => r.json()),
-    ])
-      .then(([launchData, posData]) => {
-        if (cancelled) return;
-        setLaunches((launchData.launches ?? []) as ApiLaunch[]);
-        setPositions((posData.positions ?? []) as Position[]);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [address]);
 
   if (!address) {
     return (

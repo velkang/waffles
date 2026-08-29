@@ -19,9 +19,17 @@ export async function getDb(): Promise<Db> {
     { curveAddress: 1, blockNumber: 1, logIndex: 1 },
     { unique: true },
   );
+  await db.collection("trades").createIndex({ curveAddress: 1, blockNumber: -1, logIndex: -1 });
   await db.collection("trades").createIndex({ curveAddress: 1, blockNumber: -1 });
+  await db.collection("trades").createIndex({ curveAddress: 1, timestamp: -1 });
+  await db.collection("trades").createIndex({ trader: 1, curveAddress: 1 });
   await db.collection("trades").createIndex({ timestamp: -1 });
 
+  await db.collection("realtimeEvents").createIndex({ occurredAt: -1 });
+  await db.collection("realtimeEvents").createIndex(
+    { expiresAt: 1 },
+    { expireAfterSeconds: 0 },
+  );
   await db.collection("webhookNotifications").createIndex({ processedAt: 1 });
   await db.collection("pendingPoolSwaps").createIndex(
     { expiresAt: 1 },

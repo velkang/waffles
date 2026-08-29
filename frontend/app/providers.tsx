@@ -16,26 +16,43 @@ const metadata = {
   icons: ['https://waffles.meme/favicon.ico'],
 }
 
-// Created once at module load (outside React) as AppKit requires.
-export const modal = createAppKit({
-  adapters: [wagmiAdapter],
-  projectId,
-  networks,
-  defaultNetwork: networks[0],
-  metadata,
-  themeMode: 'dark',
-  themeVariables: {
-    '--w3m-accent': '#db9d6a',
-    '--w3m-color-mix': '#141519',
-    '--w3m-color-mix-strength': 20,
-    '--w3m-border-radius-master': '2px',
-  },
-  features: {
-    analytics: false,
-    email: false,
-    socials: [],
-  },
-})
+type AppKitGlobal = typeof globalThis & {
+  __wafflesAppKitModal?: ReturnType<typeof createAppKit>
+}
+
+const appKitGlobal = globalThis as AppKitGlobal
+
+// Preserve AppKit across Next.js Fast Refresh so its WalletConnect listeners
+// are registered once for the lifetime of the browser page.
+export const modal =
+  appKitGlobal.__wafflesAppKitModal ??
+  createAppKit({
+    adapters: [wagmiAdapter],
+    projectId,
+    networks,
+    defaultNetwork: networks[0],
+    metadata,
+    themeMode: 'dark',
+    themeVariables: {
+      '--w3m-accent': '#db9d6a',
+      '--w3m-color-mix': '#141519',
+      '--w3m-color-mix-strength': 20,
+      '--w3m-border-radius-master': '2px',
+    },
+    features: {
+      analytics: false,
+      email: false,
+      socials: [],
+    },
+    enableBaseAccount: false,
+    enableCoinbase: false,
+  })
+
+if (process.env.NODE_ENV !== 'production') {
+  appKitGlobal.__wafflesAppKitModal = modal
+}
+
+import { RealtimeProvider } from '@/lib/realtime/RealtimeProvider'
 
 export function Providers({
   children,
@@ -49,7 +66,7 @@ export function Providers({
       new QueryClient({
         defaultOptions: {
           queries: {
-            staleTime: 5000,
+            staleTime: 10000,
             gcTime: 60_000,
             refetchOnWindowFocus: false,
             retry: 1,
@@ -61,7 +78,9 @@ export function Providers({
 
   return (
     <WagmiProvider config={wagmiConfig} initialState={initialState}>
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <RealtimeProvider>{children}</RealtimeProvider>
+      </QueryClientProvider>
     </WagmiProvider>
   )
 }

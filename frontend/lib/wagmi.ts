@@ -23,16 +23,30 @@ export const USDC_ADDRESS = (process.env.NEXT_PUBLIC_USDC_ADDRESS ??
 
 export const networks = [arcTestnet] as [AppKitNetwork, ...AppKitNetwork[]]
 
-export const wagmiAdapter = new WagmiAdapter({
-  networks,
-  projectId,
-  ssr: true,
-  storage: createStorage({ storage: cookieStorage }),
-  transports: {
-    [arcTestnet.id]: http(RPC_URL, {
-      batch: true,
-    }),
-  },
-})
+type WalletGlobal = typeof globalThis & {
+  __wafflesWagmiAdapter?: WagmiAdapter
+}
+
+const walletGlobal = globalThis as WalletGlobal
+
+// Preserve the adapter across Next.js Fast Refresh. Recreating it also creates
+// another WalletConnect core and duplicates its relay event listeners.
+export const wagmiAdapter =
+  walletGlobal.__wafflesWagmiAdapter ??
+  new WagmiAdapter({
+    networks,
+    projectId,
+    ssr: true,
+    storage: createStorage({ storage: cookieStorage }),
+    transports: {
+      [arcTestnet.id]: http(RPC_URL, {
+        batch: true,
+      }),
+    },
+  })
+
+if (process.env.NODE_ENV !== 'production') {
+  walletGlobal.__wafflesWagmiAdapter = wagmiAdapter
+}
 
 export const wagmiConfig = wagmiAdapter.wagmiConfig

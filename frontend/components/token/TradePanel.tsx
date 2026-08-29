@@ -23,6 +23,7 @@ import {
   useWriteMockUsdcApprove,
 } from "@/generated/contracts-generated";
 import { PoolTradePanel } from "./PoolTradePanel";
+import { useTrades } from "@/lib/hooks/queries";
 import { formatToken, formatUsd, shortAddress } from "@/lib/format";
 import { USDC_ADDRESS } from "@/lib/wagmi";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -94,26 +95,9 @@ function CurveTradePanel({
   const [phase, setPhase] = useState<"idle" | "approve" | "trade">("idle");
   const [error, setError] = useState("");
 
-  // Live trades data for real stats computation
-  const [trades, setTrades] = useState<TradeData[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchTrades() {
-      try {
-        const res = await fetch(`/api/trades?token=${tokenAddress}&limit=200`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data.trades) setTrades(data.trades);
-      } catch {}
-    }
-    fetchTrades();
-    const id = setInterval(fetchTrades, 5000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, [tokenAddress]);
+  // Live trades data for real stats computation (shared canonical query)
+  const { data: tradesData } = useTrades(tokenAddress, 200);
+  const trades = useMemo(() => (tradesData?.trades as TradeData[]) ?? [], [tradesData]);
 
   const parsedAmount = useMemo(() => {
     try {

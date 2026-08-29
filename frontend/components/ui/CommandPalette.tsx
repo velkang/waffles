@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useLaunches } from "@/lib/hooks/queries";
 
 interface TokenResult {
   token: string;
@@ -18,8 +19,7 @@ export function CommandPalette({
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<TokenResult[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { data, isLoading: loading } = useLaunches({ limit: 100 });
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -28,7 +28,7 @@ export function CommandPalette({
     document.body.style.overflow = "hidden";
     return () => {
       window.clearTimeout(focusTimer);
-      document.body.style.overflow = "";
+      document.body.style.overflow = "unset";
     };
   }, []);
 
@@ -46,43 +46,19 @@ export function CommandPalette({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Fetch search results from launches api
-  useEffect(() => {
-    let cancelled = false;
-
-    async function search() {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/launches?limit=50`);
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!cancelled && data.launches) {
-          const q = query.toLowerCase().trim();
-          if (!q) {
-            setResults(data.launches.slice(0, 8));
-          } else {
-            const filtered = data.launches.filter(
-              (l: TokenResult) =>
-                l.symbol.toLowerCase().includes(q) ||
-                l.name.toLowerCase().includes(q) ||
-                l.token.toLowerCase().includes(q)
-            );
-            setResults(filtered.slice(0, 10));
-          }
-        }
-      } catch (err) {
-        console.error("Search error:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    const t = setTimeout(search, 150);
-    return () => {
-      cancelled = true;
-      clearTimeout(t);
-    };
-  }, [query]);
+  const results = useMemo(() => {
+    const launches = (data?.launches ?? []) as TokenResult[];
+    const normalizedQuery = query.toLowerCase().trim();
+    if (!normalizedQuery) return launches.slice(0, 8);
+    return launches
+      .filter(
+        (launch) =>
+          launch.symbol.toLowerCase().includes(normalizedQuery) ||
+          launch.name.toLowerCase().includes(normalizedQuery) ||
+          launch.token.toLowerCase().includes(normalizedQuery),
+      )
+      .slice(0, 10);
+  }, [data, query]);
 
   return (
     <div

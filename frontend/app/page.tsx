@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { formatPrice, formatUsd, shortAddress } from "@/lib/format";
 import { getOptimizedImageUrl } from "@/lib/image";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { TrendingCarousel } from "@/components/explore/TrendingCarousel";
-import type { LaunchSummary } from "@/lib/types/launch";
+import { useLaunches } from "@/lib/hooks/queries";
+import { useRealtimeTopics } from "@/lib/realtime/RealtimeProvider";
 
 const CATEGORIES = [
   { id: "trending", label: "🔥 Trending" },
@@ -15,36 +16,13 @@ const CATEGORIES = [
 ] as const;
 
 export default function ExplorePage() {
-  const [tokens, setTokens] = useState<LaunchSummary[]>([]);
-  const [loading, setLoading] = useState(true);
+  useRealtimeTopics(["launches"]);
+  const { data, isLoading } = useLaunches({ limit: 100 });
+  const tokens = useMemo(() => data?.launches ?? [], [data]);
+  const loading = isLoading;
+
   const [selectedCategory, setSelectedCategory] = useState<string>("trending");
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      try {
-        const res = await fetch(`/api/launches?limit=100`);
-        if (!res.ok) throw new Error(String(res.status));
-        const data = await res.json();
-        if (!cancelled && data.launches) {
-          setTokens(data.launches);
-        }
-      } catch (err) {
-        console.error("Failed to load launches:", err);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    const id = setInterval(load, 10000);
-    return () => {
-      cancelled = true;
-      clearInterval(id);
-    };
-  }, []);
 
   // Filter & Sort based on active category
   const filteredTokens = useMemo(() => {

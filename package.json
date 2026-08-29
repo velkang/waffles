@@ -3,11 +3,22 @@
   "private": true,
   "packageManager": "pnpm@10.15.1",
   "workspaces": [
-    "frontend/*",
-    "indexer/*"
+    "frontend",
+    "backend",
+    "indexer",
+    "shared"
   ],
   "scripts": {
-    "dev:f": "pnpm --filter frontend dev",
-    "dev:i": "pnpm --filter indexer dev"
+    "dev": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter @waffles/api --filter indexer --filter frontend dev",
+    "dev:f": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter frontend dev",
+    "dev:b": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter @waffles/api dev",
+    "dev:i": "pnpm --filter indexer dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test"
+  },
+  "pnpm": {
+    "overrides": {
+      "@reown/appkit@1.8.23>@walletconnect/universal-provider": "2.24.0"
+    }
   }
 }

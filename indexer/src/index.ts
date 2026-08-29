@@ -62,6 +62,14 @@ async function main() {
               },
             ),
           ]);
+          await db.collection("realtimeEvents").insertOne({
+            type: "system.resync",
+            occurredAt: new Date(),
+            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000),
+            chainId: (config.circleBlockchain || "arc-testnet").toLowerCase(),
+            fromBlock: rewindFrom,
+            reason: "reorg_rewind",
+          });
           lastBlock = rewindFrom - 1;
           lastBlockHash =
             lastBlock >= config.startBlock
