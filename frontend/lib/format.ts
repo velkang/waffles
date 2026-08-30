@@ -17,10 +17,10 @@ export function formatToken(raw: bigint | undefined): string {
   return n.toFixed(4).replace(/\.?0+$/, "");
 }
 
-/// currentPrice() returns raw quote units (1e-6 USD) per whole token
+/// currentPrice() returns USD per whole token, scaled by 1e18.
 export function formatPrice(priceScaled: bigint | undefined): string {
   if (priceScaled === undefined) return "—";
-  const usd = Number(priceScaled) / 1e6;
+  const usd = Number(formatUnits(priceScaled, 18));
   if (usd === 0) return "$0";
   if (usd < 0.0001) return `$${usd.toPrecision(4)}`;
   return `$${usd.toPrecision(4)}`;

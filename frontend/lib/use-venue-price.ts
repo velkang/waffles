@@ -27,7 +27,7 @@ export function poolPriceFromReserves(
   const tokenReserve = tokenIsToken0 ? reserves[0] : reserves[1];
   const usdcReserve = tokenIsToken0 ? reserves[1] : reserves[0];
   if (tokenReserve === 0n) return undefined;
-  return (usdcReserve * 10n ** 18n) / tokenReserve;
+  return (usdcReserve * 10n ** 30n) / tokenReserve;
 }
 
 /// Resolves price from the venue that currently owns price discovery:
@@ -81,7 +81,10 @@ export function useVenuePrice(token: Address, curve: Address | undefined) {
     graduated,
     pool,
     price: graduated ? poolPrice : curvePrice.data,
-    mcap: graduated && poolPrice !== undefined ? poolPrice * 1_000_000_000n : curveMcap.data,
+    mcap:
+      graduated && poolPrice !== undefined
+        ? (poolPrice * 1_000_000_000n) / 10n ** 12n
+        : curveMcap.data,
     isLoading:
       graduatedQuery.isLoading ||
       (graduated

@@ -94,9 +94,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (token) {
         queryClient.setQueryData<TradesResponse>(['trades', token], (old) => {
           if (!old || !old.trades) return { trades: [trade] };
-          const tradeKey = `${trade.txHash}-${trade.logIndex}`;
+          const tradeKey = trade.eventId ?? `${trade.txHash}-${trade.logIndex}`;
           const withoutCurrent = old.trades.filter(
-            (item) => `${item.txHash}-${item.logIndex}` !== tradeKey,
+            (item) => (item.eventId ?? `${item.txHash}-${item.logIndex}`) !== tradeKey,
           );
           return {
             trades: [trade, ...withoutCurrent]

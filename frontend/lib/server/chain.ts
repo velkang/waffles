@@ -192,8 +192,8 @@ export async function getTokenSummary(
       const tokenReserve = tokenIsToken0 ? reserves[0] : reserves[1];
       const usdcReserve = tokenIsToken0 ? reserves[1] : reserves[0];
       if (tokenReserve > 0n) {
-        resolvedPrice = (usdcReserve * 10n ** 18n) / tokenReserve;
-        resolvedMcap = resolvedPrice * 1_000_000_000n;
+        resolvedPrice = (usdcReserve * 10n ** 30n) / tokenReserve;
+        resolvedMcap = (usdcReserve * 1_000_000_000n * 10n ** 18n) / tokenReserve;
       }
     }
 

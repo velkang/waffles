@@ -10,6 +10,8 @@ import {WafflesBondingCurve} from "./WafflesBondingCurve.sol";
 contract WafflesLaunchFactory {
     using SafeERC20 for IERC20;
 
+    uint256 public constant TOKEN_SUPPLY = 1_000_000_000 ether;
+
     address public owner;
     address public pendingOwner;
 
@@ -35,10 +37,9 @@ contract WafflesLaunchFactory {
     address public immutable migrator;
     uint256 public creationFee; // raw USDC, 0 = free
 
-    // Curve economics applied to every launch
-    uint256 public virtualUsdc;
-    uint256 public virtualTokens;
-    uint256 public graduationMcap;
+    uint256 public initialVirtualUsdcReserve;
+    uint256 public initialVirtualTokenReserve;
+    uint256 public minVirtualTokenReserve;
     uint256 public feeBps;
     uint256 public protocolFeeBps;
 
@@ -61,8 +62,14 @@ contract WafflesLaunchFactory {
         uint256 creationFeePaid
     );
     event CreationFeeUpdated(uint256 previousFee, uint256 newFee);
-    event OwnershipTransferStarted(address indexed previousOwner, address indexed pendingOwner);
-    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+    event OwnershipTransferStarted(
+        address indexed previousOwner,
+        address indexed pendingOwner
+    );
+    event OwnershipTransferred(
+        address indexed previousOwner,
+        address indexed newOwner
+    );
 
     error InvalidAddress();
     error InvalidParameters();
@@ -72,27 +79,36 @@ contract WafflesLaunchFactory {
         address treasury_,
         address migrator_,
         uint256 creationFee_,
-        uint256 virtualUsdc_,
-        uint256 virtualTokens_,
-        uint256 graduationMcap_,
+        uint256 initialVirtualUsdcReserve_,
+        uint256 initialVirtualTokenReserve_,
+        uint256 minVirtualTokenReserve_,
         uint256 feeBps_,
         uint256 protocolFeeBps_
     ) {
-        if (usdc_ == address(0) || treasury_ == address(0) || migrator_ == address(0)) {
+        if (
+            usdc_ == address(0) ||
+            treasury_ == address(0) ||
+            migrator_ == address(0)
+        ) {
             revert InvalidAddress();
         }
         if (
-            virtualUsdc_ == 0 || virtualTokens_ == 0 || graduationMcap_ == 0 || feeBps_ >= 10_000
-                || protocolFeeBps_ > 10_000
+            initialVirtualUsdcReserve_ == 0 ||
+            initialVirtualTokenReserve_ == 0 ||
+            minVirtualTokenReserve_ == 0 ||
+            minVirtualTokenReserve_ >= initialVirtualTokenReserve_ ||
+            feeBps_ >= 10_000 ||
+            protocolFeeBps_ > 10_000 ||
+            initialVirtualTokenReserve_ - minVirtualTokenReserve_ > TOKEN_SUPPLY
         ) revert InvalidParameters();
         owner = msg.sender;
         usdc = usdc_;
         treasury = treasury_;
         migrator = migrator_;
         creationFee = creationFee_;
-        virtualUsdc = virtualUsdc_;
-        virtualTokens = virtualTokens_;
-        graduationMcap = graduationMcap_;
+        initialVirtualUsdcReserve = initialVirtualUsdcReserve_;
+        initialVirtualTokenReserve = initialVirtualTokenReserve_;
+        minVirtualTokenReserve = minVirtualTokenReserve_;
         feeBps = feeBps_;
         protocolFeeBps = protocolFeeBps_;
     }
@@ -111,7 +127,12 @@ contract WafflesLaunchFactory {
             IERC20(usdc).safeTransferFrom(msg.sender, treasury, fee);
         }
 
-        WafflesMemeToken tokenContract = new WafflesMemeToken(name, symbol, 1_000_000_000 ether, address(this));
+        WafflesMemeToken tokenContract = new WafflesMemeToken(
+            name,
+            symbol,
+            TOKEN_SUPPLY,
+            address(this)
+        );
         uint256 supply = tokenContract.totalSupply();
         WafflesBondingCurve curveContract = new WafflesBondingCurve(
             address(tokenContract),
@@ -119,15 +140,16 @@ contract WafflesLaunchFactory {
             msg.sender,
             treasury,
             migrator,
-            supply,
-            CURVE_RESERVE,
-            virtualUsdc,
-            virtualTokens,
-            graduationMcap,
+            initialVirtualUsdcReserve,
+            initialVirtualTokenReserve,
+            minVirtualTokenReserve,
             feeBps,
             protocolFeeBps
         );
-        IERC20(address(tokenContract)).safeTransfer(address(curveContract), supply);
+        IERC20(address(tokenContract)).safeTransfer(
+            address(curveContract),
+            supply
+        );
 
         token = address(tokenContract);
         curve = address(curveContract);
@@ -184,6 +206,4 @@ contract WafflesLaunchFactory {
         pendingOwner = address(0);
         emit OwnershipTransferred(previousOwner, msg.sender);
     }
-
-    uint256 public constant CURVE_RESERVE = 200_000_000 ether;
 }

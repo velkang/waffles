@@ -19,6 +19,7 @@ export async function getDb(): Promise<Db> {
     { curveAddress: 1, blockNumber: 1, logIndex: 1 },
     { unique: true },
   );
+  await db.collection("trades").createIndex({ eventId: 1 }, { unique: true, sparse: true });
   await db.collection("trades").createIndex({ curveAddress: 1, blockNumber: -1, logIndex: -1 });
   await db.collection("trades").createIndex({ curveAddress: 1, blockNumber: -1 });
   await db.collection("trades").createIndex({ curveAddress: 1, timestamp: -1 });
@@ -31,6 +32,8 @@ export async function getDb(): Promise<Db> {
     { expireAfterSeconds: 0 },
   );
   await db.collection("webhookNotifications").createIndex({ processedAt: 1 });
+  await db.collection("indexedCircleEvents").createIndex({ processedAt: 1 });
+  await db.collection("circleEventCursors").createIndex({ updatedAt: 1 });
   await db.collection("pendingPoolSwaps").createIndex(
     { expiresAt: 1 },
     { expireAfterSeconds: 0 },
@@ -76,6 +79,7 @@ export interface LaunchDoc {
 }
 
 export interface TradeDoc {
+  eventId?: string; // stable across Circle webhook delivery and historical reconciliation
   curveAddress: string;
   trader: string;
   isBuy: boolean;
@@ -83,8 +87,8 @@ export interface TradeDoc {
   usdcGrossAmount?: string; // raw volume before curve fee
   feeAmount?: string;
   tokenAmount: string; // raw, 18dp
-  priceAfter: string; // raw quote units per whole token
-  executionPrice?: string; // average quote paid/received per whole token
+  priceAfter: string; // USD per whole token, scaled by 1e18
+  executionPrice?: string; // average USD per whole token, scaled by 1e18
   mcapAfter: string; // raw quote units
   progressBpsAfter?: number;
   blockNumber: number;

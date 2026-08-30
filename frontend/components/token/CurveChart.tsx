@@ -1,79 +1,104 @@
-"use client";
+'use client'
 
-import { useMemo } from "react";
+import { useMemo } from 'react'
 import {
   useReadWafflesBondingCurveK,
-  useReadWafflesBondingCurveReserveUsdc,
+  useReadWafflesBondingCurveGraduationMarketCapTarget,
+  useReadWafflesBondingCurveVirtualUsdcReserve,
+  useReadWafflesBondingCurveInitialVirtualUsdcReserve,
+  useReadWafflesBondingCurveTargetVirtualUsdcReserve,
   useReadWafflesBondingCurveTotalSupply,
-  useReadWafflesBondingCurveVirtualUsdc,
-} from "@/generated/contracts-generated";
+} from '@/generated/contracts-generated'
 
-const EMERALD = "#4ade80";
-const COPPER = "#db9d6a";
-const BORDER = "#24262e";
+const EMERALD = '#4ade80'
+const COPPER = '#db9d6a'
+const BORDER = '#24262e'
 
-const W = 600;
-const H = 220;
-const PAD_X = 8;
-const PAD_TOP = 14;
-const PAD_BOTTOM = 22;
+const W = 600
+const H = 220
+const PAD_X = 8
+const PAD_TOP = 14
+const PAD_BOTTOM = 22
 
 export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
-  const { data: k } = useReadWafflesBondingCurveK({ address: curveAddress });
-  const { data: virtualUsdc } = useReadWafflesBondingCurveVirtualUsdc({
-    address: curveAddress,
-  });
+  const { data: k } = useReadWafflesBondingCurveK({ address: curveAddress })
+  const { data: initialVirtualUsdc } =
+    useReadWafflesBondingCurveInitialVirtualUsdcReserve({
+      address: curveAddress,
+    })
+  const { data: virtualUsdcReserve } =
+    useReadWafflesBondingCurveVirtualUsdcReserve({ address: curveAddress })
+  const { data: targetVirtualUsdc } =
+    useReadWafflesBondingCurveTargetVirtualUsdcReserve({
+      address: curveAddress,
+    })
+  const { data: graduationTarget } =
+    useReadWafflesBondingCurveGraduationMarketCapTarget({
+      address: curveAddress,
+    })
   const { data: totalSupply } = useReadWafflesBondingCurveTotalSupply({
     address: curveAddress,
-  });
-  const { data: reserveUsdc } = useReadWafflesBondingCurveReserveUsdc({
-    address: curveAddress,
-  });
+  })
 
   const chart = useMemo(() => {
-    if (!k || !virtualUsdc || !totalSupply) return undefined;
-    const K = Number(k);
-    const Vx = Number(virtualUsdc);
-    const T = Number(totalSupply);
+    if (!k || !initialVirtualUsdc || !targetVirtualUsdc || !totalSupply)
+      return undefined
+    const K = Number(k)
+    const Vx = Number(initialVirtualUsdc)
+    const T = Number(totalSupply)
 
-    const xAt = (mcap: number) => Math.sqrt((mcap * K) / T);
     const mcapAt = (raised: number) => {
-      const X = Vx + raised;
-      return (X * X * T) / K;
-    };
-
-    const startMcap = mcapAt(0);
-    const ceiling = Math.max(startMcap * 25, startMcap * 1.05);
-    const raisedMax = xAt(ceiling) - Vx;
-
-    const points: Array<[number, number]> = [];
-    const N = 120;
-    for (let i = 0; i <= N; i++) {
-      const r = (raisedMax * i) / N;
-      points.push([r, mcapAt(r)]);
+      const X = Vx + raised
+      return (X * X * T) / K
     }
-    const mcapMin = points[0][1];
-    const mcapMax = points[points.length - 1][1];
 
-    const sx = (r: number) =>
-      PAD_X + (r / raisedMax) * (W - 2 * PAD_X);
+    const raisedMax = Number(targetVirtualUsdc) - Vx
+
+    const points: Array<[number, number]> = []
+    const N = 120
+    for (let i = 0; i <= N; i++) {
+      const r = (raisedMax * i) / N
+      points.push([r, mcapAt(r)])
+    }
+    const mcapMin = points[0][1]
+    const mcapMax = points[points.length - 1][1]
+
+    const sx = (r: number) => PAD_X + (r / raisedMax) * (W - 2 * PAD_X)
     const sy = (m: number) =>
       PAD_TOP +
-      (1 - (m - mcapMin) / (mcapMax - mcapMin)) * (H - PAD_TOP - PAD_BOTTOM);
+      (1 - (m - mcapMin) / (mcapMax - mcapMin)) * (H - PAD_TOP - PAD_BOTTOM)
 
     const path = points
-      .map(([r, m], i) => `${i === 0 ? "M" : "L"}${sx(r)},${sy(m)}`)
-      .join(" ");
+      .map(([r, m], i) => `${i === 0 ? 'M' : 'L'}${sx(r)},${sy(m)}`)
+      .join(' ')
 
-    return { path, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T };
-  }, [k, virtualUsdc, totalSupply]);
+    return { path, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T }
+  }, [k, initialVirtualUsdc, targetVirtualUsdc, totalSupply])
 
+  // Current position on the curve: derived from virtualUsdcReserve
   const now = useMemo(() => {
-    if (!chart || reserveUsdc === undefined) return undefined;
-    const X = chart.Vx + Number(reserveUsdc);
-    const mcapNow = (X * X * chart.T) / chart.K;
-    return { x: chart.sx(Number(reserveUsdc)), y: chart.sy(mcapNow) };
-  }, [chart, reserveUsdc]);
+    if (!chart || virtualUsdcReserve === undefined || !initialVirtualUsdc)
+      return undefined
+    // reserveUsdc = virtualUsdcReserve - initialVirtualUsdc
+    const raised = Math.min(
+      chart.raisedMax,
+      Math.max(0, Number(virtualUsdcReserve) - Number(initialVirtualUsdc)),
+    )
+    const X = chart.Vx + raised
+    const mcapNow = (X * X * chart.T) / chart.K
+    return { x: chart.sx(raised), y: chart.sy(mcapNow) }
+  }, [chart, virtualUsdcReserve, initialVirtualUsdc])
+
+  // Format graduation target label
+  const gradLabel = useMemo(() => {
+    if (graduationTarget === undefined) return '$— GRADUATION TARGET'
+    // graduationTarget is in raw USDC (6 decimals)
+    const usd = Number(graduationTarget) / 1e6
+    if (usd >= 1000) {
+      return `$${(usd / 1000).toFixed(usd % 1000 === 0 ? 0 : 1)}K GRADUATION TARGET`
+    }
+    return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })} GRADUATION TARGET`
+  }, [graduationTarget])
 
   return (
     <figure className="w-full">
@@ -116,7 +141,7 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
             />
 
             {/* Current Position Marker (Solid flat) */}
-            {reserveUsdc !== undefined &&
+            {virtualUsdcReserve !== undefined &&
               now &&
               isFinite(now.x) &&
               isFinite(now.y) && (
@@ -131,7 +156,15 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
                     strokeDasharray="3 3"
                   />
                   <circle cx={now.x} cy={now.y} r="5" fill={COPPER} />
-                  <circle cx={now.x} cy={now.y} r="8" fill="none" stroke={COPPER} strokeWidth="1" opacity="0.6" />
+                  <circle
+                    cx={now.x}
+                    cy={now.y}
+                    r="8"
+                    fill="none"
+                    stroke={COPPER}
+                    strokeWidth="1"
+                    opacity="0.6"
+                  />
                 </g>
               )}
           </>
@@ -156,9 +189,9 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
           fontFamily="monospace"
           fontWeight="700"
         >
-          $50,000 GRADUATION TARGET
+          {gradLabel}
         </text>
       </svg>
     </figure>
-  );
+  )
 }

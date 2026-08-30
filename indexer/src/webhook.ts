@@ -1,4 +1,4 @@
-import { createPublicKey, verify } from "node:crypto";
+import { createHash, createPublicKey, verify } from "node:crypto";
 import http from "node:http";
 import { decodeEventLog } from "viem";
 import { config } from "./config.js";
@@ -32,7 +32,7 @@ export interface CircleWebhookNotification {
     userOpHash?: string;
     blockHash: `0x${string}`;
     blockHeight: number;
-    logIndex: string | number;
+    logIndex?: string | number;
     eventName?: string;
     eventSignature?: string;
     eventSignatureHash?: `0x${string}`;
@@ -57,12 +57,31 @@ type PendingPoolSwapDoc = {
   expiresAt: Date;
 };
 
-function parseLogIndex(value: string | number): number {
+function parseLogIndex(value: string | number | undefined): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < 0) {
     throw new Error("notification.logIndex must be a non-negative safe integer");
   }
   return parsed;
+}
+
+export type CircleLogIndexResolver = (
+  body: CircleWebhookNotification,
+) => Promise<number>;
+
+export function circleEventId(body: CircleWebhookNotification): string {
+  const event = body.notification;
+  return createHash("sha256")
+    .update([
+      event.blockchain.toLowerCase(),
+      event.contractAddress.toLowerCase(),
+      event.txHash.toLowerCase(),
+      String(event.logIndex ?? ""),
+      event.eventSignatureHash?.toLowerCase() ?? event.eventSignature ?? "",
+      ...(event.topics ?? []).map((topic) => topic.toLowerCase()),
+      event.data?.toLowerCase() ?? "0x",
+    ].join(":"))
+    .digest("hex");
 }
 
 function notificationTimestamp(body: CircleWebhookNotification): Date {
@@ -106,6 +125,7 @@ async function writePoolSwap(
   const spot = spotPriceFromReserves(token0IsToken, reserves.reserve0, reserves.reserve1);
 
   const doc: TradeDoc = {
+    eventId: circleEventId(body),
     curveAddress: launch.curve,
     trader: String(args.to).toLowerCase(),
     isBuy,
@@ -126,7 +146,16 @@ async function writePoolSwap(
 
   await Promise.all([
     db.collection<TradeDoc>("trades").updateOne(
-      { curveAddress: doc.curveAddress, blockNumber: doc.blockNumber, logIndex: doc.logIndex },
+      {
+        $or: [
+          { eventId: doc.eventId },
+          {
+            curveAddress: doc.curveAddress,
+            blockNumber: doc.blockNumber,
+            logIndex: doc.logIndex,
+          },
+        ],
+      },
       { $set: doc },
       { upsert: true },
     ),
@@ -141,7 +170,8 @@ async function writePoolSwap(
 export async function processCircleWebhookPayload(
   db: IndexerDb,
   body: CircleWebhookNotification,
-): Promise<{ success: boolean; eventName?: string; pending?: boolean; error?: string }> {
+  resolveLogIndex?: CircleLogIndexResolver,
+): Promise<{ success: boolean; eventName?: string; pending?: boolean; duplicate?: boolean; error?: string }> {
   if (body.notificationType !== "contracts.eventLog" || !body.notification) {
     return { success: true };
   }
@@ -150,7 +180,29 @@ export async function processCircleWebhookPayload(
   }
 
   const { contractAddress, txHash, blockHeight, topics, data } = body.notification;
-  const logIndex = parseLogIndex(body.notification.logIndex);
+  const logIndex = body.notification.logIndex === undefined
+    ? await resolveLogIndex?.(body)
+    : parseLogIndex(body.notification.logIndex);
+  if (logIndex === undefined) {
+    throw new Error("Circle webhook omitted logIndex and no Circle event-log resolver is configured");
+  }
+  // Preserve the canonical identity for deferred Swap/Sync processing too.
+  body.notification.logIndex = logIndex;
+  const eventId = circleEventId(body);
+  const indexedEvents = db.collection<{ _id: string; processedAt: Date }>("indexedCircleEvents");
+  if (await indexedEvents.findOne({ _id: eventId })) {
+    return { success: true, duplicate: true };
+  }
+  const complete = async <T extends { success: boolean }>(result: T): Promise<T> => {
+    if (result.success) {
+      await indexedEvents.updateOne(
+        { _id: eventId },
+        { $setOnInsert: { processedAt: new Date() } },
+        { upsert: true },
+      );
+    }
+    return result;
+  };
   if (!topics || topics.length === 0) return { success: false, error: "missing topics" };
   const timestamp = notificationTimestamp(body);
 
@@ -188,7 +240,7 @@ export async function processCircleWebhookPayload(
       { token },
       { $set: { token0IsToken: token < config.usdcAddress } },
     );
-    return { success: true, eventName };
+    return complete({ success: true, eventName });
   }
 
   if (eventName === "Traded") {
@@ -206,6 +258,7 @@ export async function processCircleWebhookPayload(
       BigInt(launch.feeBps ?? 100),
     );
     const doc: TradeDoc = {
+      eventId,
       curveAddress,
       trader: String(args.trader).toLowerCase(),
       isBuy,
@@ -225,7 +278,12 @@ export async function processCircleWebhookPayload(
 
     await Promise.all([
       db.collection<TradeDoc>("trades").updateOne(
-        { curveAddress, blockNumber: blockHeight, logIndex },
+        {
+          $or: [
+            { eventId },
+            { curveAddress, blockNumber: blockHeight, logIndex },
+          ],
+        },
         { $set: doc },
         { upsert: true },
       ),
@@ -241,7 +299,7 @@ export async function processCircleWebhookPayload(
       ),
     ]);
     console.log(`[webhook] Traded indexed for curve ${curveAddress}: ${isBuy ? "BUY" : "SELL"}`);
-    return { success: true, eventName };
+    return complete({ success: true, eventName });
   }
 
   if (eventName === "Graduated") {
@@ -264,7 +322,7 @@ export async function processCircleWebhookPayload(
     if (poolAddress) $set.pool = poolAddress;
     await db.collection<LaunchDoc>("launches").updateOne({ curve: curveAddress }, { $set });
     console.log(`[webhook] Graduated indexed for curve ${curveAddress} -> pool ${poolAddress ?? "none"}`);
-    return { success: true, eventName };
+    return complete({ success: true, eventName });
   }
 
   if (eventName === "Sync") {
@@ -301,7 +359,7 @@ export async function processCircleWebhookPayload(
         db.collection<PoolSyncDoc>("poolSyncs").deleteOne({ _id: key }),
       ]);
     }
-    return { success: true, eventName };
+    return complete({ success: true, eventName });
   }
 
   if (eventName === "Swap") {
@@ -318,17 +376,17 @@ export async function processCircleWebhookPayload(
         },
         { upsert: true },
       );
-      return { success: true, eventName, pending: true };
+      return complete({ success: true, eventName, pending: true });
     }
     await writePoolSwap(db, body, args, {
       reserve0: BigInt(sync.reserve0),
       reserve1: BigInt(sync.reserve1),
     });
     await db.collection<PoolSyncDoc>("poolSyncs").deleteOne({ _id: key });
-    return { success: true, eventName };
+    return complete({ success: true, eventName });
   }
 
-  return { success: true };
+  return complete({ success: true });
 }
 
 export function verifyCircleSignatureWithPublicKey(
@@ -366,6 +424,7 @@ export function startWebhookServer(
   db: IndexerDb,
   port = config.port,
   onTopologyChanged?: () => void,
+  resolveLogIndex?: CircleLogIndexResolver,
 ) {
   const signatureVerifier = createCircleSignatureVerifier();
   const server = http.createServer(async (req, res) => {
@@ -427,7 +486,7 @@ export function startWebhookServer(
           return;
         }
 
-        const result = await processCircleWebhookPayload(db, payload);
+        const result = await processCircleWebhookPayload(db, payload, resolveLogIndex);
         if (result.success) {
           await db.collection<{ _id: string; processedAt: Date }>("webhookNotifications").updateOne(
             { _id: payload.notificationId },
@@ -445,8 +504,8 @@ export function startWebhookServer(
         res.end(JSON.stringify(result));
       } catch (error) {
         console.error("[webhook] error handling request:", error);
-        res.writeHead(400, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "invalid payload" }));
+        res.writeHead(503, { "Content-Type": "application/json", "Retry-After": "2" });
+        res.end(JSON.stringify({ error: "event processing temporarily unavailable" }));
       }
     });
   });

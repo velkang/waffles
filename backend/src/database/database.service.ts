@@ -110,6 +110,7 @@ export class DatabaseService implements OnModuleInit, OnApplicationShutdown {
         { curveAddress: 1, blockNumber: 1, logIndex: 1 },
         { unique: true },
       );
+      await trades.createIndex({ eventId: 1 }, { unique: true, sparse: true });
       await trades.createIndex({ curveAddress: 1, blockNumber: -1, logIndex: -1 });
       await trades.createIndex({ curveAddress: 1, timestamp: -1 });
       await trades.createIndex({ trader: 1, curveAddress: 1 });

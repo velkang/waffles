@@ -1,8 +1,8 @@
-"use client";
+'use client'
 
-import { useMemo, useState } from "react";
-import { formatUnits, parseUnits } from "viem";
-import { useAccount, usePublicClient } from "wagmi";
+import { useMemo, useState } from 'react'
+import { formatUnits, parseUnits } from 'viem'
+import { useAccount, usePublicClient } from 'wagmi'
 import {
   useReadWafflesAmmFactoryGetPair,
   useReadWafflesAmmMigratorFactory,
@@ -16,130 +16,140 @@ import {
   useWriteWafflesAmmRouterSwapExactTokensForTokens,
   useWriteWafflesMemeTokenApprove,
   useWriteMockUsdcApprove,
-} from "@/generated/contracts-generated";
-import { formatToken, formatUsd } from "@/lib/format";
-import { FACTORY_ADDRESS, ROUTER_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
-import { StatusBadge } from "@/components/ui/StatusBadge";
+} from '@/generated/contracts-generated'
+import { formatToken, formatUsd } from '@/lib/format'
+import { FACTORY_ADDRESS, ROUTER_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
+import { StatusBadge } from '@/components/ui/StatusBadge'
 
-type Address = `0x${string}`;
-type Mode = "buy" | "sell";
+type Address = `0x${string}`
+type Mode = 'buy' | 'sell'
 
-const BUY_PRESETS = [25, 100, 250] as const;
-const SELL_PRESETS = [25, 50, 100] as const;
-const BPS_DENOM = 10_000n;
-const FEE_NUM = 9_975n;
-const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
+const BUY_PRESETS = [25, 100, 250] as const
+const SELL_PRESETS = [25, 50, 100] as const
+const BPS_DENOM = 10_000n
+const FEE_NUM = 9_975n
+const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 
 function poolQuote(amountIn: bigint, rIn: bigint, rOut: bigint): bigint {
-  if (amountIn <= 0n || rIn <= 0n || rOut <= 0n) return 0n;
-  return (amountIn * FEE_NUM * rOut) / (rIn * BPS_DENOM + amountIn * FEE_NUM);
+  if (amountIn <= 0n || rIn <= 0n || rOut <= 0n) return 0n
+  return (amountIn * FEE_NUM * rOut) / (rIn * BPS_DENOM + amountIn * FEE_NUM)
 }
 
 export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
-  const { address: account } = useAccount();
-  const publicClient = usePublicClient();
+  const { address: account } = useAccount()
+  const publicClient = usePublicClient()
 
-  const [mode, setMode] = useState<Mode>("buy");
-  const [amount, setAmount] = useState("");
-  const slippageBps = 100;
-  const [phase, setPhase] = useState<"idle" | "approve" | "swap">("idle");
-  const [error, setError] = useState("");
+  const [mode, setMode] = useState<Mode>('buy')
+  const [amount, setAmount] = useState('')
+  const slippageBps = 100
+  const [phase, setPhase] = useState<'idle' | 'approve' | 'swap'>('idle')
+  const [error, setError] = useState('')
 
   const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
-  });
+  })
   const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
     address: migrator,
     query: { enabled: Boolean(migrator) },
-  });
-  const { data: rawPool, isLoading: poolLoading } = useReadWafflesAmmFactoryGetPair({
-    address: ammFactory,
-    args: [tokenAddress, USDC_ADDRESS],
-    query: { enabled: Boolean(ammFactory) },
-  });
-  const pool = rawPool && rawPool !== ZERO_ADDRESS ? rawPool : undefined;
+  })
+  const { data: rawPool, isLoading: poolLoading } =
+    useReadWafflesAmmFactoryGetPair({
+      address: ammFactory,
+      args: [tokenAddress, USDC_ADDRESS],
+      query: { enabled: Boolean(ammFactory) },
+    })
+  const pool = rawPool && rawPool !== ZERO_ADDRESS ? rawPool : undefined
 
   const { data: token0 } = useReadWafflesAmmPairToken0({
     address: pool,
     query: { enabled: Boolean(pool) },
-  });
+  })
   const reservesQuery = useReadWafflesAmmPairGetReserves({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
-  });
+  })
 
   const tokenIsToken0 =
-    token0 !== undefined && token0.toLowerCase() === tokenAddress.toLowerCase();
+    token0 !== undefined && token0.toLowerCase() === tokenAddress.toLowerCase()
 
-  const [r0, r1] = reservesQuery.data ?? [];
-  const rUsdc = tokenIsToken0 ? r1 : r0;
-  const rToken = tokenIsToken0 ? r0 : r1;
+  const [r0, r1] = reservesQuery.data ?? []
+  const rUsdc = tokenIsToken0 ? r1 : r0
+  const rToken = tokenIsToken0 ? r0 : r1
   const usdcBalance = useReadMockUsdcBalanceOf({
     address: USDC_ADDRESS,
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
-  });
+  })
   const tokenBalance = useReadWafflesMemeTokenBalanceOf({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
-  });
+  })
   const usdcAllowance = useReadMockUsdcAllowance({
     address: USDC_ADDRESS,
     args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
     query: { enabled: Boolean(account && ROUTER_ADDRESS) },
-  });
+  })
   const tokenAllowance = useReadWafflesMemeTokenAllowance({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
     query: { enabled: Boolean(account && ROUTER_ADDRESS) },
-  });
+  })
 
   const parsedAmount = useMemo(() => {
     try {
-      if (amount === "" || Number(amount) <= 0) return undefined;
-      return mode === "buy" ? parseUnits(amount, 6) : parseUnits(amount, 18);
+      if (amount === '' || Number(amount) <= 0) return undefined
+      return mode === 'buy' ? parseUnits(amount, 6) : parseUnits(amount, 18)
     } catch {
-      return undefined;
+      return undefined
     }
-  }, [amount, mode]);
+  }, [amount, mode])
 
-  const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
-  const allowance = mode === "buy" ? usdcAllowance.data : tokenAllowance.data;
+  const balance = mode === 'buy' ? usdcBalance.data : tokenBalance.data
+  const allowance = mode === 'buy' ? usdcAllowance.data : tokenAllowance.data
 
   const quote = useMemo(() => {
-    if (parsedAmount === undefined || rUsdc === undefined || rToken === undefined)
-      return undefined;
-    return mode === "buy"
+    if (
+      parsedAmount === undefined ||
+      rUsdc === undefined ||
+      rToken === undefined
+    )
+      return undefined
+    return mode === 'buy'
       ? poolQuote(parsedAmount, rUsdc, rToken)
-      : poolQuote(parsedAmount, rToken, rUsdc);
-  }, [parsedAmount, rUsdc, rToken, mode]);
+      : poolQuote(parsedAmount, rToken, rUsdc)
+  }, [parsedAmount, rUsdc, rToken, mode])
 
   const needsApproval =
-    parsedAmount !== undefined && allowance !== undefined && allowance < parsedAmount;
+    parsedAmount !== undefined &&
+    allowance !== undefined &&
+    allowance < parsedAmount
 
   const insufficientBalance =
-    parsedAmount !== undefined && balance !== undefined && balance < parsedAmount;
+    parsedAmount !== undefined &&
+    balance !== undefined &&
+    balance < parsedAmount
 
   const minOut =
     quote !== undefined && quote > 0n
       ? (quote * (BPS_DENOM - BigInt(slippageBps))) / BPS_DENOM
-      : undefined;
+      : undefined
 
-  const approveUsdcAsync = useWriteMockUsdcApprove().writeContractAsync;
-  const approveTokenAsync = useWriteWafflesMemeTokenApprove().writeContractAsync;
-  const swapAsync = useWriteWafflesAmmRouterSwapExactTokensForTokens().writeContractAsync;
+  const approveUsdcAsync = useWriteMockUsdcApprove().writeContractAsync
+  const approveTokenAsync = useWriteWafflesMemeTokenApprove().writeContractAsync
+  const swapAsync =
+    useWriteWafflesAmmRouterSwapExactTokensForTokens().writeContractAsync
 
   function refetchAll() {
-    reservesQuery.refetch();
-    usdcBalance.refetch();
-    tokenBalance.refetch();
-    usdcAllowance.refetch();
-    tokenAllowance.refetch();
+    reservesQuery.refetch()
+    usdcBalance.refetch()
+    tokenBalance.refetch()
+    usdcAllowance.refetch()
+    tokenAllowance.refetch()
   }
 
   async function submit(e: React.FormEvent) {
-    e.preventDefault();
+    e.preventDefault()
     if (
       !publicClient ||
       !pool ||
@@ -148,13 +158,13 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       parsedAmount === undefined ||
       minOut === undefined
     )
-      return;
-    setError("");
+      return
+    setError('')
     try {
       if (needsApproval) {
-        setPhase("approve");
+        setPhase('approve')
         const hash =
-          mode === "buy"
+          mode === 'buy'
             ? await approveUsdcAsync({
                 address: USDC_ADDRESS,
                 args: [ROUTER_ADDRESS, parsedAmount],
@@ -162,41 +172,41 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
             : await approveTokenAsync({
                 address: tokenAddress,
                 args: [ROUTER_ADDRESS, parsedAmount],
-              });
-        await publicClient.waitForTransactionReceipt({ hash });
+              })
+        await publicClient.waitForTransactionReceipt({ hash })
       }
 
-      setPhase("swap");
+      setPhase('swap')
       const swapHash = await swapAsync({
         address: ROUTER_ADDRESS,
         args: [
           pool,
-          mode === "buy" ? USDC_ADDRESS : tokenAddress,
+          mode === 'buy' ? USDC_ADDRESS : tokenAddress,
           parsedAmount,
           minOut,
           account,
           BigInt(Math.floor(Date.now() / 1000) + 20 * 60),
         ],
-      });
-      await publicClient.waitForTransactionReceipt({ hash: swapHash });
+      })
+      await publicClient.waitForTransactionReceipt({ hash: swapHash })
 
-      setAmount("");
-      setPhase("idle");
-      refetchAll();
+      setAmount('')
+      setPhase('idle')
+      refetchAll()
     } catch (err) {
-      setPhase("idle");
-      refetchAll();
+      setPhase('idle')
+      refetchAll()
       setError(
         err instanceof Error
           ? err.message.length > 180
             ? `${err.message.slice(0, 180)}…`
             : err.message
           : String(err),
-      );
+      )
     }
   }
 
-  const busy = phase !== "idle";
+  const busy = phase !== 'idle'
   const disabled =
     busy ||
     !account ||
@@ -205,10 +215,12 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     parsedAmount === undefined ||
     insufficientBalance ||
     quote === undefined ||
-    quote === 0n;
+    quote === 0n
 
   if (poolLoading) {
-    return <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />;
+    return (
+      <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
+    )
   }
 
   if (!pool) {
@@ -219,7 +231,7 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
           Token has graduated · DEX AMM pool resolving on-chain
         </p>
       </div>
-    );
+    )
   }
 
   return (
@@ -227,7 +239,9 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-3.5">
         {/* Pool Header */}
         <div className="flex items-center justify-between pb-2 border-b border-[#24262e]">
-          <span className="text-xs font-bold text-[#4ade80]">DEX AMM PAIR ACTIVE</span>
+          <span className="text-xs font-bold text-[#4ade80]">
+            DEX AMM PAIR ACTIVE
+          </span>
           <StatusBadge graduated={true} size="xs" />
         </div>
 
@@ -236,14 +250,14 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
           <button
             type="button"
             onClick={() => {
-              setMode("buy");
-              setAmount("");
-              setError("");
+              setMode('buy')
+              setAmount('')
+              setError('')
             }}
             className={`rounded-[4px] py-2 font-bold transition ${
-              mode === "buy"
-                ? "bg-[#db9d6a] text-[#0e0f12]"
-                : "text-zinc-400 hover:text-white"
+              mode === 'buy'
+                ? 'bg-[#db9d6a] text-[#0e0f12]'
+                : 'text-zinc-400 hover:text-white'
             }`}
           >
             Buy
@@ -251,14 +265,14 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
           <button
             type="button"
             onClick={() => {
-              setMode("sell");
-              setAmount("");
-              setError("");
+              setMode('sell')
+              setAmount('')
+              setError('')
             }}
             className={`rounded-[4px] py-2 font-bold transition ${
-              mode === "sell"
-                ? "bg-[#ef4444] text-white"
-                : "text-zinc-400 hover:text-white"
+              mode === 'sell'
+                ? 'bg-[#ef4444] text-white'
+                : 'text-zinc-400 hover:text-white'
             }`}
           >
             Sell
@@ -269,17 +283,24 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
           {/* Amount Input */}
           <div className="rounded-[8px] bg-[#1a1b21] border border-[#24262e] p-3 focus-within:border-[#db9d6a] transition">
             <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span>{mode === "buy" ? "YOU PAY (USDC)" : "YOU SELL (TOKENS)"}</span>
+              <span>
+                {mode === 'buy' ? 'YOU PAY (USDC)' : 'YOU SELL (TOKENS)'}
+              </span>
               {account && (
                 <div className="flex items-center gap-1">
                   <span>
-                    Bal: {balance !== undefined ? (mode === "buy" ? formatUsd(balance) : formatToken(balance)) : "—"}
+                    Bal:{' '}
+                    {balance !== undefined
+                      ? mode === 'buy'
+                        ? formatUsd(balance)
+                        : formatToken(balance)
+                      : '—'}
                   </span>
                   <button
                     type="button"
                     onClick={() =>
                       balance !== undefined &&
-                      setAmount(formatUnits(balance, mode === "buy" ? 6 : 18))
+                      setAmount(formatUnits(balance, mode === 'buy' ? 6 : 18))
                     }
                     className="font-bold text-[#db9d6a] hover:underline ml-1"
                   >
@@ -298,16 +319,18 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
                 inputMode="decimal"
                 autoComplete="off"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
+                onChange={(e) =>
+                  setAmount(e.target.value.replace(/[^0-9.]/g, ''))
+                }
               />
               <span className="shrink-0 text-xs font-bold text-zinc-400">
-                {mode === "buy" ? "USD ⇅" : "TOKEN ⇅"}
+                {mode === 'buy' ? 'USD ⇅' : 'TOKEN ⇅'}
               </span>
             </div>
           </div>
 
           {/* Quick Presets */}
-          {mode === "buy" ? (
+          {mode === 'buy' ? (
             <div className="flex items-center gap-1.5 text-xs">
               {BUY_PRESETS.map((preset) => (
                 <button
@@ -328,8 +351,8 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
                   type="button"
                   onClick={() => {
                     if (balance !== undefined && balance > 0n) {
-                      const sel = (balance * BigInt(pct)) / 100n;
-                      setAmount(formatUnits(sel, 18));
+                      const sel = (balance * BigInt(pct)) / 100n
+                      setAmount(formatUnits(sel, 18))
                     }
                   }}
                   className="flex-1 rounded-[6px] bg-[#1a1b21] border border-[#24262e] py-1.5 font-bold text-zinc-300 hover:border-[#ef4444] hover:text-[#ef4444] transition"
@@ -345,14 +368,16 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
             <div className="rounded-[6px] bg-[#101114] border border-[#24262e] p-2.5 flex items-center justify-between text-xs">
               <span className="text-zinc-400">ESTIMATED OUTPUT</span>
               <span className="font-bold text-white">
-                {mode === "buy" ? `${formatToken(minOut)} tokens` : formatUsd(minOut)}
+                {mode === 'buy'
+                  ? `${formatToken(minOut)} tokens`
+                  : formatUsd(minOut)}
               </span>
             </div>
           )}
 
           {insufficientBalance && (
             <p className="rounded-[6px] border border-red-500/40 bg-[#2b1114] p-2 text-xs text-red-300 font-bold">
-              Insufficient {mode === "buy" ? "USDC" : "Token"} balance
+              Insufficient {mode === 'buy' ? 'USDC' : 'Token'} balance
             </p>
           )}
           {error && (
@@ -365,25 +390,25 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
             type="submit"
             disabled={disabled}
             className={`w-full rounded-[8px] py-3 text-xs font-black uppercase tracking-wider transition active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed ${
-              mode === "buy"
-                ? "bg-[#db9d6a] text-[#0e0f12] hover:bg-[#e5ab7a]"
-                : "bg-[#ef4444] text-white hover:bg-[#dc2626]"
+              mode === 'buy'
+                ? 'bg-[#db9d6a] text-[#0e0f12] hover:bg-[#e5ab7a]'
+                : 'bg-[#ef4444] text-white hover:bg-[#dc2626]'
             }`}
           >
             {busy
-              ? phase === "approve"
-                ? "Approving Token…"
-                : "Executing Swap…"
+              ? phase === 'approve'
+                ? 'Approving Token…'
+                : 'Executing Swap…'
               : !account
-                ? "Connect wallet to trade"
+                ? 'Connect wallet to trade'
                 : !parsedAmount || parsedAmount === 0n
-                  ? "Enter an amount"
+                  ? 'Enter an amount'
                   : needsApproval
-                    ? `Approve & ${mode === "buy" ? "Buy" : "Sell"}`
-                    : `${mode === "buy" ? "Buy" : "Sell"} on DEX`}
+                    ? `Approve & ${mode === 'buy' ? 'Buy' : 'Sell'}`
+                    : `${mode === 'buy' ? 'Buy' : 'Sell'} on DEX`}
           </button>
         </form>
       </div>
     </div>
-  );
+  )
 }

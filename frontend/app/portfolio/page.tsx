@@ -1,110 +1,126 @@
-"use client";
+'use client'
 
-import { Suspense, useMemo, useState } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useAccount, usePublicClient, useReadContracts } from "wagmi";
+import { Suspense, useMemo, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
 import {
   wafflesAmmFactoryAbi,
   wafflesAmmPairAbi,
   useReadWafflesAmmMigratorFactory,
   useReadWafflesLaunchFactoryMigrator,
   useWriteWafflesBondingCurveClaimCreatorFees,
-} from "@/generated/contracts-generated";
-import { formatToken, formatUsd } from "@/lib/format";
-import { poolPriceFromReserves } from "@/lib/use-venue-price";
-import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import { useLaunches, usePortfolio } from "@/lib/hooks/queries";
-import { useRealtimeTopics } from "@/lib/realtime/RealtimeProvider";
+} from '@/generated/contracts-generated'
+import { formatToken, formatUsd } from '@/lib/format'
+import { poolPriceFromReserves } from '@/lib/use-venue-price'
+import { FACTORY_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
+import { StatusBadge } from '@/components/ui/StatusBadge'
+import { useLaunches, usePortfolio } from '@/lib/hooks/queries'
+import { useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
 
-type Address = `0x${string}`;
+type Address = `0x${string}`
 
 type ApiLaunch = {
-  token: string;
-  curve: string;
-  creator: string;
-  name: string;
-  symbol: string;
-  graduated?: boolean;
-};
+  token: string
+  curve: string
+  creator: string
+  name: string
+  symbol: string
+  graduated?: boolean
+}
 
 type Position = {
-  curve: string;
-  usdcSpent: string;
-  usdcReceived: string;
-  tokensBought: string;
-  tokensSold: string;
-  tradeCount: number;
-};
+  curve: string
+  usdcSpent: string
+  usdcReceived: string
+  tokensBought: string
+  tokensSold: string
+  tradeCount: number
+}
 
-const ZERO = "0x0000000000000000000000000000000000000000" as Address;
+const ZERO = '0x0000000000000000000000000000000000000000' as Address
 
 const balanceAbi = [
   {
-    type: "function",
-    name: "balanceOf",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
+    type: 'function',
+    name: 'balanceOf',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
-] as const;
+] as const
 
 const priceAbi = [
   {
-    type: "function",
-    name: "currentPrice",
-    stateMutability: "view",
+    type: 'function',
+    name: 'currentPrice',
+    stateMutability: 'view',
     inputs: [],
-    outputs: [{ name: "", type: "uint256" }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
-] as const;
+] as const
 
 const earningsAbi = [
   {
-    type: "function",
-    name: "creatorEarnings",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "address" }],
-    outputs: [{ name: "", type: "uint256" }],
+    type: 'function',
+    name: 'creatorEarnings',
+    stateMutability: 'view',
+    inputs: [{ name: '', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
   },
-] as const;
+] as const
 
 export default function PortfolioPage() {
   return (
     <Suspense>
       <PortfolioView />
     </Suspense>
-  );
+  )
 }
 
 function PortfolioView() {
-  const { address: connected } = useAccount();
-  const forced = useSearchParams().get("account");
+  const { address: connected } = useAccount()
+  const forced = useSearchParams().get('account')
   const validated =
     forced && /^0x[0-9a-fA-F]{40}$/.test(forced)
       ? (forced as Address)
-      : undefined;
-  const address = validated ?? connected;
+      : undefined
+  const address = validated ?? connected
 
-  useRealtimeTopics(address ? [`portfolio:${address.toLowerCase()}`] : []);
+  useRealtimeTopics(address ? [`portfolio:${address.toLowerCase()}`] : [])
 
-  const { data: launchData, isLoading: launchesLoading } = useLaunches({ sort: "new", limit: 200 });
-  const { data: portfolioData, isLoading: portfolioLoading } = usePortfolio(address);
+  const { data: launchData, isLoading: launchesLoading } = useLaunches({
+    sort: 'new',
+    limit: 200,
+  })
+  const { data: portfolioData, isLoading: portfolioLoading } =
+    usePortfolio(address)
 
-  const launches = useMemo(() => (launchData?.launches as ApiLaunch[]) ?? (launchesLoading ? null : []), [launchData, launchesLoading]);
-  const positions = useMemo(() => (portfolioData?.positions as Position[]) ?? (portfolioLoading ? null : []), [portfolioData, portfolioLoading]);
-  const [nonce, setNonce] = useState(0);
+  const launches = useMemo(
+    () =>
+      (launchData?.launches as ApiLaunch[]) ?? (launchesLoading ? null : []),
+    [launchData, launchesLoading],
+  )
+  const positions = useMemo(
+    () =>
+      (portfolioData?.positions as Position[]) ??
+      (portfolioLoading ? null : []),
+    [portfolioData, portfolioLoading],
+  )
+  const [nonce, setNonce] = useState(0)
 
   if (!address) {
     return (
       <div className="mx-auto max-w-md rounded-[10px] border border-[#24262e] bg-[#141519] p-8 text-center font-mono">
-        <h1 className="text-base font-bold text-white uppercase tracking-wider">PORTFOLIO TERMINAL</h1>
+        <h1 className="text-base font-bold text-white uppercase tracking-wider">
+          PORTFOLIO TERMINAL
+        </h1>
         <p className="mt-2 text-xs text-zinc-400">
-          Connect your wallet to track active token holdings, P&amp;L, and creator rewards.
+          Connect your wallet to track active token holdings, P&amp;L, and
+          creator rewards.
         </p>
       </div>
-    );
+    )
   }
 
   return (
@@ -115,7 +131,7 @@ function PortfolioView() {
       positions={positions}
       onClaimed={() => setNonce((n) => n + 1)}
     />
-  );
+  )
 }
 
 function PortfolioBody({
@@ -124,14 +140,15 @@ function PortfolioBody({
   positions,
   onClaimed,
 }: {
-  address: Address;
-  launches: ApiLaunch[] | null;
-  positions: Position[] | null;
-  onClaimed: () => void;
+  address: Address
+  launches: ApiLaunch[] | null
+  positions: Position[] | null
+  onClaimed: () => void
 }) {
-  const publicClient = usePublicClient();
-  const claimAsync = useWriteWafflesBondingCurveClaimCreatorFees().writeContractAsync;
-  const [claimingCurve, setClaimingCurve] = useState<string | null>(null);
+  const publicClient = usePublicClient()
+  const claimAsync =
+    useWriteWafflesBondingCurveClaimCreatorFees().writeContractAsync
+  const [claimingCurve, setClaimingCurve] = useState<string | null>(null)
 
   const activePositions = useMemo(
     () =>
@@ -142,54 +159,54 @@ function PortfolioBody({
           launch: launches?.find((l) => l.curve === p.curve),
         }))
         .filter((p): p is typeof p & { launch: ApiLaunch } =>
-          Boolean(p.launch)
+          Boolean(p.launch),
         ),
-    [positions, launches]
-  );
+    [positions, launches],
+  )
 
   const createdLaunches = useMemo(
     () =>
       address === undefined
         ? []
         : (launches ?? []).filter(
-            (l) => l.creator.toLowerCase() === address.toLowerCase()
+            (l) => l.creator.toLowerCase() === address.toLowerCase(),
           ),
-    [launches, address]
-  );
+    [launches, address],
+  )
 
   // Chain reads for active positions
   const balanceQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
       address: p.launch.token as Address,
       abi: balanceAbi,
-      functionName: "balanceOf" as const,
+      functionName: 'balanceOf' as const,
       args: [address ?? ZERO] as const,
     })),
     query: { enabled: Boolean(address) && activePositions.length > 0 },
-  });
+  })
 
   const priceQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
       address: p.curve as Address,
       abi: priceAbi,
-      functionName: "currentPrice" as const,
+      functionName: 'currentPrice' as const,
     })),
     query: { enabled: activePositions.length > 0 },
-  });
+  })
 
   const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
     address: FACTORY_ADDRESS,
     query: { enabled: activePositions.some((p) => p.launch.graduated) },
-  });
+  })
   const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
     address: migrator,
     query: { enabled: Boolean(migrator) },
-  });
+  })
   const pairQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
       address: ammFactory ?? ZERO,
       abi: wafflesAmmFactoryAbi,
-      functionName: "getPair" as const,
+      functionName: 'getPair' as const,
       args: [p.launch.token as Address, USDC_ADDRESS] as const,
     })),
     query: {
@@ -197,84 +214,84 @@ function PortfolioBody({
         Boolean(ammFactory) && activePositions.some((p) => p.launch.graduated),
       refetchInterval: 10_000,
     },
-  });
+  })
   const pairAddresses = activePositions.map((p, i) =>
     p.launch.graduated
       ? ((pairQueries.data?.[i]?.result as Address | undefined) ?? ZERO)
-      : ZERO
-  );
+      : ZERO,
+  )
   const token0Queries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
       address: pair,
       abi: wafflesAmmPairAbi,
-      functionName: "token0" as const,
+      functionName: 'token0' as const,
     })),
     query: {
       enabled: pairAddresses.some((pair) => pair !== ZERO),
       refetchInterval: 10_000,
     },
-  });
+  })
   const reserveQueries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
       address: pair,
       abi: wafflesAmmPairAbi,
-      functionName: "getReserves" as const,
+      functionName: 'getReserves' as const,
     })),
     query: {
       enabled: pairAddresses.some((pair) => pair !== ZERO),
       refetchInterval: 10_000,
     },
-  });
+  })
 
   const earningsQueries = useReadContracts({
     contracts: createdLaunches.map((l) => ({
       address: l.curve as Address,
       abi: earningsAbi,
-      functionName: "creatorEarnings" as const,
+      functionName: 'creatorEarnings' as const,
       args: [(address ?? ZERO) as `0x${string}`] as const,
     })),
     query: { enabled: Boolean(address) && createdLaunches.length > 0 },
-  });
+  })
 
   const rows = activePositions.map((p, i) => {
-    const balance = balanceQueries.data?.[i]?.result as bigint | undefined;
-    const curvePrice = priceQueries.data?.[i]?.result as bigint | undefined;
+    const balance = balanceQueries.data?.[i]?.result as bigint | undefined
+    const curvePrice = priceQueries.data?.[i]?.result as bigint | undefined
     const poolPrice = poolPriceFromReserves(
       p.launch.token as Address,
       token0Queries.data?.[i]?.result as Address | undefined,
-      reserveQueries.data?.[i]?.result as readonly [bigint, bigint] | undefined
-    );
-    const priceRaw = p.launch.graduated ? poolPrice : curvePrice;
+      reserveQueries.data?.[i]?.result as readonly [bigint, bigint] | undefined,
+    )
+    const priceRaw = p.launch.graduated ? poolPrice : curvePrice
     const value =
       balance !== undefined && priceRaw !== undefined
-        ? (balance * priceRaw) / 10n ** 18n
-        : undefined;
+        ? (balance * priceRaw) / 10n ** 30n
+        : undefined
 
-    const invested = BigInt(p.usdcSpent) - BigInt(p.usdcReceived);
-    const pnl = value !== undefined ? value - invested : undefined;
+    const invested = BigInt(p.usdcSpent) - BigInt(p.usdcReceived)
+    const pnl = value !== undefined ? value - invested : undefined
 
-    return { ...p, balance, value, invested, pnl };
-  });
+    return { ...p, balance, value, invested, pnl }
+  })
 
-  const totalValue = rows.reduce((acc, r) => acc + (r.value ?? 0n), 0n);
-  const totalPnl = rows.reduce((acc, r) => acc + (r.pnl ?? 0n), 0n);
+  const totalValue = rows.reduce((acc, r) => acc + (r.value ?? 0n), 0n)
+  const totalPnl = rows.reduce((acc, r) => acc + (r.pnl ?? 0n), 0n)
 
   const totalUnclaimed = earningsQueries.data?.reduce(
     (acc, q) => acc + ((q.result as bigint | undefined) ?? 0n),
-    0n
-  );
+    0n,
+  )
 
   async function claim(curve: Address) {
-    if (!publicClient) return;
+    if (!publicClient) return
     try {
-      setClaimingCurve(curve);
-      const hash = await claimAsync({ address: curve });
-      await publicClient.waitForTransactionReceipt({ hash });
-      onClaimed();
+      setClaimingCurve(curve)
+      const hash = await claimAsync({ address: curve })
+      await publicClient.waitForTransactionReceipt({ hash })
+      onClaimed()
     } catch (err) {
-      console.error(err);
+      console.error(err)
     } finally {
-      setClaimingCurve(null);
+      setClaimingCurve(null)
     }
   }
 
@@ -286,7 +303,9 @@ function PortfolioBody({
           Portfolio
         </h1>
         <p className="mt-1 text-xs text-zinc-400">
-          Denominated in <span className="text-[#db9d6a] font-bold">Circle USDC</span> on Arc L1.
+          Denominated in{' '}
+          <span className="text-[#db9d6a] font-bold">Circle USDC</span> on Arc
+          L1.
         </p>
 
         <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -313,10 +332,10 @@ function PortfolioBody({
             <div
               className={`mt-1 text-xl font-bold ${
                 totalPnl > 0n
-                  ? "text-[#4ade80]"
+                  ? 'text-[#4ade80]'
                   : totalPnl < 0n
-                    ? "text-[#ef4444]"
-                    : "text-zinc-300"
+                    ? 'text-[#ef4444]'
+                    : 'text-zinc-300'
               }`}
             >
               {totalPnl >= 0n ? `+${formatUsd(totalPnl)}` : formatUsd(totalPnl)}
@@ -334,7 +353,7 @@ function PortfolioBody({
           <div className="h-28 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
         ) : rows.length === 0 ? (
           <div className="rounded-[10px] border border-[#24262e] p-8 text-center text-xs text-zinc-400 bg-[#141519]">
-            No active positions •{" "}
+            No active positions •{' '}
             <Link href="/" className="font-bold text-[#db9d6a] hover:underline">
               Explore floor →
             </Link>
@@ -379,14 +398,14 @@ function PortfolioBody({
                     <td
                       className={`px-4 py-3 text-right font-bold ${
                         r.pnl === undefined
-                          ? "text-zinc-500"
+                          ? 'text-zinc-500'
                           : r.pnl >= 0n
-                            ? "text-[#4ade80]"
-                            : "text-[#ef4444]"
+                            ? 'text-[#4ade80]'
+                            : 'text-[#ef4444]'
                       }`}
                     >
                       {r.pnl === undefined
-                        ? "—"
+                        ? '—'
                         : r.pnl >= 0n
                           ? `+${formatUsd(r.pnl)}`
                           : formatUsd(r.pnl)}
@@ -416,7 +435,7 @@ function PortfolioBody({
           <span className="text-xs font-bold text-[#db9d6a]">
             {totalUnclaimed !== undefined
               ? `${formatUsd(totalUnclaimed)} TOTAL UNCLAIMED`
-              : ""}
+              : ''}
           </span>
         </div>
 
@@ -431,7 +450,7 @@ function PortfolioBody({
             {createdLaunches.map((l, i) => {
               const earned = earningsQueries.data?.[i]?.result as
                 | bigint
-                | undefined;
+                | undefined
               return (
                 <div
                   key={l.curve}
@@ -444,7 +463,7 @@ function PortfolioBody({
 
                   <div className="flex items-center gap-3.5">
                     <span className="text-sm font-bold text-[#db9d6a]">
-                      {earned !== undefined ? formatUsd(earned) : "—"}
+                      {earned !== undefined ? formatUsd(earned) : '—'}
                     </span>
                     <button
                       type="button"
@@ -456,15 +475,15 @@ function PortfolioBody({
                       onClick={() => claim(l.curve as Address)}
                       className="rounded-[4px] bg-[#db9d6a] px-3 py-1 text-xs font-bold text-[#0e0f12] transition hover:bg-[#e5ab7a] disabled:opacity-40 disabled:cursor-not-allowed uppercase"
                     >
-                      {claimingCurve === l.curve ? "Claiming…" : "Claim"}
+                      {claimingCurve === l.curve ? 'Claiming…' : 'Claim'}
                     </button>
                   </div>
                 </div>
-              );
+              )
             })}
           </div>
         )}
       </section>
     </div>
-  );
+  )
 }

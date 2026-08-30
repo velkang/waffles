@@ -258,7 +258,7 @@ export class RealtimeService implements OnApplicationBootstrap, OnApplicationShu
         doc.blockNumber,
         doc.logIndex,
         'trade.upserted',
-        this.getChangeSuffix(change),
+        doc.eventId ?? this.getChangeSuffix(change),
       );
 
       // Lookup token if curveAddress is known
@@ -284,6 +284,7 @@ export class RealtimeService implements OnApplicationBootstrap, OnApplicationShu
         token: tokenAddress,
         curve: doc.curveAddress,
         data: {
+          eventId: doc.eventId,
           trader: doc.trader,
           isBuy: doc.isBuy,
           usdcAmount: doc.usdcAmount,

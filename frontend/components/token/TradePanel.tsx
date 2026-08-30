@@ -12,6 +12,7 @@ import {
   useReadWafflesBondingCurveMarketCap,
   useReadWafflesBondingCurveQuoteBuy,
   useReadWafflesBondingCurveQuoteSell,
+  useReadWafflesBondingCurveGraduationMarketCapTarget,
   useReadMockUsdcAllowance,
   useReadMockUsdcBalanceOf,
   useReadWafflesMemeTokenAllowance,
@@ -153,11 +154,20 @@ function CurveTradePanel({
   const { data: creator } = useReadWafflesBondingCurveCreator({
     address: curveAddress,
   });
+  const { data: graduationMarketCapTarget } =
+    useReadWafflesBondingCurveGraduationMarketCapTarget({
+      address: curveAddress,
+    });
 
   const quote = mode === "buy" ? quoteBuy.data : quoteSell.data;
   const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
   const allowance = mode === "buy" ? usdcAllowance.data : tokenAllowance.data;
   const progress = progressBps !== undefined ? Number(progressBps) / 100 : 0;
+
+  const graduationTargetUsd =
+    graduationMarketCapTarget === undefined
+      ? undefined
+      : Number(formatUnits(graduationMarketCapTarget, 6));
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -626,7 +636,7 @@ function CurveTradePanel({
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
               <span className="text-zinc-400">LP Lock</span>
               <span className="font-bold text-[#4ade80] flex items-center gap-1">
-                <span>✓</span> 100% Burned at $50K ATH
+                <span>✓</span> 100% Burned at Graduation
               </span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
@@ -648,12 +658,21 @@ function CurveTradePanel({
             MC <span className="text-white">{marketCap ? formatUsd(marketCap) : "—"}</span>
           </span>
           <span className="text-zinc-400">
-            ATH <span className="text-[#db9d6a]">$50.0K</span>
+            ATH <span className="text-[#db9d6a]">
+              {graduationTargetUsd !== undefined
+                ? graduationTargetUsd >= 1000
+                  ? `$${(graduationTargetUsd / 1000).toFixed(graduationTargetUsd % 1000 === 0 ? 0 : 1)}K`
+                  : `$${graduationTargetUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+                : "—"}
+            </span>
           </span>
         </div>
         <ProgressBar progress={progress} graduated={false} size="md" />
         <div className="flex items-center justify-between text-[10px] text-zinc-500">
-          <span>Graduation target: $50,000 USDC</span>
+          <span>Graduation target: {graduationTargetUsd !== undefined
+            ? `$${graduationTargetUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDC`
+            : "—"}
+          </span>
           <span className="font-bold text-[#db9d6a]">{progress.toFixed(1)}%</span>
         </div>
       </div>

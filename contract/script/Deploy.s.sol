@@ -22,17 +22,14 @@ contract BroadcasterFinder {
 contract Deploy is Script {
     uint256 internal constant ARC_TESTNET_CHAIN_ID = 5_042_002;
     uint256 internal constant ANVIL_CHAIN_ID = 31_337;
-    address internal constant ARC_TESTNET_USDC = 0x3600000000000000000000000000000000000000;
+    address internal constant ARC_TESTNET_USDC =
+        0x3600000000000000000000000000000000000000;
 
-    // Curve economics (full supply on the curve, 20% non-sellable reserve):
-    //   - initial mcap ~= $5.6k (v_u / 1.2B * 1B)
-    //   - curve completes at a $50k mcap reading (7.5x v_u / threshold parity)
-    //   - the seeded pool opens at ~= $66.7k mcap (2x v_u USDC / 200M reserve)
-    //   - 1% trade fee (0.75% protocol / 0.25% creator), $1 creation fee
     uint256 internal constant CREATION_FEE = 1e6; // $1
-    uint256 internal constant VIRTUAL_USDC = 6_667e6;
-    uint256 internal constant VIRTUAL_TOKENS = 2e26;
-    uint256 internal constant GRADUATION_MCAP = 50_000e6;
+    uint256 internal constant INITIAL_VIRTUAL_USDC_RESERVE = 2_986e6;
+    uint256 internal constant INITIAL_VIRTUAL_TOKEN_RESERVE =
+        1_060_569_000 ether;
+    uint256 internal constant MIN_VIRTUAL_TOKEN_RESERVE = 251_660_441 ether;
     uint256 internal constant FEE_BPS = 100;
     uint256 internal constant PROTOCOL_FEE_BPS = 7_500;
 
@@ -46,12 +43,26 @@ contract Deploy is Script {
 
     function setUp() public {}
 
-    function getDeploymentConfig() internal view returns (NetworkConfig memory config) {
+    function getDeploymentConfig()
+        internal
+        view
+        returns (NetworkConfig memory config)
+    {
         if (block.chainid == ARC_TESTNET_CHAIN_ID) {
-            return NetworkConfig({networkName: "Arc Testnet", usdcAddress: ARC_TESTNET_USDC, deployMockUsdc: false});
+            return
+                NetworkConfig({
+                    networkName: "Arc Testnet",
+                    usdcAddress: ARC_TESTNET_USDC,
+                    deployMockUsdc: false
+                });
         }
         if (block.chainid == ANVIL_CHAIN_ID) {
-            return NetworkConfig({networkName: "Local Anvil", usdcAddress: address(0), deployMockUsdc: true});
+            return
+                NetworkConfig({
+                    networkName: "Local Anvil",
+                    usdcAddress: address(0),
+                    deployMockUsdc: true
+                });
         }
 
         revert UnsupportedChain(block.chainid);
@@ -79,16 +90,19 @@ contract Deploy is Script {
         }
 
         WafflesAmmFactory ammFactory = new WafflesAmmFactory();
-        WafflesAmmMigrator migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
+        WafflesAmmMigrator migrator = new WafflesAmmMigrator(
+            ammFactory,
+            IERC20(usdc)
+        );
         WafflesAmmRouter router = new WafflesAmmRouter(ammFactory);
         WafflesLaunchFactory factory = new WafflesLaunchFactory(
             usdc,
             treasury,
             address(migrator),
             CREATION_FEE,
-            VIRTUAL_USDC,
-            VIRTUAL_TOKENS,
-            GRADUATION_MCAP,
+            INITIAL_VIRTUAL_USDC_RESERVE,
+            INITIAL_VIRTUAL_TOKEN_RESERVE,
+            MIN_VIRTUAL_TOKEN_RESERVE,
             FEE_BPS,
             PROTOCOL_FEE_BPS
         );
@@ -97,7 +111,14 @@ contract Deploy is Script {
         vm.stopBroadcast();
 
         logDeployment(
-            address(factory), address(ammFactory), address(migrator), address(router), usdc, deployer, treasury, config
+            address(factory),
+            address(ammFactory),
+            address(migrator),
+            address(router),
+            usdc,
+            deployer,
+            treasury,
+            config
         );
     }
 
@@ -121,11 +142,17 @@ contract Deploy is Script {
         console2.log("Migrator:", migrator);
         console2.log("Router:", router);
         console2.log("Launch Factory:", launchFactory);
-        console2.log("\n--- Launch Configuration ---");
+        console2.log("\n--- Launch Configuration (Stored-Reserve) ---");
         console2.log("Creation Fee (USDC units):", CREATION_FEE);
-        console2.log("Virtual USDC:", VIRTUAL_USDC);
-        console2.log("Virtual Tokens:", VIRTUAL_TOKENS);
-        console2.log("Graduation Market Cap:", GRADUATION_MCAP);
+        console2.log(
+            "Initial Virtual USDC Reserve:",
+            INITIAL_VIRTUAL_USDC_RESERVE
+        );
+        console2.log(
+            "Initial Virtual Token Reserve:",
+            INITIAL_VIRTUAL_TOKEN_RESERVE
+        );
+        console2.log("Min Virtual Token Reserve:", MIN_VIRTUAL_TOKEN_RESERVE);
         console2.log("Trade Fee (bps):", FEE_BPS);
         console2.log("Protocol Fee Share (bps):", PROTOCOL_FEE_BPS);
         console2.log("\n=== Deployment Complete ===");

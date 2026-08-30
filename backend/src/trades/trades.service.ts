@@ -4,6 +4,7 @@ import { TradesQueryDto } from './dto/trades-query.dto';
 import { Trade } from '@waffles/shared';
 
 export interface RawTradeDoc {
+  eventId?: string;
   curveAddress: string;
   trader: string;
   isBuy: boolean;
@@ -51,6 +52,7 @@ export class TradesService {
 
     return {
       trades: trades.map((t) => ({
+        eventId: t.eventId,
         trader: t.trader,
         isBuy: t.isBuy,
         usdcAmount: t.usdcAmount,

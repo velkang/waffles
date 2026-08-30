@@ -875,11 +875,21 @@ export const wafflesBondingCurveAbi = [
       { name: 'creator_', internalType: 'address', type: 'address' },
       { name: 'treasury_', internalType: 'address', type: 'address' },
       { name: 'migrator_', internalType: 'address', type: 'address' },
-      { name: 'initialCurveSupply_', internalType: 'uint256', type: 'uint256' },
-      { name: 'reserveTokens_', internalType: 'uint256', type: 'uint256' },
-      { name: 'virtualUsdc_', internalType: 'uint256', type: 'uint256' },
-      { name: 'virtualTokens_', internalType: 'uint256', type: 'uint256' },
-      { name: 'graduationMcap_', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'initialVirtualUsdcReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'initialVirtualTokenReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'minVirtualTokenReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
       { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
       { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
     ],
@@ -889,6 +899,13 @@ export const wafflesBondingCurveAbi = [
     type: 'function',
     inputs: [],
     name: 'BPS_DENOM',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'PRICE_SCALE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -968,7 +985,7 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'graduationMcap',
+    name: 'graduationMarketCapTarget',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -996,7 +1013,14 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'initialCurveSupply',
+    name: 'initialVirtualTokenReserve',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'initialVirtualUsdcReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1004,6 +1028,13 @@ export const wafflesBondingCurveAbi = [
     type: 'function',
     inputs: [],
     name: 'k',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'liquidityTokenReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1030,6 +1061,13 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'minVirtualTokenReserve',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'protocolFeeBps',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -1045,13 +1083,6 @@ export const wafflesBondingCurveAbi = [
     type: 'function',
     inputs: [{ name: 'tokensIn', internalType: 'uint256', type: 'uint256' }],
     name: 'quoteSell',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'reserveTokens',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1076,6 +1107,13 @@ export const wafflesBondingCurveAbi = [
     type: 'function',
     inputs: [],
     name: 'sellableTokens',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'targetVirtualUsdcReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1110,14 +1148,14 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'virtualTokens',
+    name: 'virtualTokenReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
     type: 'function',
     inputs: [],
-    name: 'virtualUsdc',
+    name: 'virtualUsdcReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1211,6 +1249,7 @@ export const wafflesBondingCurveAbi = [
     name: 'Traded',
   },
   { type: 'error', inputs: [], name: 'CurveClosed' },
+  { type: 'error', inputs: [], name: 'ExcessiveSell' },
   { type: 'error', inputs: [], name: 'InsufficientReserve' },
   { type: 'error', inputs: [], name: 'InvalidParameters' },
   { type: 'error', inputs: [], name: 'NotCreator' },
@@ -1237,9 +1276,21 @@ export const wafflesLaunchFactoryAbi = [
       { name: 'treasury_', internalType: 'address', type: 'address' },
       { name: 'migrator_', internalType: 'address', type: 'address' },
       { name: 'creationFee_', internalType: 'uint256', type: 'uint256' },
-      { name: 'virtualUsdc_', internalType: 'uint256', type: 'uint256' },
-      { name: 'virtualTokens_', internalType: 'uint256', type: 'uint256' },
-      { name: 'graduationMcap_', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'initialVirtualUsdcReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'initialVirtualTokenReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
+      {
+        name: 'minVirtualTokenReserve_',
+        internalType: 'uint256',
+        type: 'uint256',
+      },
       { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
       { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
     ],
@@ -1248,7 +1299,7 @@ export const wafflesLaunchFactoryAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'CURVE_RESERVE',
+    name: 'TOKEN_SUPPLY',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1308,7 +1359,14 @@ export const wafflesLaunchFactoryAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'graduationMcap',
+    name: 'initialVirtualTokenReserve',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'initialVirtualUsdcReserve',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1334,6 +1392,13 @@ export const wafflesLaunchFactoryAbi = [
     inputs: [],
     name: 'migrator',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'minVirtualTokenReserve',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -1390,20 +1455,6 @@ export const wafflesLaunchFactoryAbi = [
     inputs: [],
     name: 'usdc',
     outputs: [{ name: '', internalType: 'address', type: 'address' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'virtualTokens',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'virtualUsdc',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {
@@ -2544,6 +2595,15 @@ export const useReadWafflesBondingCurveBpsDenom =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"PRICE_SCALE"`
+ */
+export const useReadWafflesBondingCurvePriceScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'PRICE_SCALE',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"canGraduate"`
  */
 export const useReadWafflesBondingCurveCanGraduate =
@@ -2607,12 +2667,12 @@ export const useReadWafflesBondingCurveGraduationMarketCap =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationMcap"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"graduationMarketCapTarget"`
  */
-export const useReadWafflesBondingCurveGraduationMcap =
+export const useReadWafflesBondingCurveGraduationMarketCapTarget =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
-    functionName: 'graduationMcap',
+    functionName: 'graduationMarketCapTarget',
   })
 
 /**
@@ -2643,12 +2703,21 @@ export const useReadWafflesBondingCurveGraduationProgressBps =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"initialCurveSupply"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"initialVirtualTokenReserve"`
  */
-export const useReadWafflesBondingCurveInitialCurveSupply =
+export const useReadWafflesBondingCurveInitialVirtualTokenReserve =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
-    functionName: 'initialCurveSupply',
+    functionName: 'initialVirtualTokenReserve',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"initialVirtualUsdcReserve"`
+ */
+export const useReadWafflesBondingCurveInitialVirtualUsdcReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'initialVirtualUsdcReserve',
   })
 
 /**
@@ -2658,6 +2727,15 @@ export const useReadWafflesBondingCurveK = /*#__PURE__*/ createUseReadContract({
   abi: wafflesBondingCurveAbi,
   functionName: 'k',
 })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"liquidityTokenReserve"`
+ */
+export const useReadWafflesBondingCurveLiquidityTokenReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'liquidityTokenReserve',
+  })
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"marketCap"`
@@ -2675,6 +2753,15 @@ export const useReadWafflesBondingCurveMigrator =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
     functionName: 'migrator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"minVirtualTokenReserve"`
+ */
+export const useReadWafflesBondingCurveMinVirtualTokenReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'minVirtualTokenReserve',
   })
 
 /**
@@ -2705,15 +2792,6 @@ export const useReadWafflesBondingCurveQuoteSell =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"reserveTokens"`
- */
-export const useReadWafflesBondingCurveReserveTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: wafflesBondingCurveAbi,
-    functionName: 'reserveTokens',
-  })
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"reserveUsdc"`
  */
 export const useReadWafflesBondingCurveReserveUsdc =
@@ -2729,6 +2807,15 @@ export const useReadWafflesBondingCurveSellableTokens =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
     functionName: 'sellableTokens',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"targetVirtualUsdcReserve"`
+ */
+export const useReadWafflesBondingCurveTargetVirtualUsdcReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'targetVirtualUsdcReserve',
   })
 
 /**
@@ -2768,21 +2855,21 @@ export const useReadWafflesBondingCurveUsdc =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualTokens"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualTokenReserve"`
  */
-export const useReadWafflesBondingCurveVirtualTokens =
+export const useReadWafflesBondingCurveVirtualTokenReserve =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
-    functionName: 'virtualTokens',
+    functionName: 'virtualTokenReserve',
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualUsdc"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"virtualUsdcReserve"`
  */
-export const useReadWafflesBondingCurveVirtualUsdc =
+export const useReadWafflesBondingCurveVirtualUsdcReserve =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
-    functionName: 'virtualUsdc',
+    functionName: 'virtualUsdcReserve',
   })
 
 /**
@@ -2911,12 +2998,12 @@ export const useReadWafflesLaunchFactory = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"CURVE_RESERVE"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"TOKEN_SUPPLY"`
  */
-export const useReadWafflesLaunchFactoryCurveReserve =
+export const useReadWafflesLaunchFactoryTokenSupply =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
-    functionName: 'CURVE_RESERVE',
+    functionName: 'TOKEN_SUPPLY',
   })
 
 /**
@@ -2956,12 +3043,21 @@ export const useReadWafflesLaunchFactoryFeeBps =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"graduationMcap"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"initialVirtualTokenReserve"`
  */
-export const useReadWafflesLaunchFactoryGraduationMcap =
+export const useReadWafflesLaunchFactoryInitialVirtualTokenReserve =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
-    functionName: 'graduationMcap',
+    functionName: 'initialVirtualTokenReserve',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"initialVirtualUsdcReserve"`
+ */
+export const useReadWafflesLaunchFactoryInitialVirtualUsdcReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'initialVirtualUsdcReserve',
   })
 
 /**
@@ -2980,6 +3076,15 @@ export const useReadWafflesLaunchFactoryMigrator =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
     functionName: 'migrator',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"minVirtualTokenReserve"`
+ */
+export const useReadWafflesLaunchFactoryMinVirtualTokenReserve =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'minVirtualTokenReserve',
   })
 
 /**
@@ -3034,24 +3139,6 @@ export const useReadWafflesLaunchFactoryUsdc =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
     functionName: 'usdc',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"virtualTokens"`
- */
-export const useReadWafflesLaunchFactoryVirtualTokens =
-  /*#__PURE__*/ createUseReadContract({
-    abi: wafflesLaunchFactoryAbi,
-    functionName: 'virtualTokens',
-  })
-
-/**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"virtualUsdc"`
- */
-export const useReadWafflesLaunchFactoryVirtualUsdc =
-  /*#__PURE__*/ createUseReadContract({
-    abi: wafflesLaunchFactoryAbi,
-    functionName: 'virtualUsdc',
   })
 
 /**

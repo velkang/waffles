@@ -1,4 +1,5 @@
 const TOKEN_SCALE = 10n ** 18n;
+const USD_PRICE_SCALE_FACTOR = 10n ** 30n;
 const DEFAULT_TOTAL_SUPPLY = 1_000_000_000n * TOKEN_SCALE;
 
 export function spotPriceFromReserves(
@@ -11,13 +12,13 @@ export function spotPriceFromReserves(
   const usdcReserve = tokenIsToken0 ? reserve1 : reserve0;
   if (tokenReserve <= 0n) return { price: 0n, marketCap: 0n };
 
-  const price = (usdcReserve * TOKEN_SCALE) / tokenReserve;
+  const price = (usdcReserve * USD_PRICE_SCALE_FACTOR) / tokenReserve;
   return {
     price,
-    marketCap: (price * totalSupply) / TOKEN_SCALE,
+    marketCap: (usdcReserve * totalSupply) / tokenReserve,
   };
 }
 
 export function executionPrice(usdcAmount: bigint, tokenAmount: bigint): bigint {
-  return tokenAmount > 0n ? (usdcAmount * TOKEN_SCALE) / tokenAmount : 0n;
+  return tokenAmount > 0n ? (usdcAmount * USD_PRICE_SCALE_FACTOR) / tokenAmount : 0n;
 }

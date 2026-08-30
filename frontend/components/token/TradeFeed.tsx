@@ -118,7 +118,7 @@ export function TradeFeed({ token }: { token: `0x${string}` }) {
                 const mcapVal = t.mcapAfter ? BigInt(t.mcapAfter) : undefined;
                 return (
                   <tr
-                    key={`${t.txHash}-${t.logIndex}`}
+                    key={t.eventId ?? `${t.txHash}-${t.logIndex}`}
                     className="transition-colors hover:bg-[#1a1b21]"
                   >
                     {/* Trade Type */}

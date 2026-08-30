@@ -16,6 +16,7 @@ function createMockDb() {
   const tradesMap = new Map<string, any>();
   const pendingPoolSwapsMap = new Map<string, any>();
   const poolSyncsMap = new Map<string, any>();
+  const indexedCircleEventsMap = new Map<string, any>();
 
   const db = {
     collection(name: string) {
@@ -46,10 +47,33 @@ function createMockDb() {
       if (name === "trades") {
         return {
           async updateOne(filter: any, update: any) {
-            const key = `${filter.curveAddress}:${filter.blockNumber}:${filter.logIndex}`;
-            let doc = tradesMap.get(key) || {};
+            const eventId = filter.eventId
+              ?? filter.$or?.find((candidate: any) => candidate.eventId)?.eventId;
+            const natural = filter.$or?.find(
+              (candidate: any) => candidate.curveAddress && candidate.blockNumber !== undefined,
+            ) ?? filter;
+            const key = eventId
+              ?? `${filter.curveAddress}:${filter.blockNumber}:${filter.logIndex}`;
+            const legacyKey = `${natural.curveAddress}:${natural.blockNumber}:${natural.logIndex}`;
+            let doc = tradesMap.get(key) || tradesMap.get(legacyKey) || {};
             if (update.$set) doc = { ...doc, ...update.$set };
+            if (key !== legacyKey) tradesMap.delete(legacyKey);
             tradesMap.set(key, doc);
+            return { acknowledged: true };
+          },
+        };
+      }
+      if (name === "indexedCircleEvents") {
+        return {
+          async findOne(filter: any) {
+            return indexedCircleEventsMap.get(filter._id) ?? null;
+          },
+          async updateOne(filter: any, update: any) {
+            indexedCircleEventsMap.set(filter._id, {
+              ...(indexedCircleEventsMap.get(filter._id) ?? {}),
+              _id: filter._id,
+              ...(update.$setOnInsert ?? {}),
+            });
             return { acknowledged: true };
           },
         };
@@ -78,6 +102,7 @@ function createMockDb() {
     _trades: tradesMap,
     _pendingPoolSwaps: pendingPoolSwapsMap,
     _poolSyncs: poolSyncsMap,
+    _indexedCircleEvents: indexedCircleEventsMap,
   };
   return db as any;
 }
@@ -201,11 +226,22 @@ test("webhook ingests Traded event and updates launch metrics", async () => {
     notification: {
       ...payload.notification,
       txHash: "0x7777777777777777777777777777777777777777777777777777777777777777",
-      logIndex: 9,
+      logIndex: undefined,
     },
   };
-  await processCircleWebhookPayload(db, secondPayload);
-  assert.equal(db._trades.size, 2, "distinct log indexes in one block must not collide");
+  let resolverCalls = 0;
+  await processCircleWebhookPayload(db, secondPayload, async (received) => {
+    resolverCalls += 1;
+    assert.equal(received, secondPayload);
+    return 9;
+  });
+  assert.equal(resolverCalls, 1);
+  assert.equal(secondPayload.notification.logIndex, 9);
+  assert.equal(db._trades.size, 2, "distinct Circle event logs must not collide");
+
+  const duplicate = await processCircleWebhookPayload(db, secondPayload, async () => 9);
+  assert.equal(duplicate.duplicate, true);
+  assert.equal(db._trades.size, 2);
 });
 
 test("webhook reconciles a Swap that arrives before its matching Sync", async () => {

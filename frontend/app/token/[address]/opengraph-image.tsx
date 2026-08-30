@@ -22,7 +22,7 @@ function fmtUsd(raw: bigint | undefined): string {
 
 function fmtPrice(raw: bigint | undefined): string {
   if (raw === undefined) return "—";
-  const usd = Number(raw) / 1e6;
+  const usd = Number(raw) / 1e18;
   if (usd === 0) return "$0";
   return `$${usd.toPrecision(4)}`;
 }

@@ -1,101 +1,39 @@
 import { config } from "./config.js";
 import { getDb } from "./db.js";
-import { createClient, syncRange } from "./ingest.js";
+import {
+  CircleMonitorManager,
+  circleMonitoringConfigured,
+  startCircleMonitorReconciler,
+} from "./circle-monitors.js";
+import { startCircleEventLogReconciler } from "./circle-event-logs.js";
 import { startWebhookServer } from "./webhook.js";
-import { startCircleMonitorReconciler } from "./circle-monitors.js";
-
-type SyncDoc = {
-  _id: string;
-  lastBlock: number;
-  lastBlockHash?: string;
-};
 
 async function main() {
-  const db = await getDb();
-  const client = createClient();
-  const sync = db.collection<SyncDoc>("sync");
-  const syncId = config.factoryAddress.toLowerCase();
-
-  // 1. Start real-time Circle Webhook receiver
-  const monitorReconciler = startCircleMonitorReconciler(db);
-  startWebhookServer(db, config.port, monitorReconciler?.reconcileNow);
-
-  // 2. Setup poller safety net
-  const chainHead = Number(await client.getBlockNumber());
-  const initialFromBlock = Math.max(config.startBlock, chainHead - 10_000);
-  const saved = await sync.findOne({ _id: syncId });
-  let lastBlock = saved?.lastBlock ?? initialFromBlock - 1;
-  let lastBlockHash = saved?.lastBlockHash;
-
-  if (lastBlock >= config.startBlock && !lastBlockHash) {
-    lastBlockHash = (await client.getBlock({ blockNumber: BigInt(lastBlock) })).hash;
+  if (!circleMonitoringConfigured()) {
+    throw new Error(
+      "CIRCLE_API_KEY and CIRCLE_ENTITY_SECRET are required: Circle webhooks and event logs are the indexer's event source",
+    );
   }
 
-  console.log(
-    `⚡ waffles indexer running: webhook port=${config.port} | poller factory=${config.factoryAddress} next=${lastBlock + 1} head=${chainHead} confirmations=${config.confirmations}`,
+  const db = await getDb();
+  const manager = new CircleMonitorManager(db);
+  const monitorReconciler = startCircleMonitorReconciler(db, manager);
+  const eventLogReconciler = startCircleEventLogReconciler(db, manager);
+  const reconcileTopology = () => {
+    monitorReconciler?.reconcileNow();
+    eventLogReconciler.reconcileNow();
+  };
+
+  startWebhookServer(
+    db,
+    config.port,
+    reconcileTopology,
+    (body) => manager.resolveLogIndex(body),
   );
 
-  // Background safety-net poller
-  for (;;) {
-    try {
-      if (lastBlock >= config.startBlock && lastBlockHash) {
-        const canonical = await client.getBlock({ blockNumber: BigInt(lastBlock) });
-        if (canonical.hash !== lastBlockHash) {
-          const rewindFrom = Math.max(
-            config.startBlock,
-            lastBlock - config.reorgLookback + 1,
-          );
-          console.warn(`reorg detected: rewinding from block ${rewindFrom}`);
-          await Promise.all([
-            db.collection("trades").deleteMany({ blockNumber: { $gte: rewindFrom } }),
-            db.collection("launches").deleteMany({ createdBlock: { $gte: rewindFrom } }),
-            db.collection("launches").updateMany(
-              { graduationBlock: { $gte: rewindFrom } },
-              {
-                $set: { graduated: false },
-                $unset: {
-                  graduatedAt: "",
-                  graduationBlock: "",
-                  graduationTxHash: "",
-                  pool: "",
-                },
-              },
-            ),
-          ]);
-          await db.collection("realtimeEvents").insertOne({
-            type: "system.resync",
-            occurredAt: new Date(),
-            expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1_000),
-            chainId: (config.circleBlockchain || "arc-testnet").toLowerCase(),
-            fromBlock: rewindFrom,
-            reason: "reorg_rewind",
-          });
-          lastBlock = rewindFrom - 1;
-          lastBlockHash =
-            lastBlock >= config.startBlock
-              ? (await client.getBlock({ blockNumber: BigInt(lastBlock) })).hash
-              : undefined;
-        }
-      }
-
-      const head = Number(await client.getBlockNumber());
-      const safeHead = Math.max(0, head - config.confirmations);
-      if (lastBlock < safeHead) {
-        lastBlock = await syncRange(client, db, lastBlock + 1, safeHead);
-        lastBlockHash = (
-          await client.getBlock({ blockNumber: BigInt(lastBlock) })
-        ).hash;
-        await sync.updateOne(
-          { _id: syncId },
-          { $set: { lastBlock, lastBlockHash } },
-          { upsert: true },
-        );
-      }
-    } catch (err) {
-      console.error("safety-net sync error:", err instanceof Error ? err.message : err);
-    }
-    await new Promise((resolve) => setTimeout(resolve, config.pollIntervalMs));
-  }
+  console.log(
+    `⚡ waffles Circle indexer running: webhook=${config.port} blockchain=${config.circleBlockchain} factory=${config.factoryAddress}`,
+  );
 }
 
 main().catch((err) => {

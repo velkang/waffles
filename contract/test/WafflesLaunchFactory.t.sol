@@ -22,7 +22,15 @@ contract WafflesLaunchFactoryTest is Test {
         usdc = new MockUSDC();
         migrator = new MockMigrator(address(usdc));
         factory = new WafflesLaunchFactory(
-            address(usdc), treasury, address(migrator), CREATION_FEE, 5_000e6, 2e26, 50_000e6, 100, 7_500
+            address(usdc),
+            treasury,
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_060_569_000 ether,
+            251_660_441 ether,
+            100,
+            7_500
         );
         usdc.mint(creator, 1_000e6);
         vm.prank(creator);
@@ -93,6 +101,12 @@ contract WafflesLaunchFactoryTest is Test {
         assertEq(usdc.balanceOf(treasury), CREATION_FEE);
         assertEq(WafflesMemeToken(token).balanceOf(curve), 1_000_000_000 ether);
         assertEq(factory.tokenOfCurve(curve), token);
+
+        // Verify stored-reserve parameters
+        WafflesBondingCurve c = WafflesBondingCurve(curve);
+        assertEq(c.initialVirtualUsdcReserve(), 2_986e6);
+        assertEq(c.initialVirtualTokenReserve(), 1_060_569_000 ether);
+        assertEq(c.minVirtualTokenReserve(), 251_660_441 ether);
     }
 
     function test_CreateTokenWithoutFee() public {
@@ -113,7 +127,46 @@ contract WafflesLaunchFactoryTest is Test {
     function test_InvalidFeeConfigurationReverts() public {
         vm.expectRevert(WafflesLaunchFactory.InvalidParameters.selector);
         new WafflesLaunchFactory(
-            address(usdc), treasury, address(migrator), CREATION_FEE, 5_000e6, 2e26, 50_000e6, 10_000, 7_500
+            address(usdc),
+            treasury,
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_060_569_000 ether,
+            251_660_441 ether,
+            10_000, // feeBps >= 10_000 → invalid
+            7_500
+        );
+    }
+
+    function test_InvalidReserveConfigurationReverts() public {
+        // minVirtualTokenReserve >= initialVirtualTokenReserve → invalid
+        vm.expectRevert(WafflesLaunchFactory.InvalidParameters.selector);
+        new WafflesLaunchFactory(
+            address(usdc),
+            treasury,
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_060_569_000 ether,
+            1_060_569_000 ether, // min == initial → invalid
+            100,
+            7_500
+        );
+    }
+
+    function test_SellableSupplyCannotExceedMintedSupply() public {
+        vm.expectRevert(WafflesLaunchFactory.InvalidParameters.selector);
+        new WafflesLaunchFactory(
+            address(usdc),
+            treasury,
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_500_000_001 ether,
+            500_000_000 ether,
+            100,
+            7_500
         );
     }
 

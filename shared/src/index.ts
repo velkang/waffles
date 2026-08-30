@@ -24,6 +24,7 @@ export interface LaunchSummary {
 }
 
 export interface Trade {
+  eventId?: string;
   trader: string;
   isBuy: boolean;
   usdcAmount: string;
