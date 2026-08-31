@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "wagmi": "wagmi generate"
+    "wagmi": "wagmi generate",
+    "build:cloudflare": "opennextjs-cloudflare build",
+    "deploy:cloudflare": "opennextjs-cloudflare upload"
   },
   "dependencies": {
     "@reown/appkit": "1.8.23",
