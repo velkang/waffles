@@ -16,17 +16,20 @@ contract WafflesAmmTest is Test {
     WafflesAmmPair pair;
 
     address alice = makeAddr("alice");
+    address creator = makeAddr("creator");
+    address treasury = makeAddr("treasury");
+    address rewardsTreasury = makeAddr("rewardsTreasury");
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     uint256 constant FEE_DENOM = 10_000;
-    uint256 constant FEE_NUM = 9_975; // 0.25% swap fee
+    uint256 constant FEE_NUM = 9_900; // 1% fee
 
     function setUp() public {
         usdc = new MockUSDC();
         token = new WafflesMemeToken("A", "A", 1_000_000_000 ether, address(this));
-        factory = new WafflesAmmFactory();
+        factory = new WafflesAmmFactory(address(usdc), treasury, rewardsTreasury);
         factory.setPairCreator(address(this));
-        pair = WafflesAmmPair(factory.createPair(address(token), address(usdc)));
+        pair = WafflesAmmPair(factory.createPair(address(token), address(usdc), creator));
 
         assertTrue(token.transfer(alice, 50_000_000 ether));
         usdc.mint(alice, 10_000e6);
@@ -41,6 +44,14 @@ contract WafflesAmmTest is Test {
         assertEq(factory.getPair(address(usdc), address(token)), address(pair));
         assertEq(factory.allPairsLength(), 1);
         assertEq(pair.factory(), address(factory));
+        assertEq(pair.creator(), creator);
+        assertEq(pair.treasury(), treasury);
+        assertEq(pair.rewardsTreasury(), rewardsTreasury);
+    }
+
+    function test_RewardsTreasuryMustDifferFromPlatformTreasury() public {
+        vm.expectRevert(WafflesAmmFactory.ZeroAddress.selector);
+        new WafflesAmmFactory(address(usdc), treasury, treasury);
     }
 
     function test_MintFirstLiquidity() public {
@@ -110,6 +121,12 @@ contract WafflesAmmTest is Test {
         }
 
         assertEq(token.balanceOf(alice), 50_000_000 ether + expectedOut);
+        uint256 fee = (usdcIn * pair.FEE_BPS()) / FEE_DENOM;
+        uint256 creatorFee = (fee * pair.CREATOR_FEE_SHARE_BPS()) / FEE_DENOM;
+        uint256 platformFee = (fee * pair.PLATFORM_FEE_SHARE_BPS()) / FEE_DENOM;
+        assertEq(usdc.balanceOf(creator), creatorFee);
+        assertEq(usdc.balanceOf(treasury), platformFee);
+        assertEq(usdc.balanceOf(rewardsTreasury), fee - creatorFee - platformFee);
     }
 
     function test_SwapGreedyOutputReverts() public {

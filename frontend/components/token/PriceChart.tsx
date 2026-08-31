@@ -1,29 +1,59 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  CandlestickSeries,
+  ColorType,
+  CrosshairMode,
+  HistogramSeries,
+  createChart,
+  type CandlestickData,
+  type HistogramData,
+  type IChartApi,
+  type ISeriesApi,
+  type UTCTimestamp,
+} from 'lightweight-charts'
 import { CurveChart } from '@/components/token/CurveChart'
-import { formatUsd } from '@/lib/format'
+import { useReadWafflesBondingCurveTotalSupply } from '@/generated/contracts-generated'
 import { useCandles } from '@/lib/hooks/queries'
-import { useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
+import { useRealtime, useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
 import type { Candle } from '@waffles/shared'
 
 const INTERVALS = [
   { label: '1m', seconds: 60 },
   { label: '5m', seconds: 300 },
   { label: '15m', seconds: 900 },
+  { label: '1h', seconds: 3_600 },
+  { label: '4h', seconds: 14_400 },
+  { label: '1D', seconds: 86_400 },
 ] as const
 
-const EMERALD = '#4ade80'
-const CRIMSON = '#ef4444'
-const GRATICULE = '#24262e'
+const PRICE_SCALE = 1e18
+const USDC_SCALE = 1e6
+const TOKEN_SCALE = 1e18
+const UP = '#4ade80'
+const DOWN = '#ef4444'
+const COPPER = '#db9d6a'
+const BORDER = '#24262e'
+const SURFACE = '#141519'
+const MUTED = '#71717a'
 
-const W = 600
-const H = 280
-const PAD_L = 8
-const PAD_R = 64
-const PRICE_H = 210
-const VOL_TOP = 226
-const VOL_H = 40
+type DisplayMode = 'price' | 'mcap'
+
+interface Readout {
+  time: UTCTimestamp
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+interface ChartDataset {
+  candles: CandlestickData<UTCTimestamp>[]
+  volume: HistogramData<UTCTimestamp>[]
+  latest: Readout | null
+}
 
 export function PriceChart({
   token,
@@ -33,303 +63,551 @@ export function PriceChart({
   curve: `0x${string}`
 }) {
   useRealtimeTopics([`token:${token.toLowerCase()}`])
-  const [intervalSec, setIntervalSec] = useState<number>(60)
-  const { data, isLoading } = useCandles(token, intervalSec, 240)
-  const candles = data?.candles ?? (isLoading ? null : [])
 
-  const hasCandles = candles !== null && candles.length > 0
+  const { status } = useRealtime()
+  const [intervalSec, setIntervalSec] = useState<number>(60)
+  const [displayMode, setDisplayMode] = useState<DisplayMode>('price')
+  const [hovered, setHovered] = useState<Readout | null>(null)
+  const { data, isLoading, isFetching, isError, refetch } = useCandles(
+    token,
+    intervalSec,
+    240,
+  )
+  const { data: totalSupply } = useReadWafflesBondingCurveTotalSupply({
+    address: curve,
+  })
+
+  const dataset = useMemo(
+    () => buildDataset(data?.candles ?? [], displayMode, totalSupply),
+    [data?.candles, displayMode, totalSupply],
+  )
+  const readout = hovered ?? dataset.latest
+  const selectedInterval =
+    INTERVALS.find((interval) => interval.seconds === intervalSec)?.label ??
+    `${intervalSec}s`
 
   return (
-    <section className="rounded-[10px] border border-[#24262e] bg-[#141519] p-4">
-      {hasCandles ? (
-        <CandleSvg
-          candles={candles!}
+    <section className="overflow-hidden rounded-[10px] border border-[#24262e] bg-[#141519]">
+      <div className="flex flex-col gap-3 border-b border-[#24262e] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div>
+            <h2 className="text-sm font-bold text-white">Market chart</h2>
+            <p className="mt-0.5 text-[11px] text-zinc-500">
+              Confirmed trades · UTC candles
+            </p>
+          </div>
+          <RealtimeStatus status={status} />
+        </div>
+
+        <div
+          className="inline-flex w-fit rounded-[6px] border border-[#24262e] bg-[#0e0f12] p-0.5 text-xs font-semibold"
+          aria-label="Chart value"
+        >
+          <ModeButton
+            active={displayMode === 'price'}
+            onClick={() => setDisplayMode('price')}
+          >
+            Price
+          </ModeButton>
+          <ModeButton
+            active={displayMode === 'mcap'}
+            disabled={totalSupply === undefined}
+            onClick={() => setDisplayMode('mcap')}
+          >
+            Market cap
+          </ModeButton>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 px-4 pt-3 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="flex max-w-full gap-1 overflow-x-auto pb-1"
+          aria-label="Candle interval"
+        >
+          {INTERVALS.map((interval) => (
+            <button
+              key={interval.label}
+              type="button"
+              aria-pressed={intervalSec === interval.seconds}
+              onClick={() => setIntervalSec(interval.seconds)}
+              className={`shrink-0 rounded-[5px] border px-2.5 py-1.5 font-mono text-[11px] font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#db9d6a] ${
+                intervalSec === interval.seconds
+                  ? 'border-[#db9d6a] bg-[#db9d6a] text-[#0e0f12]'
+                  : 'border-[#24262e] bg-[#1a1b21] text-zinc-400 hover:border-zinc-600 hover:text-white'
+              }`}
+            >
+              {interval.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex min-h-7 flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] text-zinc-500">
+          {readout ? (
+            <>
+              <Metric
+                label="O"
+                value={formatValue(readout.open, displayMode)}
+              />
+              <Metric
+                label="H"
+                value={formatValue(readout.high, displayMode)}
+                tone="up"
+              />
+              <Metric
+                label="L"
+                value={formatValue(readout.low, displayMode)}
+                tone="down"
+              />
+              <Metric
+                label="C"
+                value={formatValue(readout.close, displayMode)}
+              />
+              <Metric label="VOL" value={formatCompactUsd(readout.volume)} />
+              <span className="text-zinc-600">
+                {formatCandleTime(readout.time)}
+              </span>
+            </>
+          ) : (
+            <span>OHLCV appears with the first confirmed trade</span>
+          )}
+        </div>
+      </div>
+
+      <div className="relative mt-1 min-h-[340px] sm:min-h-[390px]">
+        <FinancialChart
+          dataset={dataset}
+          displayMode={displayMode}
           intervalSec={intervalSec}
-          onInterval={setIntervalSec}
+          onHover={setHovered}
         />
-      ) : (
-        <>
-          <CurveChart curveAddress={curve} />
-          <p className="mt-2 text-center text-xs font-mono text-zinc-400">
-            {candles === null
-              ? 'Streaming historical ticks…'
-              : 'Showing live curve trajectory · Candles appear with first trades'}
-          </p>
-        </>
-      )}
+
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#141519]/90">
+            <p className="font-mono text-xs text-zinc-400">
+              Loading {selectedInterval} candles…
+            </p>
+          </div>
+        )}
+
+        {!isLoading && isError && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#141519]/95 px-6 text-center">
+            <p className="text-sm font-semibold text-white">
+              Chart data is unavailable
+            </p>
+            <p className="mt-1 max-w-sm text-xs text-zinc-400">
+              Realtime remains connected; retry the historical candle snapshot.
+            </p>
+            <button
+              type="button"
+              onClick={() => void refetch()}
+              className="mt-3 rounded-[6px] border border-[#db9d6a] px-3 py-1.5 text-xs font-bold text-[#db9d6a] transition-colors hover:bg-[#db9d6a] hover:text-[#0e0f12]"
+            >
+              Retry candles
+            </button>
+          </div>
+        )}
+
+        {!isLoading && !isError && dataset.candles.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center">
+            <span className="mb-3 h-px w-16 bg-[#db9d6a]" />
+            <p className="text-sm font-semibold text-white">
+              No trades in this interval yet
+            </p>
+            <p className="mt-1 max-w-sm text-xs leading-5 text-zinc-400">
+              The first confirmed trade will create the active candle here
+              automatically.
+            </p>
+          </div>
+        )}
+
+        {/* {isFetching && !isLoading && (
+          <span className="absolute right-4 top-2 rounded-[4px] border border-[#24262e] bg-[#0e0f12] px-2 py-1 font-mono text-[10px] text-zinc-500">
+            Syncing
+          </span>
+        )} */}
+      </div>
+
+      {/* <div className="border-t border-[#24262e] px-4 py-3">
+        <div className="mb-1 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xs font-bold text-zinc-200">Bonding curve trajectory</h3>
+            <p className="mt-0.5 text-[10px] text-zinc-500">Protocol progress, separate from price history</p>
+          </div>
+          <span className="rounded-[4px] border border-[#24262e] px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500">
+            Protocol
+          </span>
+        </div>
+        <CurveChart curveAddress={curve} compact />
+      </div> */}
     </section>
   )
 }
 
-function CandleSvg({
-  candles,
+function FinancialChart({
+  dataset,
+  displayMode,
   intervalSec,
-  onInterval,
+  onHover,
 }: {
-  candles: Candle[]
+  dataset: ChartDataset
+  displayMode: DisplayMode
   intervalSec: number
-  onInterval: (s: number) => void
+  onHover: (readout: Readout | null) => void
 }) {
-  const chart = useMemo(() => {
-    const maxBars = Math.min(candles.length, 60)
-    const view = candles.slice(-maxBars)
-    if (view.length === 0) return null
+  const containerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null)
+  const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null)
+  const renderStateRef = useRef({ key: '', length: 0, lastTime: 0 })
 
-    let pMin = Infinity
-    let pMax = -Infinity
-    let vMax = 0
-    view.forEach((c) => {
-      const h = Number(c.high)
-      const l = Number(c.low)
-      const v = Number(c.volume)
-      if (h > pMax) pMax = h
-      if (l < pMin) pMin = l
-      if (v > vMax) vMax = v
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    const chart = createChart(container, {
+      width: container.clientWidth,
+      height: container.clientHeight,
+      layout: {
+        background: { type: ColorType.Solid, color: SURFACE },
+        textColor: MUTED,
+        fontSize: 11,
+        fontFamily:
+          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        attributionLogo: true,
+      },
+      grid: {
+        vertLines: { color: 'rgba(36, 38, 46, 0.5)' },
+        horzLines: { color: 'rgba(36, 38, 46, 0.75)' },
+      },
+      crosshair: {
+        mode: CrosshairMode.Normal,
+        vertLine: { color: '#52525b', labelBackgroundColor: '#27272a' },
+        horzLine: { color: '#52525b', labelBackgroundColor: '#27272a' },
+      },
+      rightPriceScale: {
+        borderColor: BORDER,
+        scaleMargins: { top: 0.08, bottom: 0.28 },
+      },
+      timeScale: {
+        borderColor: BORDER,
+        timeVisible: true,
+        secondsVisible: false,
+        rightOffset: 4,
+        barSpacing: 8,
+        minBarSpacing: 3,
+        fixLeftEdge: false,
+        fixRightEdge: false,
+      },
+      handleScroll: {
+        mouseWheel: true,
+        pressedMouseMove: true,
+        horzTouchDrag: true,
+        vertTouchDrag: false,
+      },
+      handleScale: {
+        axisPressedMouseMove: true,
+        mouseWheel: true,
+        pinch: true,
+      },
     })
 
-    if (pMax === pMin) {
-      pMax *= 1.05
-      pMin *= 0.95
-    }
-    const pRange = pMax - pMin || 1
-    const vRange = vMax || 1
+    const candleSeries = chart.addSeries(CandlestickSeries, {
+      upColor: UP,
+      downColor: DOWN,
+      wickUpColor: UP,
+      wickDownColor: DOWN,
+      borderVisible: false,
+      priceLineColor: COPPER,
+      priceLineWidth: 1,
+      priceLineVisible: true,
+      lastValueVisible: true,
+    })
+    const volumeSeries = chart.addSeries(HistogramSeries, {
+      priceFormat: { type: 'volume' },
+      priceScaleId: 'volume',
+      lastValueVisible: false,
+      priceLineVisible: false,
+    })
+    volumeSeries.priceScale().applyOptions({
+      scaleMargins: { top: 0.78, bottom: 0 },
+    })
 
-    const plotW = W - PAD_L - PAD_R
-    const barW = Math.max(3, Math.min(10, plotW / view.length - 2))
-    const step = plotW / view.length
-
-    const yP = (p: number) =>
-      PRICE_H - ((p - pMin) / pRange) * (PRICE_H - 16) - 8
-    const yV = (v: number) => VOL_TOP + VOL_H - (v / vRange) * VOL_H
-
-    const bars = view.map((c, i) => {
-      const x = PAD_L + i * step + step / 2
-      const o = Number(c.open)
-      const cl = Number(c.close)
-      const h = Number(c.high)
-      const l = Number(c.low)
-      const v = Number(c.volume)
-      const isUp = cl >= o
-      const bodyTop = yP(Math.max(o, cl))
-      const bodyBot = yP(Math.min(o, cl))
-      const bodyH = Math.max(1, bodyBot - bodyTop)
-
-      return {
-        x,
-        wickY1: yP(h),
-        wickY2: yP(l),
-        bodyTop,
-        bodyH,
-        isUp,
-        vH: VOL_TOP + VOL_H - yV(v),
-        volY: yV(v),
-        c,
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.point) {
+        onHover(null)
+        return
       }
+      const candle = param.seriesData.get(candleSeries)
+      const volume = param.seriesData.get(volumeSeries)
+      if (!candle || !('open' in candle)) {
+        onHover(null)
+        return
+      }
+      onHover({
+        time: param.time as UTCTimestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: volume && 'value' in volume ? volume.value : 0,
+      })
     })
 
-    const last = view[view.length - 1]
-    const lastPrice = Number(last.close)
+    const resizeObserver = new ResizeObserver(([entry]) => {
+      chart.applyOptions({
+        width: Math.floor(entry.contentRect.width),
+        height: Math.floor(entry.contentRect.height),
+      })
+    })
+    resizeObserver.observe(container)
 
-    return {
-      bars,
-      pMin,
-      pMax,
-      vMax,
-      barW,
-      lastPrice,
-      yLast: yP(lastPrice),
+    chartRef.current = chart
+    candleSeriesRef.current = candleSeries
+    volumeSeriesRef.current = volumeSeries
+
+    return () => {
+      resizeObserver.disconnect()
+      chart.remove()
+      chartRef.current = null
+      candleSeriesRef.current = null
+      volumeSeriesRef.current = null
+      renderStateRef.current = { key: '', length: 0, lastTime: 0 }
     }
-  }, [candles])
+  }, [onHover])
 
-  if (!chart) return null
+  useEffect(() => {
+    const chart = chartRef.current
+    const candleSeries = candleSeriesRef.current
+    const volumeSeries = volumeSeriesRef.current
+    if (!chart || !candleSeries || !volumeSeries) return
+
+    const latest = dataset.candles.at(-1)
+    const key = `${displayMode}:${intervalSec}`
+    const previous = renderStateRef.current
+    const latestTime = latest ? Number(latest.time) : 0
+    const canUpdateLastBar =
+      previous.key === key &&
+      dataset.candles.length > 0 &&
+      (latestTime === previous.lastTime ||
+        (latestTime > previous.lastTime &&
+          dataset.candles.length === previous.length + 1))
+
+    candleSeries.applyOptions({
+      priceFormat: {
+        type: 'custom',
+        minMove: minimumMove(latest?.close ?? 0),
+        formatter: (value: number) => formatAxisValue(value, displayMode),
+      },
+    })
+
+    if (canUpdateLastBar && latest) {
+      candleSeries.update(latest)
+      const latestVolume = dataset.volume.at(-1)
+      if (latestVolume) volumeSeries.update(latestVolume)
+    } else {
+      candleSeries.setData(dataset.candles)
+      volumeSeries.setData(dataset.volume)
+      if (dataset.candles.length > 0) chart.timeScale().fitContent()
+    }
+
+    renderStateRef.current = {
+      key,
+      length: dataset.candles.length,
+      lastTime: latestTime,
+    }
+  }, [dataset, displayMode, intervalSec])
 
   return (
-    <div>
-      {/* Header controls (Pump.fun style) */}
-      <div className="mb-2 flex items-center justify-between font-mono text-xs">
-        <div className="flex items-center gap-1">
-          {INTERVALS.map((int) => (
-            <button
-              key={int.label}
-              type="button"
-              onClick={() => onInterval(int.seconds)}
-              className={`rounded-[4px] px-2.5 py-1 font-bold transition ${
-                intervalSec === int.seconds
-                  ? 'bg-[#db9d6a] text-[#0e0f12]'
-                  : 'bg-[#1a1b21] text-zinc-400 hover:text-white border border-[#24262e]'
-              }`}
-            >
-              {int.label}
-            </button>
-          ))}
-          <span className="text-zinc-500 ml-2">Price/MCap</span>
-        </div>
-        <span className="text-[11px] text-zinc-400">
-          LAST:{' '}
-          <span className="font-bold text-white">
-            ${(chart.lastPrice / 1e18).toFixed(9)}
-          </span>
-        </span>
-      </div>
-
-      <figure className="w-full">
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          className="w-full select-none"
-          role="img"
-        >
-          {/* Graticule lines */}
-          <line
-            x1={PAD_L}
-            y1={PRICE_H / 4}
-            x2={W - PAD_R}
-            y2={PRICE_H / 4}
-            stroke={GRATICULE}
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-          <line
-            x1={PAD_L}
-            y1={PRICE_H / 2}
-            x2={W - PAD_R}
-            y2={PRICE_H / 2}
-            stroke={GRATICULE}
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-          <line
-            x1={PAD_L}
-            y1={(PRICE_H * 3) / 4}
-            x2={W - PAD_R}
-            y2={(PRICE_H * 3) / 4}
-            stroke={GRATICULE}
-            strokeWidth="1"
-            strokeDasharray="3 3"
-          />
-          <line
-            x1={PAD_L}
-            y1={PRICE_H}
-            x2={W - PAD_R}
-            y2={PRICE_H}
-            stroke={GRATICULE}
-            strokeWidth="1"
-          />
-          <line
-            x1={PAD_L}
-            y1={VOL_TOP + VOL_H}
-            x2={W - PAD_R}
-            y2={VOL_TOP + VOL_H}
-            stroke={GRATICULE}
-            strokeWidth="1"
-          />
-
-          {/* Right Y-axis price labels */}
-          <text
-            x={W - PAD_R + 6}
-            y={14}
-            fill="#71717a"
-            fontSize="9"
-            fontFamily="monospace"
-          >
-            ${(chart.pMax / 1e18).toPrecision(4)}
-          </text>
-          <text
-            x={W - PAD_R + 6}
-            y={PRICE_H / 2}
-            fill="#71717a"
-            fontSize="9"
-            fontFamily="monospace"
-          >
-            $
-            {((chart.pMin + (chart.pMax - chart.pMin) / 2) / 1e18).toPrecision(
-              4,
-            )}
-          </text>
-          <text
-            x={W - PAD_R + 6}
-            y={PRICE_H - 4}
-            fill="#71717a"
-            fontSize="9"
-            fontFamily="monospace"
-          >
-            ${(chart.pMin / 1e18).toPrecision(4)}
-          </text>
-
-          {/* Volume baseline */}
-          <text
-            x={W - PAD_R + 6}
-            y={VOL_TOP + 10}
-            fill="#71717a"
-            fontSize="8"
-            fontFamily="monospace"
-          >
-            VOL {formatUsd(BigInt(Math.round(chart.vMax)))}
-          </text>
-
-          {/* Volume Bars */}
-          {chart.bars.map((b, i) => (
-            <rect
-              key={`v-${i}`}
-              x={b.x - chart.barW / 2}
-              y={b.volY}
-              width={chart.barW}
-              height={Math.max(1, b.vH)}
-              fill={b.isUp ? EMERALD : CRIMSON}
-              opacity={0.4}
-            />
-          ))}
-
-          {/* Candles */}
-          {chart.bars.map((b, i) => (
-            <g key={`c-${i}`}>
-              <line
-                x1={b.x}
-                y1={b.wickY1}
-                x2={b.x}
-                y2={b.wickY2}
-                stroke={b.isUp ? EMERALD : CRIMSON}
-                strokeWidth="1"
-              />
-              <rect
-                x={b.x - chart.barW / 2}
-                y={b.bodyTop}
-                width={chart.barW}
-                height={b.bodyH}
-                fill={b.isUp ? EMERALD : CRIMSON}
-              />
-            </g>
-          ))}
-
-          {/* Last Price Marker */}
-          <line
-            x1={PAD_L}
-            y1={chart.yLast}
-            x2={W - PAD_R}
-            y2={chart.yLast}
-            stroke="#db9d6a"
-            strokeWidth="1"
-            strokeDasharray="2 2"
-          />
-          <rect
-            x={W - PAD_R + 2}
-            y={chart.yLast - 7}
-            width={PAD_R - 4}
-            height={14}
-            fill="#db9d6a"
-            rx="3"
-          />
-          <text
-            x={W - PAD_R + 5}
-            y={chart.yLast + 3}
-            fill="#0e0f12"
-            fontSize="8.5"
-            fontWeight="bold"
-            fontFamily="monospace"
-          >
-            ${(chart.lastPrice / 1e18).toPrecision(4)}
-          </text>
-        </svg>
-      </figure>
-    </div>
+    <div
+      ref={containerRef}
+      className="absolute inset-0"
+      role="img"
+      aria-label={`${displayMode === 'price' ? 'Price' : 'Market cap'} candlestick chart with volume`}
+    />
   )
+}
+
+function buildDataset(
+  candles: Candle[],
+  mode: DisplayMode,
+  totalSupply: bigint | undefined,
+): ChartDataset {
+  const supply =
+    totalSupply === undefined ? undefined : Number(totalSupply) / TOKEN_SCALE
+  const valueFor = (raw: string) => {
+    const price = Number(raw) / PRICE_SCALE
+    return mode === 'mcap' && supply !== undefined ? price * supply : price
+  }
+
+  const sorted = [...candles].sort((a, b) => a.time - b.time)
+  const points = sorted.flatMap((candle) => {
+    const point = {
+      time: Math.floor(candle.time / 1000) as UTCTimestamp,
+      open: valueFor(candle.open),
+      high: valueFor(candle.high),
+      low: valueFor(candle.low),
+      close: valueFor(candle.close),
+    }
+    if (
+      !Number.isFinite(point.open) ||
+      !Number.isFinite(point.high) ||
+      !Number.isFinite(point.low) ||
+      !Number.isFinite(point.close)
+    ) {
+      return []
+    }
+    return [
+      {
+        candle: point,
+        volume: {
+          time: point.time,
+          value: Number(candle.volume) / USDC_SCALE,
+          color:
+            point.close >= point.open
+              ? 'rgba(74, 222, 128, 0.35)'
+              : 'rgba(239, 68, 68, 0.35)',
+        },
+      },
+    ]
+  })
+
+  const mapped = points.map((point) => point.candle)
+  const volumes = points.map((point) => point.volume)
+  const latestCandle = mapped.at(-1)
+  const latestVolume = volumes.at(-1)
+
+  return {
+    candles: mapped,
+    volume: volumes,
+    latest:
+      latestCandle && latestVolume
+        ? {
+            ...latestCandle,
+            volume: latestVolume.value,
+          }
+        : null,
+  }
+}
+
+function RealtimeStatus({
+  status,
+}: {
+  status: 'connecting' | 'connected' | 'disconnected'
+}) {
+  const connected = status === 'connected'
+  const connecting = status === 'connecting'
+  const label = connected ? 'Live' : connecting ? 'Connecting' : 'Reconnecting'
+  const dot = connected
+    ? 'bg-[#4ade80]'
+    : connecting
+      ? 'bg-[#db9d6a]'
+      : 'bg-[#ef4444]'
+
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-[#24262e] bg-[#0e0f12] px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-400"
+      aria-live="polite"
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
+      {label}
+    </span>
+  )
+}
+
+function ModeButton({
+  active,
+  disabled,
+  onClick,
+  children,
+}: {
+  active: boolean
+  disabled?: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-[4px] px-3 py-1.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#db9d6a] disabled:cursor-not-allowed disabled:opacity-40 ${
+        active ? 'bg-[#24262e] text-white' : 'text-zinc-500 hover:text-zinc-200'
+      }`}
+    >
+      {children}
+    </button>
+  )
+}
+
+function Metric({
+  label,
+  value,
+  tone,
+}: {
+  label: string
+  value: string
+  tone?: 'up' | 'down'
+}) {
+  return (
+    <span>
+      {label}{' '}
+      <span
+        className={
+          tone === 'up'
+            ? 'text-[#4ade80]'
+            : tone === 'down'
+              ? 'text-[#ef4444]'
+              : 'text-zinc-200'
+        }
+      >
+        {value}
+      </span>
+    </span>
+  )
+}
+
+function minimumMove(value: number): number {
+  if (!Number.isFinite(value) || value <= 0) return 0.00000001
+  return 10 ** (Math.floor(Math.log10(value)) - 5)
+}
+
+function formatAxisValue(value: number, mode: DisplayMode): string {
+  if (mode === 'mcap') return formatCompactNumber(value)
+  if (value === 0) return '$0'
+  if (Math.abs(value) >= 1)
+    return `$${value.toLocaleString(undefined, { maximumFractionDigits: 4 })}`
+  if (Math.abs(value) >= 0.0001)
+    return `$${value.toFixed(6).replace(/0+$/, '').replace(/\.$/, '')}`
+  return `$${value.toPrecision(4)}`
+}
+
+function formatValue(value: number, mode: DisplayMode): string {
+  return mode === 'mcap'
+    ? formatCompactNumber(value)
+    : formatAxisValue(value, mode)
+}
+
+function formatCompactNumber(value: number): string {
+  const absolute = Math.abs(value)
+  if (absolute >= 1_000_000_000)
+    return `$${(value / 1_000_000_000).toFixed(2)}B`
+  if (absolute >= 1_000_000) return `$${(value / 1_000_000).toFixed(2)}M`
+  if (absolute >= 1_000) return `$${(value / 1_000).toFixed(2)}K`
+  return `$${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+}
+
+function formatCompactUsd(value: number): string {
+  return formatCompactNumber(value)
+}
+
+function formatCandleTime(time: UTCTimestamp): string {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+    hour12: false,
+  }).format(new Date(Number(time) * 1000))
 }

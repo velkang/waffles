@@ -308,6 +308,9 @@ test("webhook reconciles a Swap that arrives before its matching Sync", async ()
   const trade = [...db._trades.values()][0];
   assert.notEqual(trade.priceAfter, "0");
   assert.equal(trade.logIndex, 13);
+  assert.equal(trade.usdcAmount, "100000000");
+  assert.equal(trade.usdcGrossAmount, "100000000");
+  assert.equal(trade.feeAmount, "1000000");
   assert.equal(db._pendingPoolSwaps.size, 0);
 });
 

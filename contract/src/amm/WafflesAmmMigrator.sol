@@ -9,12 +9,12 @@ import {WafflesAmmPair} from "./WafflesAmmPair.sol";
 
 interface IWafflesLaunchRegistry {
     function tokenOfCurve(address curve) external view returns (address);
+    function creatorOfToken(address token) external view returns (address);
 }
 
 /// @notice Seeds a token/USDC WafflesAmmPair with a graduating waffles.meme curve's remaining
 ///         assets (reserve + unsold balance + raised USDC) and burns the LP
-///         tokens it receives: liquidity is permanently locked and swap fees
-///         compound in the pool.
+///         tokens it receives so graduation liquidity is permanently locked.
 contract WafflesAmmMigrator is ILiquidityMigrator {
     using SafeERC20 for IERC20;
 
@@ -55,7 +55,9 @@ contract WafflesAmmMigrator is ILiquidityMigrator {
         if (tokenAmount == 0 || usdcAmount == 0) revert InvalidAmounts();
         if (factory.getPair(token, address(usdc)) != address(0)) revert PairAlreadyExists();
 
-        pool = factory.createPair(token, address(usdc));
+        address creator = IWafflesLaunchRegistry(launchFactory).creatorOfToken(token);
+        if (creator == address(0)) revert Unauthorized();
+        pool = factory.createPair(token, address(usdc), creator);
 
         IERC20(token).safeTransferFrom(msg.sender, address(this), tokenAmount);
         usdc.safeTransferFrom(msg.sender, address(this), usdcAmount);

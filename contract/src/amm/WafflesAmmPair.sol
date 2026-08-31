@@ -1,30 +1,46 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.26;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 interface IAmmFactory {
-    function parameters() external view returns (address, address);
+    function parameters()
+        external
+        view
+        returns (
+            address token0,
+            address token1,
+            address usdc,
+            address creator,
+            address treasury,
+            address rewardsTreasury
+        );
 }
 
-/// @notice Constant-product pool (Uniswap-V2-style) for waffles.meme with a 0.25% swap fee
-///         accruing to liquidity providers. The first mint locks
-///         MINIMUM_LIQUIDITY forever; graduated pools have their LP burned,
-///         so their fees compound inside the pool as permanent depth.
+/// @notice Constant-product pool for graduated waffles.meme tokens. Every swap
+///         charges a 1% USDC fee split 70/25/5 between the token creator, the
+///         platform treasury, and the rewards treasury.
 contract WafflesAmmPair is ERC20, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOM = 10_000;
     uint256 public constant MINIMUM_LIQUIDITY = 1000;
-    uint256 public constant FEE_BPS = 25; // 0.25% to LPs
+    uint256 public constant FEE_BPS = 100;
+    uint256 public constant CREATOR_FEE_SHARE_BPS = 7_000;
+    uint256 public constant PLATFORM_FEE_SHARE_BPS = 2_500;
+    uint256 public constant REWARDS_FEE_SHARE_BPS = 500;
 
     address public immutable factory;
     address public immutable token0;
     address public immutable token1;
+    address public immutable usdc;
+    address public immutable creator;
+    address public immutable treasury;
+    address public immutable rewardsTreasury;
 
     uint256 private reserve0;
     uint256 private reserve1;
@@ -40,6 +56,14 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
         uint256 amount1Out
     );
     event Sync(uint256 reserve0, uint256 reserve1);
+    event FeeAllocated(
+        address indexed trader,
+        uint256 grossUsdcAmount,
+        uint256 totalFee,
+        uint256 creatorFee,
+        uint256 platformFee,
+        uint256 rewardsFee
+    );
 
     error InsufficientLiquidity();
     error InsufficientLiquidityMinted();
@@ -51,7 +75,7 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
 
     constructor() ERC20("Waffles LP", "WFLP") {
         factory = msg.sender;
-        (token0, token1) = IAmmFactory(msg.sender).parameters();
+        (token0, token1, usdc, creator, treasury, rewardsTreasury) = IAmmFactory(msg.sender).parameters();
     }
 
     function getReserves() public view returns (uint256, uint256) {
@@ -110,23 +134,58 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
         if (amount0Out >= r0 || amount1Out >= r1) revert InsufficientLiquidity();
         if (to == token0 || to == token1) revert InvalidTo();
 
-        if (amount0Out > 0) IERC20(token0).safeTransfer(to, amount0Out);
-        if (amount1Out > 0) IERC20(token1).safeTransfer(to, amount1Out);
+        if (amount0Out > 0) _transferOutput(token0, amount0Out, to);
+        if (amount1Out > 0) _transferOutput(token1, amount1Out, to);
 
         uint256 b0 = IERC20(token0).balanceOf(address(this));
         uint256 b1 = IERC20(token1).balanceOf(address(this));
 
+        uint256 gross0In = b0 > r0 - amount0Out ? b0 - (r0 - amount0Out) : 0;
+        uint256 gross1In = b1 > r1 - amount1Out ? b1 - (r1 - amount1Out) : 0;
+        if (token0 == usdc && gross0In > 0) {
+            _allocateFee(to, gross0In);
+        }
+        if (token1 == usdc && gross1In > 0) {
+            _allocateFee(to, gross1In);
+        }
+
+        b0 = IERC20(token0).balanceOf(address(this));
+        b1 = IERC20(token1).balanceOf(address(this));
         uint256 a0In = b0 > r0 - amount0Out ? b0 - (r0 - amount0Out) : 0;
         uint256 a1In = b1 > r1 - amount1Out ? b1 - (r1 - amount1Out) : 0;
         if (a0In == 0 && a1In == 0) revert InsufficientInputAmount();
 
-        // 0.25% fee check
-        uint256 b0Adjusted = (b0 * BPS_DENOM) - (a0In * FEE_BPS);
-        uint256 b1Adjusted = (b1 * BPS_DENOM) - (a1In * FEE_BPS);
-        if (b0Adjusted * b1Adjusted < r0 * r1 * (BPS_DENOM ** 2)) revert K();
+        if (b0 * b1 < r0 * r1) revert K();
 
         _update(b0, b1);
-        emit Swap(msg.sender, to, a0In, a1In, amount0Out, amount1Out);
+        emit Swap(
+            msg.sender, to, token0 == usdc ? gross0In : a0In, token1 == usdc ? gross1In : a1In, amount0Out, amount1Out
+        );
+    }
+
+    function _transferOutput(address outputToken, uint256 grossAmount, address to) private {
+        if (outputToken != usdc) {
+            IERC20(outputToken).safeTransfer(to, grossAmount);
+            return;
+        }
+
+        uint256 fee = _allocateFee(to, grossAmount);
+        IERC20(outputToken).safeTransfer(to, grossAmount - fee);
+    }
+
+    function _allocateFee(address trader, uint256 grossUsdcAmount) private returns (uint256 fee) {
+        fee = (grossUsdcAmount * FEE_BPS) / BPS_DENOM;
+        uint256 creatorFee = (fee * CREATOR_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 platformFee = (fee * PLATFORM_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 rewardsFee = fee - creatorFee - platformFee;
+
+        if (creatorFee > 0) IERC20(usdc).safeTransfer(creator, creatorFee);
+        if (platformFee > 0) IERC20(usdc).safeTransfer(treasury, platformFee);
+        if (rewardsFee > 0) {
+            IERC20(usdc).safeTransfer(rewardsTreasury, rewardsFee);
+        }
+
+        emit FeeAllocated(trader, grossUsdcAmount, fee, creatorFee, platformFee, rewardsFee);
     }
 
     function skim(address to) external nonReentrant {

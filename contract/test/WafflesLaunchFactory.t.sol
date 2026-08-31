@@ -14,6 +14,7 @@ contract WafflesLaunchFactoryTest is Test {
     WafflesLaunchFactory factory;
 
     address treasury = makeAddr("treasury");
+    address rewardsTreasury = makeAddr("rewardsTreasury");
     address creator = makeAddr("creator");
 
     uint256 constant CREATION_FEE = 1e6;
@@ -24,13 +25,13 @@ contract WafflesLaunchFactoryTest is Test {
         factory = new WafflesLaunchFactory(
             address(usdc),
             treasury,
+            rewardsTreasury,
             address(migrator),
             CREATION_FEE,
             2_986e6,
             1_060_569_000 ether,
             251_660_441 ether,
-            100,
-            7_500
+            100
         );
         usdc.mint(creator, 1_000e6);
         vm.prank(creator);
@@ -107,6 +108,8 @@ contract WafflesLaunchFactoryTest is Test {
         assertEq(c.initialVirtualUsdcReserve(), 2_986e6);
         assertEq(c.initialVirtualTokenReserve(), 1_060_569_000 ether);
         assertEq(c.minVirtualTokenReserve(), 251_660_441 ether);
+        assertEq(c.rewardsTreasury(), rewardsTreasury);
+        assertEq(factory.creatorOfToken(token), creator);
     }
 
     function test_CreateTokenWithoutFee() public {
@@ -124,18 +127,48 @@ contract WafflesLaunchFactoryTest is Test {
         factory.createToken("Broke", "BROKE", "", "", "", "", "");
     }
 
-    function test_InvalidFeeConfigurationReverts() public {
+    function test_NonOnePercentFeeConfigurationReverts() public {
         vm.expectRevert(WafflesLaunchFactory.InvalidParameters.selector);
         new WafflesLaunchFactory(
             address(usdc),
+            treasury,
+            rewardsTreasury,
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_060_569_000 ether,
+            251_660_441 ether,
+            99
+        );
+    }
+
+    function test_ZeroRewardsTreasuryReverts() public {
+        vm.expectRevert(WafflesLaunchFactory.InvalidAddress.selector);
+        new WafflesLaunchFactory(
+            address(usdc),
+            treasury,
+            address(0),
+            address(migrator),
+            CREATION_FEE,
+            2_986e6,
+            1_060_569_000 ether,
+            251_660_441 ether,
+            100
+        );
+    }
+
+    function test_RewardsTreasuryMustDifferFromPlatformTreasury() public {
+        vm.expectRevert(WafflesLaunchFactory.InvalidAddress.selector);
+        new WafflesLaunchFactory(
+            address(usdc),
+            treasury,
             treasury,
             address(migrator),
             CREATION_FEE,
             2_986e6,
             1_060_569_000 ether,
             251_660_441 ether,
-            10_000, // feeBps >= 10_000 → invalid
-            7_500
+            100
         );
     }
 
@@ -145,13 +178,13 @@ contract WafflesLaunchFactoryTest is Test {
         new WafflesLaunchFactory(
             address(usdc),
             treasury,
+            rewardsTreasury,
             address(migrator),
             CREATION_FEE,
             2_986e6,
             1_060_569_000 ether,
             1_060_569_000 ether, // min == initial → invalid
-            100,
-            7_500
+            100
         );
     }
 
@@ -160,13 +193,13 @@ contract WafflesLaunchFactoryTest is Test {
         new WafflesLaunchFactory(
             address(usdc),
             treasury,
+            rewardsTreasury,
             address(migrator),
             CREATION_FEE,
             2_986e6,
             1_500_000_001 ether,
             500_000_000 ether,
-            100,
-            7_500
+            100
         );
     }
 

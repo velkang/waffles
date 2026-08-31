@@ -182,7 +182,15 @@ export const mockUsdcAbi = [
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 export const wafflesAmmFactoryAbi = [
-  { type: 'constructor', inputs: [], stateMutability: 'nonpayable' },
+  {
+    type: 'constructor',
+    inputs: [
+      { name: 'usdc_', internalType: 'address', type: 'address' },
+      { name: 'treasury_', internalType: 'address', type: 'address' },
+      { name: 'rewardsTreasury_', internalType: 'address', type: 'address' },
+    ],
+    stateMutability: 'nonpayable',
+  },
   {
     type: 'function',
     inputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -202,6 +210,7 @@ export const wafflesAmmFactoryAbi = [
     inputs: [
       { name: 'tokenA', internalType: 'address', type: 'address' },
       { name: 'tokenB', internalType: 'address', type: 'address' },
+      { name: 'creator', internalType: 'address', type: 'address' },
     ],
     name: 'createPair',
     outputs: [{ name: 'pair', internalType: 'address', type: 'address' }],
@@ -238,7 +247,18 @@ export const wafflesAmmFactoryAbi = [
     outputs: [
       { name: '', internalType: 'address', type: 'address' },
       { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
+      { name: '', internalType: 'address', type: 'address' },
     ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rewardsTreasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -249,6 +269,20 @@ export const wafflesAmmFactoryAbi = [
     name: 'setPairCreator',
     outputs: [],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'treasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
   },
   {
     type: 'event',
@@ -262,6 +296,12 @@ export const wafflesAmmFactoryAbi = [
       },
       {
         name: 'token1',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'creator',
         internalType: 'address',
         type: 'address',
         indexed: true,
@@ -390,6 +430,13 @@ export const wafflesAmmPairAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'CREATOR_FEE_SHARE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'FEE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -398,6 +445,20 @@ export const wafflesAmmPairAbi = [
     type: 'function',
     inputs: [],
     name: 'MINIMUM_LIQUIDITY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'PLATFORM_FEE_SHARE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'REWARDS_FEE_SHARE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -441,6 +502,13 @@ export const wafflesAmmPairAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'creator',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'decimals',
     outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
     stateMutability: 'view',
@@ -474,6 +542,13 @@ export const wafflesAmmPairAbi = [
     inputs: [],
     name: 'name',
     outputs: [{ name: '', internalType: 'string', type: 'string' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rewardsTreasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -551,6 +626,20 @@ export const wafflesAmmPairAbi = [
     stateMutability: 'nonpayable',
   },
   {
+    type: 'function',
+    inputs: [],
+    name: 'treasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'usdc',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
+    stateMutability: 'view',
+  },
+  {
     type: 'event',
     anonymous: false,
     inputs: [
@@ -600,6 +689,49 @@ export const wafflesAmmPairAbi = [
       },
     ],
     name: 'Burn',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'trader',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'grossUsdcAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'totalFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creatorFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'rewardsFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeAllocated',
   },
   {
     type: 'event',
@@ -777,7 +909,7 @@ export const wafflesAmmRouterAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'FEE_NUM',
+    name: 'FEE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -874,6 +1006,7 @@ export const wafflesBondingCurveAbi = [
       { name: 'usdc_', internalType: 'address', type: 'address' },
       { name: 'creator_', internalType: 'address', type: 'address' },
       { name: 'treasury_', internalType: 'address', type: 'address' },
+      { name: 'rewardsTreasury_', internalType: 'address', type: 'address' },
       { name: 'migrator_', internalType: 'address', type: 'address' },
       {
         name: 'initialVirtualUsdcReserve_',
@@ -891,7 +1024,6 @@ export const wafflesBondingCurveAbi = [
         type: 'uint256',
       },
       { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
-      { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -905,7 +1037,35 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'CREATOR_FEE_SHARE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'PLATFORM_FEE_SHARE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'PRICE_SCALE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'REWARDS_FEE_SHARE_BPS',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'TRADE_FEE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1067,13 +1227,6 @@ export const wafflesBondingCurveAbi = [
   },
   {
     type: 'function',
-    inputs: [],
-    name: 'protocolFeeBps',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
     inputs: [{ name: 'usdcIn', internalType: 'uint256', type: 'uint256' }],
     name: 'quoteBuy',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
@@ -1091,6 +1244,13 @@ export const wafflesBondingCurveAbi = [
     inputs: [],
     name: 'reserveUsdc',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'rewardsTreasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1177,6 +1337,49 @@ export const wafflesBondingCurveAbi = [
       },
     ],
     name: 'CreatorFeesClaimed',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'trader',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+      {
+        name: 'grossUsdcAmount',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'totalFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'creatorFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'platformFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+      {
+        name: 'rewardsFee',
+        internalType: 'uint256',
+        type: 'uint256',
+        indexed: false,
+      },
+    ],
+    name: 'FeeAllocated',
   },
   {
     type: 'event',
@@ -1274,6 +1477,7 @@ export const wafflesLaunchFactoryAbi = [
     inputs: [
       { name: 'usdc_', internalType: 'address', type: 'address' },
       { name: 'treasury_', internalType: 'address', type: 'address' },
+      { name: 'rewardsTreasury_', internalType: 'address', type: 'address' },
       { name: 'migrator_', internalType: 'address', type: 'address' },
       { name: 'creationFee_', internalType: 'uint256', type: 'uint256' },
       {
@@ -1292,7 +1496,6 @@ export const wafflesLaunchFactoryAbi = [
         type: 'uint256',
       },
       { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
-      { name: 'protocolFeeBps_', internalType: 'uint256', type: 'uint256' },
     ],
     stateMutability: 'nonpayable',
   },
@@ -1300,6 +1503,13 @@ export const wafflesLaunchFactoryAbi = [
     type: 'function',
     inputs: [],
     name: 'TOKEN_SUPPLY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'TRADE_FEE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -1347,6 +1557,13 @@ export const wafflesLaunchFactoryAbi = [
     inputs: [],
     name: 'creationFee',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
+    name: 'creatorOfToken',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1418,8 +1635,8 @@ export const wafflesLaunchFactoryAbi = [
   {
     type: 'function',
     inputs: [],
-    name: 'protocolFeeBps',
-    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    name: 'rewardsTreasury',
+    outputs: [{ name: '', internalType: 'address', type: 'address' }],
     stateMutability: 'view',
   },
   {
@@ -1996,6 +2213,31 @@ export const useReadWafflesAmmFactoryParameters =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"rewardsTreasury"`
+ */
+export const useReadWafflesAmmFactoryRewardsTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'rewardsTreasury',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadWafflesAmmFactoryTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmFactoryAbi,
+    functionName: 'treasury',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadWafflesAmmFactoryUsdc = /*#__PURE__*/ createUseReadContract(
+  { abi: wafflesAmmFactoryAbi, functionName: 'usdc' },
+)
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__
  */
 export const useWriteWafflesAmmFactory = /*#__PURE__*/ createUseWriteContract({
@@ -2177,6 +2419,15 @@ export const useReadWafflesAmmPairBpsDenom =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"CREATOR_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesAmmPairCreatorFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'CREATOR_FEE_SHARE_BPS',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"FEE_BPS"`
  */
 export const useReadWafflesAmmPairFeeBps = /*#__PURE__*/ createUseReadContract({
@@ -2191,6 +2442,24 @@ export const useReadWafflesAmmPairMinimumLiquidity =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesAmmPairAbi,
     functionName: 'MINIMUM_LIQUIDITY',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"PLATFORM_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesAmmPairPlatformFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'PLATFORM_FEE_SHARE_BPS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"REWARDS_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesAmmPairRewardsFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'REWARDS_FEE_SHARE_BPS',
   })
 
 /**
@@ -2210,6 +2479,13 @@ export const useReadWafflesAmmPairBalanceOf =
     abi: wafflesAmmPairAbi,
     functionName: 'balanceOf',
   })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"creator"`
+ */
+export const useReadWafflesAmmPairCreator = /*#__PURE__*/ createUseReadContract(
+  { abi: wafflesAmmPairAbi, functionName: 'creator' },
+)
 
 /**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"decimals"`
@@ -2245,6 +2521,15 @@ export const useReadWafflesAmmPairName = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"rewardsTreasury"`
+ */
+export const useReadWafflesAmmPairRewardsTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'rewardsTreasury',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"symbol"`
  */
 export const useReadWafflesAmmPairSymbol = /*#__PURE__*/ createUseReadContract({
@@ -2276,6 +2561,23 @@ export const useReadWafflesAmmPairTotalSupply =
     abi: wafflesAmmPairAbi,
     functionName: 'totalSupply',
   })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"treasury"`
+ */
+export const useReadWafflesAmmPairTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'treasury',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"usdc"`
+ */
+export const useReadWafflesAmmPairUsdc = /*#__PURE__*/ createUseReadContract({
+  abi: wafflesAmmPairAbi,
+  functionName: 'usdc',
+})
 
 /**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__
@@ -2454,6 +2756,15 @@ export const useWatchWafflesAmmPairBurnEvent =
   })
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"FeeAllocated"`
+ */
+export const useWatchWafflesAmmPairFeeAllocatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmPairAbi,
+    eventName: 'FeeAllocated',
+  })
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `eventName` set to `"Mint"`
  */
 export const useWatchWafflesAmmPairMintEvent =
@@ -2506,12 +2817,12 @@ export const useReadWafflesAmmRouterBpsDenom =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"FEE_NUM"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"FEE_BPS"`
  */
-export const useReadWafflesAmmRouterFeeNum =
+export const useReadWafflesAmmRouterFeeBps =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesAmmRouterAbi,
-    functionName: 'FEE_NUM',
+    functionName: 'FEE_BPS',
   })
 
 /**
@@ -2595,12 +2906,48 @@ export const useReadWafflesBondingCurveBpsDenom =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"CREATOR_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesBondingCurveCreatorFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'CREATOR_FEE_SHARE_BPS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"PLATFORM_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesBondingCurvePlatformFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'PLATFORM_FEE_SHARE_BPS',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"PRICE_SCALE"`
  */
 export const useReadWafflesBondingCurvePriceScale =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
     functionName: 'PRICE_SCALE',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"REWARDS_FEE_SHARE_BPS"`
+ */
+export const useReadWafflesBondingCurveRewardsFeeShareBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'REWARDS_FEE_SHARE_BPS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"TRADE_FEE_BPS"`
+ */
+export const useReadWafflesBondingCurveTradeFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'TRADE_FEE_BPS',
   })
 
 /**
@@ -2765,15 +3112,6 @@ export const useReadWafflesBondingCurveMinVirtualTokenReserve =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"protocolFeeBps"`
- */
-export const useReadWafflesBondingCurveProtocolFeeBps =
-  /*#__PURE__*/ createUseReadContract({
-    abi: wafflesBondingCurveAbi,
-    functionName: 'protocolFeeBps',
-  })
-
-/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"quoteBuy"`
  */
 export const useReadWafflesBondingCurveQuoteBuy =
@@ -2798,6 +3136,15 @@ export const useReadWafflesBondingCurveReserveUsdc =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
     functionName: 'reserveUsdc',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"rewardsTreasury"`
+ */
+export const useReadWafflesBondingCurveRewardsTreasury =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'rewardsTreasury',
   })
 
 /**
@@ -2973,6 +3320,15 @@ export const useWatchWafflesBondingCurveCreatorFeesClaimedEvent =
   })
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `eventName` set to `"FeeAllocated"`
+ */
+export const useWatchWafflesBondingCurveFeeAllocatedEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesBondingCurveAbi,
+    eventName: 'FeeAllocated',
+  })
+
+/**
  * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `eventName` set to `"Graduated"`
  */
 export const useWatchWafflesBondingCurveGraduatedEvent =
@@ -3007,6 +3363,15 @@ export const useReadWafflesLaunchFactoryTokenSupply =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"TRADE_FEE_BPS"`
+ */
+export const useReadWafflesLaunchFactoryTradeFeeBps =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'TRADE_FEE_BPS',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"allTokens"`
  */
 export const useReadWafflesLaunchFactoryAllTokens =
@@ -3031,6 +3396,15 @@ export const useReadWafflesLaunchFactoryCreationFee =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
     functionName: 'creationFee',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"creatorOfToken"`
+ */
+export const useReadWafflesLaunchFactoryCreatorOfToken =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'creatorOfToken',
   })
 
 /**
@@ -3106,12 +3480,12 @@ export const useReadWafflesLaunchFactoryPendingOwner =
   })
 
 /**
- * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"protocolFeeBps"`
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"rewardsTreasury"`
  */
-export const useReadWafflesLaunchFactoryProtocolFeeBps =
+export const useReadWafflesLaunchFactoryRewardsTreasury =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesLaunchFactoryAbi,
-    functionName: 'protocolFeeBps',
+    functionName: 'rewardsTreasury',
   })
 
 /**

@@ -14,7 +14,7 @@ contract WafflesAmmRouter is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOM = 10_000;
-    uint256 public constant FEE_NUM = 9_975; // 0.25% pair fee
+    uint256 public constant FEE_BPS = 100;
 
     WafflesAmmFactory public immutable factory;
 
@@ -50,7 +50,13 @@ contract WafflesAmmRouter is ReentrancyGuard {
         (uint256 reserve0, uint256 reserve1) = ammPair.getReserves();
         (uint256 reserveIn, uint256 reserveOut) = tokenIn == token0 ? (reserve0, reserve1) : (reserve1, reserve0);
         if (reserveIn == 0 || reserveOut == 0) return 0;
-        amountOut = (amountIn * FEE_NUM * reserveOut) / (reserveIn * BPS_DENOM + amountIn * FEE_NUM);
+        if (tokenIn == ammPair.usdc()) {
+            uint256 netAmountIn = amountIn - _fee(amountIn);
+            amountOut = (netAmountIn * reserveOut) / (reserveIn + netAmountIn);
+        } else {
+            uint256 grossAmountOut = (amountIn * reserveOut) / (reserveIn + amountIn);
+            amountOut = grossAmountOut - _fee(grossAmountOut);
+        }
     }
 
     function swapExactTokensForTokens(
@@ -80,10 +86,22 @@ contract WafflesAmmRouter is ReentrancyGuard {
         uint256 reserveIn = zeroForOne ? reserve0 : reserve1;
         uint256 reserveOut = zeroForOne ? reserve1 : reserve0;
         uint256 actualAmountIn = balanceIn - reserveIn;
-        amountOut = (actualAmountIn * FEE_NUM * reserveOut) / (reserveIn * BPS_DENOM + actualAmountIn * FEE_NUM);
+        uint256 grossAmountOut;
+        if (tokenIn == ammPair.usdc()) {
+            uint256 netAmountIn = actualAmountIn - _fee(actualAmountIn);
+            grossAmountOut = (netAmountIn * reserveOut) / (reserveIn + netAmountIn);
+            amountOut = grossAmountOut;
+        } else {
+            grossAmountOut = (actualAmountIn * reserveOut) / (reserveIn + actualAmountIn);
+            amountOut = grossAmountOut - _fee(grossAmountOut);
+        }
         if (amountOut < minAmountOut || amountOut == 0) revert Slippage();
 
-        ammPair.swap(zeroForOne ? 0 : amountOut, zeroForOne ? amountOut : 0, to);
+        ammPair.swap(zeroForOne ? 0 : grossAmountOut, zeroForOne ? grossAmountOut : 0, to);
         emit SwapExactIn(msg.sender, pair, tokenIn, actualAmountIn, amountOut, to);
+    }
+
+    function _fee(uint256 grossUsdcAmount) private pure returns (uint256) {
+        return (grossUsdcAmount * FEE_BPS) / BPS_DENOM;
     }
 }

@@ -17,6 +17,7 @@ contract WafflesBondingCurveTest is Test {
     WafflesLaunchFactory factory;
 
     address treasury = makeAddr("treasury");
+    address rewardsTreasury = makeAddr("rewardsTreasury");
     address creator = makeAddr("creator");
     address trader = makeAddr("trader");
 
@@ -26,7 +27,8 @@ contract WafflesBondingCurveTest is Test {
     uint256 constant SELLABLE = INITIAL_VIRTUAL_TOKENS - MIN_VIRTUAL_TOKENS; // 808_908_559 ether
     uint256 constant LIQUIDITY_RESERVE = 1_000_000_000 ether - SELLABLE; // 191_091_441 ether
     uint256 constant FEE_BPS = 100; // 1%
-    uint256 constant PROTOCOL_FEE_BPS = 7_500; // 75% of fee (0.75% total)
+    uint256 constant CREATOR_FEE_SHARE_BPS = 7_000;
+    uint256 constant PLATFORM_FEE_SHARE_BPS = 2_500;
 
     WafflesMemeToken token;
     WafflesBondingCurve curve;
@@ -37,25 +39,18 @@ contract WafflesBondingCurveTest is Test {
         factory = new WafflesLaunchFactory(
             address(usdc),
             treasury,
+            rewardsTreasury,
             address(migrator),
             0,
             INITIAL_VIRTUAL_USDC,
             INITIAL_VIRTUAL_TOKENS,
             MIN_VIRTUAL_TOKENS,
-            FEE_BPS,
-            PROTOCOL_FEE_BPS
+            FEE_BPS
         );
 
         vm.prank(creator);
-        (address tokenAddr, address curveAddr) = factory.createToken(
-            "Ghost",
-            "GHOST",
-            "desc",
-            "uri",
-            "site",
-            "tw",
-            "tg"
-        );
+        (address tokenAddr, address curveAddr) =
+            factory.createToken("Ghost", "GHOST", "desc", "uri", "site", "tw", "tg");
         token = WafflesMemeToken(tokenAddr);
         curve = WafflesBondingCurve(curveAddr);
 
@@ -81,6 +76,38 @@ contract WafflesBondingCurveTest is Test {
         assertEq(curve.PRICE_SCALE(), 1e18);
     }
 
+    function test_NonOnePercentFeeConfigurationReverts() public {
+        vm.expectRevert(WafflesBondingCurve.InvalidParameters.selector);
+        new WafflesBondingCurve(
+            address(token),
+            address(usdc),
+            creator,
+            treasury,
+            rewardsTreasury,
+            address(migrator),
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
+            99
+        );
+    }
+
+    function test_RewardsTreasuryMustDifferFromPlatformTreasury() public {
+        vm.expectRevert(WafflesBondingCurve.InvalidParameters.selector);
+        new WafflesBondingCurve(
+            address(token),
+            address(usdc),
+            creator,
+            treasury,
+            treasury,
+            address(migrator),
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
+            FEE_BPS
+        );
+    }
+
     // ========== PRICE & MARKET CAP ==========
 
     function test_ExactInitialPriceAndMarketCap() public view {
@@ -88,11 +115,7 @@ contract WafflesBondingCurveTest is Test {
         assertApproxEqAbs(mcap, 2_816e6, 5e6, "initial mcap should be ~$2,816");
 
         uint256 price = curve.currentPrice();
-        assertEq(
-            price,
-            2_815_469_809_130,
-            "initial price should retain 18-decimal USD precision"
-        );
+        assertEq(price, 2_815_469_809_130, "initial price should retain 18-decimal USD precision");
         assertEq(curve.graduationMarketCapTarget(), 50_003_318_268);
     }
 
@@ -101,12 +124,7 @@ contract WafflesBondingCurveTest is Test {
         curve.buy(100_000e6, 0);
 
         assertTrue(curve.graduated(), "should have graduated");
-        assertApproxEqAbs(
-            curve.graduationMarketCap(),
-            50_000e6,
-            500e6,
-            "graduation mcap should be ~$50,000"
-        );
+        assertApproxEqAbs(curve.graduationMarketCap(), 50_000e6, 500e6, "graduation mcap should be ~$50,000");
     }
 
     // ========== BUY ==========
@@ -121,9 +139,12 @@ contract WafflesBondingCurveTest is Test {
         assertGt(curve.graduationProgressBps(), 0);
 
         uint256 fee = (100e6 * FEE_BPS) / 10_000;
-        uint256 protoFee = (fee * PROTOCOL_FEE_BPS) / 10_000;
-        assertEq(usdc.balanceOf(treasury), protoFee);
-        assertEq(curve.creatorEarnings(creator), fee - protoFee);
+        uint256 creatorFee = (fee * CREATOR_FEE_SHARE_BPS) / 10_000;
+        uint256 platformFee = (fee * PLATFORM_FEE_SHARE_BPS) / 10_000;
+        uint256 rewardsFee = fee - creatorFee - platformFee;
+        assertEq(usdc.balanceOf(treasury), platformFee);
+        assertEq(usdc.balanceOf(rewardsTreasury), rewardsFee);
+        assertEq(curve.creatorEarnings(creator), creatorFee);
     }
 
     function test_PriceRisesAfterBuy() public {
@@ -170,16 +191,14 @@ contract WafflesBondingCurveTest is Test {
         vm.prank(trader);
         uint256 bought = curve.buy(2_000e6, 0);
 
-        uint256 kAfterBuy = curve.virtualUsdcReserve() *
-            curve.virtualTokenReserve();
+        uint256 kAfterBuy = curve.virtualUsdcReserve() * curve.virtualTokenReserve();
         // k should stay >= k0 due to ceiling rounding
         assertGe(kAfterBuy, k0, "k should not decrease after buy");
 
         vm.prank(trader);
         curve.sell(bought / 2, 0);
 
-        uint256 kAfterSell = curve.virtualUsdcReserve() *
-            curve.virtualTokenReserve();
+        uint256 kAfterSell = curve.virtualUsdcReserve() * curve.virtualTokenReserve();
         assertGe(kAfterSell, k0, "k should not decrease after sell");
     }
 
@@ -191,11 +210,7 @@ contract WafflesBondingCurveTest is Test {
         vm.prank(trader);
         uint256 bought = curve.buy(100_000e6, 0);
 
-        assertEq(
-            bought,
-            SELLABLE,
-            "draining buy should output exactly sellable tokens"
-        );
+        assertEq(bought, SELLABLE, "draining buy should output exactly sellable tokens");
         assertTrue(curve.graduated(), "should have graduated");
 
         uint256 consumed = balBefore - usdc.balanceOf(trader);
@@ -210,11 +225,7 @@ contract WafflesBondingCurveTest is Test {
     // ========== PROGRESS ==========
 
     function test_ProgressFromVirtualReserves() public {
-        assertEq(
-            curve.graduationProgressBps(),
-            0,
-            "initial progress should be 0"
-        );
+        assertEq(curve.graduationProgressBps(), 0, "initial progress should be 0");
 
         vm.prank(trader);
         curve.buy(500e6, 0);
@@ -238,19 +249,12 @@ contract WafflesBondingCurveTest is Test {
 
         vm.prank(trader);
         curve.buy(1_000e6, 0);
-        assertFalse(
-            curve.canGraduate(),
-            "should not graduate after partial buy"
-        );
+        assertFalse(curve.canGraduate(), "should not graduate after partial buy");
 
         vm.prank(trader);
         curve.buy(100_000e6, 0);
         assertTrue(curve.graduated());
-        assertEq(
-            curve.virtualTokenReserve(),
-            MIN_VIRTUAL_TOKENS,
-            "should be at min reserve"
-        );
+        assertEq(curve.virtualTokenReserve(), MIN_VIRTUAL_TOKENS, "should be at min reserve");
     }
 
     function test_GraduationOnCrossingBuy() public {
@@ -263,21 +267,13 @@ contract WafflesBondingCurveTest is Test {
         assertGt(curve.graduationMarketCap(), 0);
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 signature = keccak256(
-            "Graduated(address,address,uint256,uint256)"
-        );
+        bytes32 signature = keccak256("Graduated(address,address,uint256,uint256)");
         bool found;
         for (uint256 i; i < logs.length; ++i) {
             if (logs[i].topics.length == 3 && logs[i].topics[0] == signature) {
                 assertEq(logs[i].emitter, address(curve));
-                assertEq(
-                    logs[i].topics[2],
-                    bytes32(uint256(uint160(address(token))))
-                );
-                (uint256 price, uint256 mcap) = abi.decode(
-                    logs[i].data,
-                    (uint256, uint256)
-                );
+                assertEq(logs[i].topics[2], bytes32(uint256(uint160(address(token)))));
+                (uint256 price, uint256 mcap) = abi.decode(logs[i].data, (uint256, uint256));
                 assertEq(price, curve.graduationPrice());
                 assertEq(mcap, curve.graduationMarketCap());
                 found = true;
@@ -300,21 +296,9 @@ contract WafflesBondingCurveTest is Test {
         vm.prank(trader);
         token.transfer(address(curve), bought / 2);
 
-        assertEq(
-            curve.currentPrice(),
-            priceAfterBuy,
-            "price should not change from donation"
-        );
-        assertEq(
-            curve.marketCap(),
-            mcapAfterBuy,
-            "mcap should not change from donation"
-        );
-        assertEq(
-            curve.graduationProgressBps(),
-            progressAfterBuy,
-            "progress should not change from donation"
-        );
+        assertEq(curve.currentPrice(), priceAfterBuy, "price should not change from donation");
+        assertEq(curve.marketCap(), mcapAfterBuy, "mcap should not change from donation");
+        assertEq(curve.graduationProgressBps(), progressAfterBuy, "progress should not change from donation");
     }
 
     function test_DonatedUsdcNoEffect() public {
@@ -326,16 +310,8 @@ contract WafflesBondingCurveTest is Test {
 
         usdc.mint(address(curve), 10_000e6);
 
-        assertEq(
-            curve.currentPrice(),
-            priceBefore,
-            "price should not change from USDC donation"
-        );
-        assertEq(
-            curve.marketCap(),
-            mcapBefore,
-            "mcap should not change from USDC donation"
-        );
+        assertEq(curve.currentPrice(), priceBefore, "price should not change from USDC donation");
+        assertEq(curve.marketCap(), mcapBefore, "mcap should not change from USDC donation");
     }
 
     function test_DonatedTokensNotInMigration() public {
@@ -350,18 +326,10 @@ contract WafflesBondingCurveTest is Test {
         assertTrue(curve.graduated());
 
         uint256 migratedTokens = migrator.totalMigratedTokens();
-        assertEq(
-            migratedTokens,
-            LIQUIDITY_RESERVE,
-            "migrated tokens should be exactly liquidityTokenReserve"
-        );
+        assertEq(migratedTokens, LIQUIDITY_RESERVE, "migrated tokens should be exactly liquidityTokenReserve");
 
         uint256 lockedTokens = token.balanceOf(address(curve));
-        assertEq(
-            lockedTokens,
-            bought / 2,
-            "donated tokens should remain locked in curve"
-        );
+        assertEq(lockedTokens, bought / 2, "donated tokens should remain locked in curve");
     }
 
     // ========== EXCESSIVE SELL ==========
@@ -374,6 +342,37 @@ contract WafflesBondingCurveTest is Test {
     }
 
     // ========== FEES ==========
+
+    function test_SellUsesExactFeeSplit() public {
+        vm.prank(trader);
+        uint256 bought = curve.buy(1_000e6, 0);
+
+        uint256 creatorBefore = curve.creatorEarnings(creator);
+        uint256 platformBefore = usdc.balanceOf(treasury);
+        uint256 rewardsBefore = usdc.balanceOf(rewardsTreasury);
+
+        vm.prank(trader);
+        curve.sell(bought / 2, 0);
+
+        uint256 creatorFee = curve.creatorEarnings(creator) - creatorBefore;
+        uint256 platformFee = usdc.balanceOf(treasury) - platformBefore;
+        uint256 rewardsFee = usdc.balanceOf(rewardsTreasury) - rewardsBefore;
+        uint256 totalFee = creatorFee + platformFee + rewardsFee;
+
+        assertGt(totalFee, 0);
+        assertEq(creatorFee, (totalFee * CREATOR_FEE_SHARE_BPS) / 10_000);
+        assertEq(platformFee, (totalFee * PLATFORM_FEE_SHARE_BPS) / 10_000);
+        assertEq(rewardsFee, totalFee - creatorFee - platformFee);
+    }
+
+    function test_FeeRoundingRemainderGoesToRewards() public {
+        vm.prank(trader);
+        curve.buy(100, 0);
+
+        assertEq(curve.creatorEarnings(creator), 0);
+        assertEq(usdc.balanceOf(treasury), 0);
+        assertEq(usdc.balanceOf(rewardsTreasury), 1);
+    }
 
     function test_ClaimCreatorFees() public {
         vm.prank(trader);

@@ -13,13 +13,18 @@ contract WafflesBondingCurve is ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     uint256 public constant BPS_DENOM = 10_000;
+    uint256 public constant TRADE_FEE_BPS = 100;
     uint256 public constant PRICE_SCALE = 1e18;
+    uint256 public constant CREATOR_FEE_SHARE_BPS = 7_000;
+    uint256 public constant PLATFORM_FEE_SHARE_BPS = 2_500;
+    uint256 public constant REWARDS_FEE_SHARE_BPS = 500;
     uint256 private constant PRICE_CONVERSION_FACTOR = 1e30;
 
     IERC20 public immutable token;
     IERC20 public immutable usdc;
     address public immutable creator;
     address public immutable treasury;
+    address public immutable rewardsTreasury;
     ILiquidityMigrator public immutable migrator;
 
     uint256 public immutable totalSupply_; // raw token units
@@ -29,7 +34,6 @@ contract WafflesBondingCurve is ReentrancyGuard {
     uint256 public immutable minVirtualTokenReserve;
     uint256 public immutable liquidityTokenReserve; // tokens reserved for AMM
     uint256 public immutable feeBps; // total trade fee, e.g. 100 = 1 %
-    uint256 public immutable protocolFeeBps; // share of fee to treasury
 
     uint256 public virtualUsdcReserve; // current virtual USDC position
     uint256 public virtualTokenReserve; // current virtual token position
@@ -51,13 +55,16 @@ contract WafflesBondingCurve is ReentrancyGuard {
         uint256 mcapAfter,
         uint256 progressBpsAfter
     );
-    event Graduated(
-        address indexed pool,
-        address indexed token,
-        uint256 graduationPrice,
-        uint256 graduationMarketCap
-    );
+    event Graduated(address indexed pool, address indexed token, uint256 graduationPrice, uint256 graduationMarketCap);
     event CreatorFeesClaimed(address indexed creator, uint256 amount);
+    event FeeAllocated(
+        address indexed trader,
+        uint256 grossUsdcAmount,
+        uint256 totalFee,
+        uint256 creatorFee,
+        uint256 platformFee,
+        uint256 rewardsFee
+    );
 
     error CurveClosed();
     error Slippage();
@@ -73,37 +80,30 @@ contract WafflesBondingCurve is ReentrancyGuard {
         address usdc_,
         address creator_,
         address treasury_,
+        address rewardsTreasury_,
         address migrator_,
         uint256 initialVirtualUsdcReserve_,
         uint256 initialVirtualTokenReserve_,
         uint256 minVirtualTokenReserve_,
-        uint256 feeBps_,
-        uint256 protocolFeeBps_
+        uint256 feeBps_
     ) {
         if (
-            token_ == address(0) ||
-            usdc_ == address(0) ||
-            creator_ == address(0) ||
-            treasury_ == address(0) ||
-            migrator_ == address(0) ||
-            initialVirtualUsdcReserve_ == 0 ||
-            initialVirtualTokenReserve_ == 0 ||
-            minVirtualTokenReserve_ == 0 ||
-            minVirtualTokenReserve_ >= initialVirtualTokenReserve_ ||
-            feeBps_ >= BPS_DENOM ||
-            protocolFeeBps_ > BPS_DENOM
+            token_ == address(0) || usdc_ == address(0) || creator_ == address(0) || treasury_ == address(0)
+                || rewardsTreasury_ == address(0) || migrator_ == address(0) || initialVirtualUsdcReserve_ == 0
+                || initialVirtualTokenReserve_ == 0 || minVirtualTokenReserve_ == 0 || rewardsTreasury_ == treasury_
+                || minVirtualTokenReserve_ >= initialVirtualTokenReserve_ || feeBps_ != TRADE_FEE_BPS
         ) revert InvalidParameters();
 
         token = IERC20(token_);
         usdc = IERC20(usdc_);
         creator = creator_;
         treasury = treasury_;
+        rewardsTreasury = rewardsTreasury_;
         migrator = ILiquidityMigrator(migrator_);
 
         totalSupply_ = IERC20(token_).totalSupply();
 
-        uint256 sellable = initialVirtualTokenReserve_ -
-            minVirtualTokenReserve_;
+        uint256 sellable = initialVirtualTokenReserve_ - minVirtualTokenReserve_;
         if (sellable > totalSupply_) revert InvalidParameters();
 
         initialVirtualUsdcReserve = initialVirtualUsdcReserve_;
@@ -116,34 +116,24 @@ contract WafflesBondingCurve is ReentrancyGuard {
         virtualTokenReserve = initialVirtualTokenReserve_;
 
         feeBps = feeBps_;
-        protocolFeeBps = protocolFeeBps_;
     }
 
     // ---------- views ----------
 
     /// @notice Tokens still purchasable on the curve.
     function sellableTokens() public view returns (uint256) {
-        return
-            virtualTokenReserve > minVirtualTokenReserve
-                ? virtualTokenReserve - minVirtualTokenReserve
-                : 0;
+        return virtualTokenReserve > minVirtualTokenReserve ? virtualTokenReserve - minVirtualTokenReserve : 0;
     }
 
     /// @notice Marginal USD price per whole token, scaled by 1e18.
     /// @dev USDC has 6 decimals and the token has 18, hence the 1e30 factor.
     function currentPrice() public view returns (uint256) {
-        return
-            Math.mulDiv(
-                virtualUsdcReserve,
-                PRICE_CONVERSION_FACTOR,
-                virtualTokenReserve
-            );
+        return Math.mulDiv(virtualUsdcReserve, PRICE_CONVERSION_FACTOR, virtualTokenReserve);
     }
 
     /// @notice Market cap in raw quote units (price × total supply).
     function marketCap() public view returns (uint256) {
-        return
-            Math.mulDiv(virtualUsdcReserve, totalSupply_, virtualTokenReserve);
+        return Math.mulDiv(virtualUsdcReserve, totalSupply_, virtualTokenReserve);
     }
 
     /// @notice Virtual USDC reserve at which the curve is complete.
@@ -153,12 +143,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
 
     /// @notice Graduation market cap in raw USDC units.
     function graduationMarketCapTarget() public view returns (uint256) {
-        return
-            Math.mulDiv(
-                targetVirtualUsdcReserve(),
-                totalSupply_,
-                minVirtualTokenReserve
-            );
+        return Math.mulDiv(targetVirtualUsdcReserve(), totalSupply_, minVirtualTokenReserve);
     }
 
     /// @notice Curve progress: fraction of the sellable supply that has been
@@ -176,12 +161,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
         if (graduated) revert CurveClosed();
         uint256 netIn = usdcIn - (usdcIn * feeBps) / BPS_DENOM;
         uint256 newVirtualUsdc = virtualUsdcReserve + netIn;
-        uint256 newVirtualTokens = Math.mulDiv(
-            k,
-            1,
-            newVirtualUsdc,
-            Math.Rounding.Ceil
-        );
+        uint256 newVirtualTokens = Math.mulDiv(k, 1, newVirtualUsdc, Math.Rounding.Ceil);
         if (newVirtualTokens >= virtualTokenReserve) return 0;
         uint256 out = virtualTokenReserve - newVirtualTokens;
         uint256 sellable = sellableTokens();
@@ -192,14 +172,10 @@ contract WafflesBondingCurve is ReentrancyGuard {
     function quoteSell(uint256 tokensIn) public view returns (uint256) {
         if (graduated) revert CurveClosed();
         uint256 newVirtualTokens = virtualTokenReserve + tokensIn;
-        if (newVirtualTokens > initialVirtualTokenReserve)
+        if (newVirtualTokens > initialVirtualTokenReserve) {
             revert ExcessiveSell();
-        uint256 newVirtualUsdc = Math.mulDiv(
-            k,
-            1,
-            newVirtualTokens,
-            Math.Rounding.Ceil
-        );
+        }
+        uint256 newVirtualUsdc = Math.mulDiv(k, 1, newVirtualTokens, Math.Rounding.Ceil);
         if (newVirtualUsdc >= virtualUsdcReserve) return 0;
         uint256 grossOut = virtualUsdcReserve - newVirtualUsdc;
         uint256 fee = (grossOut * feeBps) / BPS_DENOM;
@@ -208,10 +184,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
 
     // ---------- trading ----------
 
-    function buy(
-        uint256 usdcIn,
-        uint256 minTokensOut
-    ) external nonReentrant returns (uint256) {
+    function buy(uint256 usdcIn, uint256 minTokensOut) external nonReentrant returns (uint256) {
         if (graduated) revert CurveClosed();
 
         uint256 sellable = sellableTokens();
@@ -222,23 +195,13 @@ contract WafflesBondingCurve is ReentrancyGuard {
         uint256 consumed = usdcIn;
         uint256 netIn = usdcIn - (usdcIn * feeBps) / BPS_DENOM;
         uint256 newVirtualUsdc = virtualUsdcReserve + netIn;
-        uint256 newVirtualTokens = Math.mulDiv(
-            k,
-            1,
-            newVirtualUsdc,
-            Math.Rounding.Ceil
-        );
+        uint256 newVirtualTokens = Math.mulDiv(k, 1, newVirtualUsdc, Math.Rounding.Ceil);
         uint256 tokensOut = virtualTokenReserve - newVirtualTokens;
 
         if (tokensOut >= sellable) {
             uint256 targetVirtualUsdc = targetVirtualUsdcReserve();
             uint256 netInNeeded = targetVirtualUsdc - virtualUsdcReserve;
-            uint256 consumedNeeded = Math.mulDiv(
-                netInNeeded,
-                BPS_DENOM,
-                BPS_DENOM - feeBps,
-                Math.Rounding.Ceil
-            );
+            uint256 consumedNeeded = Math.mulDiv(netInNeeded, BPS_DENOM, BPS_DENOM - feeBps, Math.Rounding.Ceil);
             if (consumedNeeded <= usdcIn) {
                 tokensOut = sellable;
                 consumed = consumedNeeded;
@@ -249,7 +212,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
             }
         }
 
-        _splitFee(consumed);
+        _splitFee(msg.sender, consumed);
         netIn = consumed - (consumed * feeBps) / BPS_DENOM;
 
         // Update stored reserves
@@ -276,24 +239,17 @@ contract WafflesBondingCurve is ReentrancyGuard {
         return tokensOut;
     }
 
-    function sell(
-        uint256 tokensIn,
-        uint256 minUsdcOut
-    ) external nonReentrant returns (uint256) {
+    function sell(uint256 tokensIn, uint256 minUsdcOut) external nonReentrant returns (uint256) {
         if (graduated) revert CurveClosed();
 
         token.safeTransferFrom(msg.sender, address(this), tokensIn);
 
         uint256 newVirtualTokens = virtualTokenReserve + tokensIn;
-        if (newVirtualTokens > initialVirtualTokenReserve)
+        if (newVirtualTokens > initialVirtualTokenReserve) {
             revert ExcessiveSell();
+        }
 
-        uint256 newVirtualUsdc = Math.mulDiv(
-            k,
-            1,
-            newVirtualTokens,
-            Math.Rounding.Ceil
-        );
+        uint256 newVirtualUsdc = Math.mulDiv(k, 1, newVirtualTokens, Math.Rounding.Ceil);
         if (newVirtualUsdc >= virtualUsdcReserve) revert ZeroOutput();
         uint256 grossOut = virtualUsdcReserve - newVirtualUsdc;
         if (grossOut > reserveUsdc) revert InsufficientReserve();
@@ -307,7 +263,7 @@ contract WafflesBondingCurve is ReentrancyGuard {
         if (netOut < minUsdcOut) revert Slippage();
 
         usdc.safeTransfer(msg.sender, netOut);
-        _splitFee(grossOut);
+        _splitFee(msg.sender, grossOut);
 
         emit Traded({
             trader: msg.sender,
@@ -347,30 +303,33 @@ contract WafflesBondingCurve is ReentrancyGuard {
         uint256 usdcAmount = reserveUsdc;
         reserveUsdc = 0;
         if (tokenAmount > 0 || usdcAmount > 0) {
-            if (tokenAmount > 0)
+            if (tokenAmount > 0) {
                 token.forceApprove(address(migrator), tokenAmount);
-            if (usdcAmount > 0)
+            }
+            if (usdcAmount > 0) {
                 usdc.forceApprove(address(migrator), usdcAmount);
+            }
             pool = migrator.migrate(address(token), tokenAmount, usdcAmount);
         }
         graduationPool = pool;
-        emit Graduated(
-            pool,
-            address(token),
-            graduationPrice,
-            graduationMarketCap
-        );
+        emit Graduated(pool, address(token), graduationPrice, graduationMarketCap);
     }
 
     // ---------- fees ----------
 
-    function _splitFee(uint256 grossAmount) internal {
+    function _splitFee(address trader, uint256 grossAmount) internal {
         uint256 fee = (grossAmount * feeBps) / BPS_DENOM;
-        if (fee == 0) return;
-        uint256 protocolFee = (fee * protocolFeeBps) / BPS_DENOM;
-        uint256 creatorFee = fee - protocolFee;
-        if (protocolFee > 0) usdc.safeTransfer(treasury, protocolFee);
+        uint256 creatorFee = (fee * CREATOR_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 platformFee = (fee * PLATFORM_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 rewardsFee = fee - creatorFee - platformFee;
+
         if (creatorFee > 0) creatorEarnings[creator] += creatorFee;
+        if (platformFee > 0) usdc.safeTransfer(treasury, platformFee);
+        if (rewardsFee > 0) {
+            usdc.safeTransfer(rewardsTreasury, rewardsFee);
+        }
+
+        emit FeeAllocated(trader, grossAmount, fee, creatorFee, platformFee, rewardsFee);
     }
 
     function claimCreatorFees() external nonReentrant {

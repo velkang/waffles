@@ -9,9 +9,14 @@ contract WafflesAmmFactory {
     address[] public allPairs;
 
     address public immutable owner;
+    address public immutable usdc;
+    address public immutable treasury;
+    address public immutable rewardsTreasury;
     address public pairCreator;
 
-    event PairCreated(address indexed token0, address indexed token1, address pair, uint256 pairCount);
+    event PairCreated(
+        address indexed token0, address indexed token1, address indexed creator, address pair, uint256 pairCount
+    );
 
     error IdenticalAddresses();
     error ZeroAddress();
@@ -22,9 +27,17 @@ contract WafflesAmmFactory {
     // Parameters consumed by the WafflesAmmPair constructor during createPair.
     address private token0Param;
     address private token1Param;
+    address private creatorParam;
 
-    constructor() {
+    constructor(address usdc_, address treasury_, address rewardsTreasury_) {
+        if (
+            usdc_ == address(0) || treasury_ == address(0) || rewardsTreasury_ == address(0)
+                || rewardsTreasury_ == treasury_
+        ) revert ZeroAddress();
         owner = msg.sender;
+        usdc = usdc_;
+        treasury = treasury_;
+        rewardsTreasury = rewardsTreasury_;
     }
 
     /// @notice Permanently authorizes the graduation migrator to create pools.
@@ -37,31 +50,34 @@ contract WafflesAmmFactory {
         pairCreator = pairCreator_;
     }
 
-    function parameters() external view returns (address, address) {
-        return (token0Param, token1Param);
+    function parameters() external view returns (address, address, address, address, address, address) {
+        return (token0Param, token1Param, usdc, creatorParam, treasury, rewardsTreasury);
     }
 
     function allPairsLength() external view returns (uint256) {
         return allPairs.length;
     }
 
-    function createPair(address tokenA, address tokenB) external returns (address pair) {
+    function createPair(address tokenA, address tokenB, address creator) external returns (address pair) {
         if (msg.sender != pairCreator) revert Unauthorized();
         if (tokenA == tokenB) revert IdenticalAddresses();
         (address token0, address token1) = tokenA < tokenB ? (tokenA, tokenB) : (tokenB, tokenA);
-        if (token0 == address(0)) revert ZeroAddress();
+        if (token0 == address(0) || creator == address(0)) revert ZeroAddress();
+        if (tokenA != usdc && tokenB != usdc) revert Unauthorized();
         if (getPair[token0][token1] != address(0)) revert PairExists();
 
         token0Param = token0;
         token1Param = token1;
+        creatorParam = creator;
         pair = address(new WafflesAmmPair());
         delete token0Param;
         delete token1Param;
+        delete creatorParam;
 
         getPair[token0][token1] = pair;
         getPair[token1][token0] = pair;
         allPairs.push(pair);
 
-        emit PairCreated(token0, token1, pair, allPairs.length);
+        emit PairCreated(token0, token1, creator, pair, allPairs.length);
     }
 }

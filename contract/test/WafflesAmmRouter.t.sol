@@ -16,13 +16,16 @@ contract WafflesAmmRouterTest is Test {
     WafflesAmmPair pair;
     WafflesAmmRouter router;
     address trader = makeAddr("trader");
+    address creator = makeAddr("creator");
+    address treasury = makeAddr("treasury");
+    address rewardsTreasury = makeAddr("rewardsTreasury");
 
     function setUp() public {
         usdc = new MockUSDC();
         token = new WafflesMemeToken("Arc", "ARC", 1_000_000_000 ether, address(this));
-        factory = new WafflesAmmFactory();
+        factory = new WafflesAmmFactory(address(usdc), treasury, rewardsTreasury);
         factory.setPairCreator(address(this));
-        pair = WafflesAmmPair(factory.createPair(address(token), address(usdc)));
+        pair = WafflesAmmPair(factory.createPair(address(token), address(usdc), creator));
         router = new WafflesAmmRouter(factory);
 
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
@@ -53,6 +56,9 @@ contract WafflesAmmRouterTest is Test {
         assertEq(out, quote);
         assertEq(token.balanceOf(trader) - tokenBefore, quote);
         assertEq(usdcBefore - usdc.balanceOf(trader), usdcIn);
+        assertEq(usdc.balanceOf(creator), 700_000);
+        assertEq(usdc.balanceOf(treasury), 250_000);
+        assertEq(usdc.balanceOf(rewardsTreasury), 50_000);
     }
 
     function test_SwapTokenForUsdcAtomically() public {
@@ -71,6 +77,11 @@ contract WafflesAmmRouterTest is Test {
         assertEq(out, quote);
         assertEq(tokenBefore - token.balanceOf(trader), tokenIn);
         assertEq(usdc.balanceOf(trader) - usdcBefore, quote);
+        uint256 totalFee = usdc.balanceOf(creator) + usdc.balanceOf(treasury) + usdc.balanceOf(rewardsTreasury);
+        assertGt(totalFee, 0);
+        assertEq(usdc.balanceOf(creator), (totalFee * 7_000) / 10_000);
+        assertEq(usdc.balanceOf(treasury), (totalFee * 2_500) / 10_000);
+        assertEq(usdc.balanceOf(rewardsTreasury), totalFee - usdc.balanceOf(creator) - usdc.balanceOf(treasury));
     }
 
     function test_ExpiredSwapReverts() public {

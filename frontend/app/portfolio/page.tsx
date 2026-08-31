@@ -430,7 +430,7 @@ function PortfolioBody({
       <section className="space-y-2.5">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-bold uppercase tracking-wider text-[#db9d6a]">
-            Creator Earnings (0.25% OF CURVE TRADES)
+            Creator Earnings (0.70% OF CURVE TRADE VOLUME)
           </h2>
           <span className="text-xs font-bold text-[#db9d6a]">
             {totalUnclaimed !== undefined

@@ -15,12 +15,18 @@ const COPPER = '#db9d6a'
 const BORDER = '#24262e'
 
 const W = 600
-const H = 220
 const PAD_X = 8
 const PAD_TOP = 14
-const PAD_BOTTOM = 22
 
-export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
+export function CurveChart({
+  curveAddress,
+  compact = false,
+}: {
+  curveAddress: `0x${string}`
+  compact?: boolean
+}) {
+  const H = compact ? 126 : 220
+  const PAD_BOTTOM = compact ? 20 : 22
   const { data: k } = useReadWafflesBondingCurveK({ address: curveAddress })
   const { data: initialVirtualUsdc } =
     useReadWafflesBondingCurveInitialVirtualUsdcReserve({
@@ -73,7 +79,7 @@ export function CurveChart({ curveAddress }: { curveAddress: `0x${string}` }) {
       .join(' ')
 
     return { path, sx, sy, raisedMax, mcapMin, mcapMax, K, Vx, T }
-  }, [k, initialVirtualUsdc, targetVirtualUsdc, totalSupply])
+  }, [H, PAD_BOTTOM, k, initialVirtualUsdc, targetVirtualUsdc, totalSupply])
 
   // Current position on the curve: derived from virtualUsdcReserve
   const now = useMemo(() => {

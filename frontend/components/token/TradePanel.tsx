@@ -645,7 +645,9 @@ function CurveTradePanel({
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-zinc-400">Trade Fee</span>
-              <span className="font-bold text-zinc-200">1.0% (0.75% Protocol / 0.25% Creator)</span>
+              <span className="font-bold text-zinc-200">
+                1.0% (0.70% Creator / 0.25% Platform / 0.05% Rewards)
+              </span>
             </div>
           </div>
         )}

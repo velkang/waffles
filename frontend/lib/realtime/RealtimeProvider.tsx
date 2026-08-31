@@ -66,6 +66,26 @@ const SSE_EVENT_TYPES: readonly RealtimeEventType[] = [
   'heartbeat',
 ];
 
+function tradeIdentity(trade: Trade): string {
+  return trade.eventId ?? `${trade.txHash}-${trade.logIndex}`;
+}
+
+function compareIntegerStrings(left: string, right: string): number {
+  if (/^\d+$/.test(left) && /^\d+$/.test(right)) {
+    const leftValue = BigInt(left);
+    const rightValue = BigInt(right);
+    return leftValue === rightValue ? 0 : leftValue > rightValue ? 1 : -1;
+  }
+  return Number(left) - Number(right);
+}
+
+function addIntegerStrings(left: string, right: string): string {
+  if (/^\d+$/.test(left) && /^\d+$/.test(right)) {
+    return String(BigInt(left) + BigInt(right));
+  }
+  return String(Number(left) + Number(right));
+}
+
 export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<'connecting' | 'connected' | 'disconnected'>('disconnected');
@@ -92,11 +112,16 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
       // 1. Update trades query cache
       if (token) {
+        const tradeKey = tradeIdentity(trade);
+        const cachedTrades = queryClient.getQueryData<TradesResponse>(['trades', token]);
+        const tradeAlreadyInSnapshot = Boolean(
+          cachedTrades?.trades.some((item) => tradeIdentity(item) === tradeKey),
+        );
+
         queryClient.setQueryData<TradesResponse>(['trades', token], (old) => {
           if (!old || !old.trades) return { trades: [trade] };
-          const tradeKey = trade.eventId ?? `${trade.txHash}-${trade.logIndex}`;
           const withoutCurrent = old.trades.filter(
-            (item) => (item.eventId ?? `${item.txHash}-${item.logIndex}`) !== tradeKey,
+            (item) => tradeIdentity(item) !== tradeKey,
           );
           return {
             trades: [trade, ...withoutCurrent]
@@ -139,49 +164,73 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           };
         });
 
-        // 4. Update candles for active intervals
-        const intervals = [60, 300, 900];
-        intervals.forEach((intervalSec) => {
-          queryClient.setQueryData<CandlesResponse>(['candles', token, intervalSec], (old) => {
-            const bucketMs = intervalSec * 1000;
-            const tradeTime = new Date(trade.timestamp).getTime();
-            const tradeBucketTime = Math.floor(tradeTime / bucketMs) * bucketMs;
-            const tradePriceNum = Number(trade.priceAfter ?? trade.executionPrice ?? 0);
-            const tradeVolumeNum = Number(trade.usdcGrossAmount ?? trade.usdcAmount ?? 0);
-            if (!Number.isFinite(tradeBucketTime) || !Number.isFinite(tradePriceNum)) {
-              return old;
-            }
-            const newCandle = {
-              time: tradeBucketTime,
-              open: String(tradePriceNum),
-              close: String(tradePriceNum),
-              high: String(tradePriceNum),
-              low: String(tradePriceNum),
-              volume: String(tradeVolumeNum),
-              trades: 1,
-            };
-            if (!old || !old.candles || old.candles.length === 0) {
-              return { candles: [newCandle] };
-            }
-
-            const candles = [...old.candles];
-            const lastCandle = { ...candles[candles.length - 1] };
-
-            if (tradeBucketTime === lastCandle.time) {
-              // Update current candle
-              lastCandle.close = String(tradePriceNum);
-              lastCandle.high = String(Math.max(Number(lastCandle.high), tradePriceNum));
-              lastCandle.low = String(Math.min(Number(lastCandle.low), tradePriceNum));
-              lastCandle.volume = String(Number(lastCandle.volume) + tradeVolumeNum);
-              lastCandle.trades += 1;
-              candles[candles.length - 1] = lastCandle;
-              return { candles };
-            } else if (tradeBucketTime > lastCandle.time) {
-              return { candles: [...candles.slice(1), newCandle] };
-            }
-            return old;
+        // 4. Update every candle interval currently open in the UI. A normal
+        // confirmed event stays entirely in memory; only a late historical
+        // event reconciles its REST snapshot.
+        if (!tradeAlreadyInSnapshot) {
+          const candleQueries = queryClient.getQueryCache().findAll({
+            queryKey: ['candles', token],
           });
-        });
+
+          for (const candleQuery of candleQueries) {
+            const intervalSec = Number(candleQuery.queryKey[2]);
+            if (!Number.isSafeInteger(intervalSec) || intervalSec <= 0) continue;
+
+            let requiresReconciliation = false;
+            queryClient.setQueryData<CandlesResponse>(candleQuery.queryKey, (old) => {
+              const bucketMs = intervalSec * 1000;
+              const tradeTime = new Date(trade.timestamp).getTime();
+              const tradeBucketTime = Math.floor(tradeTime / bucketMs) * bucketMs;
+              const tradePrice = trade.priceAfter ?? trade.executionPrice;
+              const tradeVolume = trade.usdcGrossAmount ?? trade.usdcAmount;
+              if (!Number.isFinite(tradeBucketTime) || !tradePrice || !tradeVolume) {
+                return old;
+              }
+              const newCandle = {
+                time: tradeBucketTime,
+                open: tradePrice,
+                close: tradePrice,
+                high: tradePrice,
+                low: tradePrice,
+                volume: tradeVolume,
+                trades: 1,
+              };
+              if (!old || !old.candles || old.candles.length === 0) {
+                return { candles: [newCandle] };
+              }
+
+              const candles = [...old.candles];
+              const lastCandle = { ...candles[candles.length - 1] };
+
+              if (tradeBucketTime === lastCandle.time) {
+                lastCandle.close = tradePrice;
+                if (compareIntegerStrings(tradePrice, lastCandle.high) > 0) {
+                  lastCandle.high = tradePrice;
+                }
+                if (compareIntegerStrings(tradePrice, lastCandle.low) < 0) {
+                  lastCandle.low = tradePrice;
+                }
+                lastCandle.volume = addIntegerStrings(lastCandle.volume, tradeVolume);
+                lastCandle.trades += 1;
+                candles[candles.length - 1] = lastCandle;
+                return { candles };
+              }
+              if (tradeBucketTime > lastCandle.time) {
+                return { candles: [...candles, newCandle].slice(-240) };
+              }
+
+              requiresReconciliation = true;
+              return old;
+            });
+
+            if (requiresReconciliation) {
+              void queryClient.invalidateQueries({
+                queryKey: candleQuery.queryKey,
+                exact: true,
+              });
+            }
+          }
+        }
       }
     },
     [queryClient],

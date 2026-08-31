@@ -39,11 +39,11 @@ export class CandlesService {
             },
             open: { $first: { $toString: '$priceAfter' } },
             close: { $last: { $toString: '$priceAfter' } },
-            high: { $max: { $toDouble: '$priceAfter' } },
-            low: { $min: { $toDouble: '$priceAfter' } },
+            high: { $max: { $toDecimal: '$priceAfter' } },
+            low: { $min: { $toDecimal: '$priceAfter' } },
             volume: {
               $sum: {
-                $toDouble: { $ifNull: ['$usdcGrossAmount', '$usdcAmount'] },
+                $toDecimal: { $ifNull: ['$usdcGrossAmount', '$usdcAmount'] },
               },
             },
             trades: { $sum: 1 },

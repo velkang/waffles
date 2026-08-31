@@ -27,12 +27,22 @@ type Mode = 'buy' | 'sell'
 const BUY_PRESETS = [25, 100, 250] as const
 const SELL_PRESETS = [25, 50, 100] as const
 const BPS_DENOM = 10_000n
-const FEE_NUM = 9_975n
+const FEE_BPS = 100n
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 
-function poolQuote(amountIn: bigint, rIn: bigint, rOut: bigint): bigint {
+function poolQuote(
+  amountIn: bigint,
+  rIn: bigint,
+  rOut: bigint,
+  isUsdcInput: boolean,
+): bigint {
   if (amountIn <= 0n || rIn <= 0n || rOut <= 0n) return 0n
-  return (amountIn * FEE_NUM * rOut) / (rIn * BPS_DENOM + amountIn * FEE_NUM)
+  if (isUsdcInput) {
+    const netAmountIn = amountIn - (amountIn * FEE_BPS) / BPS_DENOM
+    return (netAmountIn * rOut) / (rIn + netAmountIn)
+  }
+  const grossAmountOut = (amountIn * rOut) / (rIn + amountIn)
+  return grossAmountOut - (grossAmountOut * FEE_BPS) / BPS_DENOM
 }
 
 export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
@@ -116,8 +126,8 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     )
       return undefined
     return mode === 'buy'
-      ? poolQuote(parsedAmount, rUsdc, rToken)
-      : poolQuote(parsedAmount, rToken, rUsdc)
+      ? poolQuote(parsedAmount, rUsdc, rToken, true)
+      : poolQuote(parsedAmount, rToken, rUsdc, false)
   }, [parsedAmount, rUsdc, rToken, mode])
 
   const needsApproval =

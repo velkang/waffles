@@ -10,28 +10,20 @@ import {WafflesAmmMigrator} from "../src/amm/WafflesAmmMigrator.sol";
 import {WafflesAmmRouter} from "../src/amm/WafflesAmmRouter.sol";
 import {WafflesLaunchFactory} from "../src/WafflesLaunchFactory.sol";
 
-contract BroadcasterFinder {
-    address public immutable BROADCASTER;
-
-    constructor() {
-        BROADCASTER = msg.sender;
-    }
-}
-
 /// @notice Deploys the complete waffles.meme launchpad on a supported network.
 contract Deploy is Script {
     uint256 internal constant ARC_TESTNET_CHAIN_ID = 5_042_002;
     uint256 internal constant ANVIL_CHAIN_ID = 31_337;
-    address internal constant ARC_TESTNET_USDC =
-        0x3600000000000000000000000000000000000000;
+    address internal constant ARC_TESTNET_USDC = 0x3600000000000000000000000000000000000000;
 
     uint256 internal constant CREATION_FEE = 1e6; // $1
     uint256 internal constant INITIAL_VIRTUAL_USDC_RESERVE = 2_986e6;
-    uint256 internal constant INITIAL_VIRTUAL_TOKEN_RESERVE =
-        1_060_569_000 ether;
+    uint256 internal constant INITIAL_VIRTUAL_TOKEN_RESERVE = 1_060_569_000 ether;
     uint256 internal constant MIN_VIRTUAL_TOKEN_RESERVE = 251_660_441 ether;
     uint256 internal constant FEE_BPS = 100;
-    uint256 internal constant PROTOCOL_FEE_BPS = 7_500;
+    uint256 internal constant CREATOR_FEE_SHARE_BPS = 7_000;
+    uint256 internal constant PLATFORM_FEE_SHARE_BPS = 2_500;
+    uint256 internal constant REWARDS_FEE_SHARE_BPS = 500;
 
     struct NetworkConfig {
         string networkName;
@@ -40,29 +32,16 @@ contract Deploy is Script {
     }
 
     error UnsupportedChain(uint256 chainId);
+    error RewardsTreasuryMustDiffer();
 
     function setUp() public {}
 
-    function getDeploymentConfig()
-        internal
-        view
-        returns (NetworkConfig memory config)
-    {
+    function getDeploymentConfig() internal view returns (NetworkConfig memory config) {
         if (block.chainid == ARC_TESTNET_CHAIN_ID) {
-            return
-                NetworkConfig({
-                    networkName: "Arc Testnet",
-                    usdcAddress: ARC_TESTNET_USDC,
-                    deployMockUsdc: false
-                });
+            return NetworkConfig({networkName: "Arc Testnet", usdcAddress: ARC_TESTNET_USDC, deployMockUsdc: false});
         }
         if (block.chainid == ANVIL_CHAIN_ID) {
-            return
-                NetworkConfig({
-                    networkName: "Local Anvil",
-                    usdcAddress: address(0),
-                    deployMockUsdc: true
-                });
+            return NetworkConfig({networkName: "Local Anvil", usdcAddress: address(0), deployMockUsdc: true});
         }
 
         revert UnsupportedChain(block.chainid);
@@ -76,35 +55,32 @@ contract Deploy is Script {
         console2.log("Chain ID:", block.chainid);
 
         vm.startBroadcast();
-        BroadcasterFinder finder = new BroadcasterFinder();
-        address deployer = finder.BROADCASTER();
-        vm.stopBroadcast();
-
-        vm.startBroadcast(deployer);
+        (, address deployer,) = vm.readCallers();
 
         address treasury = vm.envOr("TREASURY_ADDRESS", deployer);
+        address rewardsTreasury = config.deployMockUsdc
+            ? vm.envOr("REWARDS_TREASURY_ADDRESS", address(0xBEEF))
+            : vm.envAddress("REWARDS_TREASURY_ADDRESS");
+        if (rewardsTreasury == treasury) revert RewardsTreasuryMustDiffer();
         address usdc = config.usdcAddress;
         if (config.deployMockUsdc) {
             console2.log("Deploying MockUSDC...");
             usdc = address(new MockUSDC());
         }
 
-        WafflesAmmFactory ammFactory = new WafflesAmmFactory();
-        WafflesAmmMigrator migrator = new WafflesAmmMigrator(
-            ammFactory,
-            IERC20(usdc)
-        );
+        WafflesAmmFactory ammFactory = new WafflesAmmFactory(usdc, treasury, rewardsTreasury);
+        WafflesAmmMigrator migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
         WafflesAmmRouter router = new WafflesAmmRouter(ammFactory);
         WafflesLaunchFactory factory = new WafflesLaunchFactory(
             usdc,
             treasury,
+            rewardsTreasury,
             address(migrator),
             CREATION_FEE,
             INITIAL_VIRTUAL_USDC_RESERVE,
             INITIAL_VIRTUAL_TOKEN_RESERVE,
             MIN_VIRTUAL_TOKEN_RESERVE,
-            FEE_BPS,
-            PROTOCOL_FEE_BPS
+            FEE_BPS
         );
         ammFactory.setPairCreator(address(migrator));
         migrator.setLaunchFactory(address(factory));
@@ -118,6 +94,7 @@ contract Deploy is Script {
             usdc,
             deployer,
             treasury,
+            rewardsTreasury,
             config
         );
     }
@@ -130,12 +107,14 @@ contract Deploy is Script {
         address usdc,
         address deployer,
         address treasury,
+        address rewardsTreasury,
         NetworkConfig memory config
     ) internal pure {
         console2.log("\n=== Deployment Summary ===");
         console2.log("Network:", config.networkName);
         console2.log("Deployer / Owner:", deployer);
         console2.log("Treasury:", treasury);
+        console2.log("Rewards Treasury:", rewardsTreasury);
         console2.log("\n--- Contract Addresses ---");
         console2.log("USDC:", usdc);
         console2.log("AMM Factory:", ammFactory);
@@ -144,17 +123,13 @@ contract Deploy is Script {
         console2.log("Launch Factory:", launchFactory);
         console2.log("\n--- Launch Configuration (Stored-Reserve) ---");
         console2.log("Creation Fee (USDC units):", CREATION_FEE);
-        console2.log(
-            "Initial Virtual USDC Reserve:",
-            INITIAL_VIRTUAL_USDC_RESERVE
-        );
-        console2.log(
-            "Initial Virtual Token Reserve:",
-            INITIAL_VIRTUAL_TOKEN_RESERVE
-        );
+        console2.log("Initial Virtual USDC Reserve:", INITIAL_VIRTUAL_USDC_RESERVE);
+        console2.log("Initial Virtual Token Reserve:", INITIAL_VIRTUAL_TOKEN_RESERVE);
         console2.log("Min Virtual Token Reserve:", MIN_VIRTUAL_TOKEN_RESERVE);
         console2.log("Trade Fee (bps):", FEE_BPS);
-        console2.log("Protocol Fee Share (bps):", PROTOCOL_FEE_BPS);
+        console2.log("Creator Fee Share (bps):", CREATOR_FEE_SHARE_BPS);
+        console2.log("Platform Fee Share (bps):", PLATFORM_FEE_SHARE_BPS);
+        console2.log("Rewards Fee Share (bps):", REWARDS_FEE_SHARE_BPS);
         console2.log("\n=== Deployment Complete ===");
     }
 }

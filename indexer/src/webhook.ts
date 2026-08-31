@@ -122,6 +122,7 @@ async function writePoolSwap(
   const tokenLeg = token0IsToken
     ? isBuy ? amount0Out : amount0In
     : isBuy ? amount1Out : amount1In;
+  const normalized = normalizeCurveUsdcAmounts(isBuy, usdcLeg, 100n);
   const spot = spotPriceFromReserves(token0IsToken, reserves.reserve0, reserves.reserve1);
 
   const doc: TradeDoc = {
@@ -129,12 +130,12 @@ async function writePoolSwap(
     curveAddress: launch.curve,
     trader: String(args.to).toLowerCase(),
     isBuy,
-    usdcAmount: String(usdcLeg),
-    usdcGrossAmount: String(usdcLeg),
-    feeAmount: "0",
+    usdcAmount: String(normalized.walletAmount),
+    usdcGrossAmount: String(normalized.grossAmount),
+    feeAmount: String(normalized.feeAmount),
     tokenAmount: String(tokenLeg),
     priceAfter: String(spot.price),
-    executionPrice: String(executionPrice(usdcLeg, tokenLeg)),
+    executionPrice: String(executionPrice(normalized.walletAmount, tokenLeg)),
     mcapAfter: String(spot.marketCap),
     progressBpsAfter: 10_000,
     blockNumber: blockHeight,
