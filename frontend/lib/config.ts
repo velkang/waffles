@@ -1,0 +1,8 @@
+export const GRADUATION_TARGET_USD = Number(
+  process.env.NEXT_PUBLIC_GRADUATION_TARGET_USD || 50000
+);
+
+export const GRADUATION_TARGET_FORMATTED =
+  GRADUATION_TARGET_USD >= 1000
+    ? `$${(GRADUATION_TARGET_USD / 1000).toLocaleString()}K`
+    : `$${GRADUATION_TARGET_USD.toLocaleString()}`;

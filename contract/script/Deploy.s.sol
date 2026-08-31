@@ -71,15 +71,19 @@ contract Deploy is Script {
         WafflesAmmFactory ammFactory = new WafflesAmmFactory(usdc, treasury, rewardsTreasury);
         WafflesAmmMigrator migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
         WafflesAmmRouter router = new WafflesAmmRouter(ammFactory);
+        uint256 initialVirtualUsdcReserve = vm.envOr("INITIAL_VIRTUAL_USDC_RESERVE", INITIAL_VIRTUAL_USDC_RESERVE);
+        uint256 initialVirtualTokenReserve = vm.envOr("INITIAL_VIRTUAL_TOKEN_RESERVE", INITIAL_VIRTUAL_TOKEN_RESERVE);
+        uint256 minVirtualTokenReserve = vm.envOr("MIN_VIRTUAL_TOKEN_RESERVE", MIN_VIRTUAL_TOKEN_RESERVE);
+
         WafflesLaunchFactory factory = new WafflesLaunchFactory(
             usdc,
             treasury,
             rewardsTreasury,
             address(migrator),
             CREATION_FEE,
-            INITIAL_VIRTUAL_USDC_RESERVE,
-            INITIAL_VIRTUAL_TOKEN_RESERVE,
-            MIN_VIRTUAL_TOKEN_RESERVE,
+            initialVirtualUsdcReserve,
+            initialVirtualTokenReserve,
+            minVirtualTokenReserve,
             FEE_BPS
         );
         ammFactory.setPairCreator(address(migrator));
@@ -109,7 +113,7 @@ contract Deploy is Script {
         address treasury,
         address rewardsTreasury,
         NetworkConfig memory config
-    ) internal pure {
+    ) internal view {
         console2.log("\n=== Deployment Summary ===");
         console2.log("Network:", config.networkName);
         console2.log("Deployer / Owner:", deployer);
@@ -122,11 +126,11 @@ contract Deploy is Script {
         console2.log("Router:", router);
         console2.log("Launch Factory:", launchFactory);
         console2.log("\n--- Launch Configuration (Stored-Reserve) ---");
-        console2.log("Creation Fee (USDC units):", CREATION_FEE);
-        console2.log("Initial Virtual USDC Reserve:", INITIAL_VIRTUAL_USDC_RESERVE);
-        console2.log("Initial Virtual Token Reserve:", INITIAL_VIRTUAL_TOKEN_RESERVE);
-        console2.log("Min Virtual Token Reserve:", MIN_VIRTUAL_TOKEN_RESERVE);
-        console2.log("Trade Fee (bps):", FEE_BPS);
+        console2.log("Creation Fee (USDC units):", WafflesLaunchFactory(launchFactory).creationFee());
+        console2.log("Initial Virtual USDC Reserve:", WafflesLaunchFactory(launchFactory).initialVirtualUsdcReserve());
+        console2.log("Initial Virtual Token Reserve:", WafflesLaunchFactory(launchFactory).initialVirtualTokenReserve());
+        console2.log("Min Virtual Token Reserve:", WafflesLaunchFactory(launchFactory).minVirtualTokenReserve());
+        console2.log("Trade Fee (bps):", WafflesLaunchFactory(launchFactory).feeBps());
         console2.log("Creator Fee Share (bps):", CREATOR_FEE_SHARE_BPS);
         console2.log("Platform Fee Share (bps):", PLATFORM_FEE_SHARE_BPS);
         console2.log("Rewards Fee Share (bps):", REWARDS_FEE_SHARE_BPS);

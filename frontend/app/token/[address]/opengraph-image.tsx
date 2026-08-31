@@ -1,6 +1,7 @@
 import { ImageResponse } from 'next/og'
 import { getAddress } from 'viem'
 import { getTokenSummary } from '@/lib/server/chain'
+import { GRADUATION_TARGET_FORMATTED } from '@/lib/config'
 
 export const alt = 'Token on waffles.meme'
 export const size = { width: 1200, height: 630 }
@@ -230,7 +231,7 @@ export default async function OgImage({
           }}
         >
           <span>Circle USDC-Native Token on Arc L1</span>
-          <span style={{ color: AMBER }}>$50,000 Graduation Target</span>
+          <span style={{ color: AMBER }}>{GRADUATION_TARGET_FORMATTED} Graduation Target</span>
         </div>
       </div>
     </div>,

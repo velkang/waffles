@@ -13,6 +13,7 @@ import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import { ProgressBar } from "@/components/ui/ProgressBar";
 import { ImageUpload } from "@/components/ui/ImageUpload";
+import { GRADUATION_TARGET_FORMATTED } from "@/lib/config";
 
 type Status = "idle" | "approving" | "creating" | "done" | "error";
 
@@ -279,7 +280,7 @@ export default function CreatePage() {
                   TARGET
                 </span>
                 <span className="font-bold text-[#db9d6a] text-xs">
-                  $50,000
+                  {GRADUATION_TARGET_FORMATTED}
                 </span>
               </div>
             </div>
