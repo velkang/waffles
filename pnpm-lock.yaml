@@ -189,6 +189,9 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+      wrangler:
+        specifier: ^4.127.1
+        version: 4.127.1(bufferutil@4.1.0)(utf-8-validate@5.0.10)
 
   indexer:
     dependencies:
