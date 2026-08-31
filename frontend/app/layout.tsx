@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { headers } from "next/headers";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -24,13 +23,11 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const cookies = (await headers()).get("cookie");
-
   return (
     <html
       lang="en"
@@ -40,7 +37,7 @@ export default async function RootLayout({
         suppressHydrationWarning
         className="flex min-h-full flex-col bg-[#0e0f12] text-[#fafafa] selection:bg-[#db9d6a] selection:text-[#0e0f12]"
       >
-        <Providers cookies={cookies}>
+        <Providers cookies={null}>
           <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
             {children}
