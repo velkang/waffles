@@ -21,8 +21,15 @@ import { useVenuePrice } from "@/lib/use-venue-price";
 type Address = `0x${string}`;
 
 export default function TokenPage() {
-  const { address } = useParams<{ address: string }>();
-  const token = address as Address;
+  const params = useParams<{ address?: string }>();
+  const resolvedAddress =
+    params?.address && params.address !== "default"
+      ? params.address
+      : typeof window !== "undefined" &&
+          window.location.pathname.startsWith("/token/")
+        ? window.location.pathname.split("/token/")[1]?.split("/")[0] || ""
+        : "";
+  const token = resolvedAddress as Address;
 
   const launchQuery = useReadWafflesLaunchFactoryLaunchOfToken({
     address: FACTORY_ADDRESS,

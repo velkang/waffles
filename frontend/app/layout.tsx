@@ -1,32 +1,32 @@
-import type { Metadata } from "next";
-import { Inter, Geist_Mono } from "next/font/google";
-import "./globals.css";
-import { Providers } from "./providers";
-import { Header } from "@/components/Header";
+import type { Metadata } from 'next'
+import { Inter, Geist_Mono } from 'next/font/google'
+import './globals.css'
+import { Providers } from './providers'
+import { Header } from '@/components/Header'
 
 const inter = Inter({
-  variable: "--font-sans",
-  subsets: ["latin"],
-});
+  variable: '--font-sans',
+  subsets: ['latin'],
+})
 
 const geistMono = Geist_Mono({
-  variable: "--font-mono",
-  subsets: ["latin"],
-});
+  variable: '--font-mono',
+  subsets: ['latin'],
+})
 
 export const metadata: Metadata = {
-  title: "waffles.meme — Fair Token Launchpad on Arc L1",
+  title: 'waffles.meme — Fair Token Launchpad on Arc L1',
   description:
-    "Fair launch tokens on waffles.meme: virtual USDC bonding curves, instant trading, and automatic DEX liquidity graduation on Arc L1.",
+    'Fair launch tokens on waffles.meme: virtual USDC bonding curves, instant trading, and automatic DEX liquidity graduation on Arc L1.',
   icons: {
-    icon: "/favicon.ico",
+    icon: '/favicon.ico',
   },
-};
+}
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
   return (
     <html
@@ -63,5 +63,5 @@ export default function RootLayout({
         </Providers>
       </body>
     </html>
-  );
+  )
 }
