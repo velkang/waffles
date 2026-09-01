@@ -1,18 +1,26 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { apiClient } from "@/lib/api-client";
 
 interface ImageUploadProps {
   value: string;
   onChange: (url: string) => void;
+  onUploadingChange?: (uploading: boolean) => void;
 }
 
-export function ImageUpload({ value, onChange }: ImageUploadProps) {
+export function ImageUpload({ value, onChange, onUploadingChange }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState("");
   const [error, setError] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   const handleFile = async (file: File) => {
     setError("");
@@ -30,22 +38,22 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
     }
 
     // Instant local preview while uploading
-    const previousValue = value;
     const localPreview = URL.createObjectURL(file);
-    onChange(localPreview);
+    setPreviewUrl(localPreview);
 
     // Upload directly to Cloudinary with backend signed params
     setUploading(true);
+    onUploadingChange?.(true);
     try {
       const result = await apiClient.uploadImage(file);
       onChange(result.url);
     } catch (err) {
       console.error("Upload error:", err);
       setError(err instanceof Error ? err.message : "Failed to upload image.");
-      onChange(previousValue);
     } finally {
-      URL.revokeObjectURL(localPreview);
+      setPreviewUrl("");
       setUploading(false);
+      onUploadingChange?.(false);
     }
   };
 
@@ -104,7 +112,7 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
         onChange={handleInputChange}
       />
 
-      {value ? (
+      {previewUrl || value ? (
         /* Preview Card */
         <div
           onClick={() => inputRef.current?.click()}
@@ -112,7 +120,7 @@ export function ImageUpload({ value, onChange }: ImageUploadProps) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={value}
+            src={previewUrl || value}
             alt="Upload preview"
             className="h-14 w-14 rounded-[6px] object-cover bg-[#0e0f12] border border-[#24262e] shrink-0"
           />

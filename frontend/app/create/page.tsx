@@ -41,6 +41,7 @@ export default function CreatePage() {
 
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
+  const [imageUploading, setImageUploading] = useState(false)
   const [initialBuyAmount, setInitialBuyAmount] = useState<string>('')
   const [form, setForm] = useState({
     name: '',
@@ -64,6 +65,7 @@ export default function CreatePage() {
 
   const canSubmit =
     status === 'idle' &&
+    !imageUploading &&
     form.name.trim() !== '' &&
     form.symbol.trim() !== '' &&
     isBuyAmountValid
@@ -227,6 +229,7 @@ export default function CreatePage() {
           <ImageUpload
             value={form.imageUri}
             onChange={(url) => set('imageUri')(url)}
+            onUploadingChange={setImageUploading}
           />
 
           {/* Initial Dev Buy Option */}
