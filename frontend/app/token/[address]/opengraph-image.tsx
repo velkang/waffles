@@ -28,10 +28,6 @@ function fmtPrice(raw: bigint | undefined): string {
   return `$${usd.toPrecision(4)}`
 }
 
-export function generateStaticParams() {
-  return [{ address: "default" }];
-}
-
 export default async function OgImage({
   params,
 }: {

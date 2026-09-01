@@ -1,10 +1,6 @@
 import type { Metadata } from 'next'
 import { GRADUATION_TARGET_FORMATTED } from '@/lib/config'
 
-export function generateStaticParams() {
-  return [{ address: "default" }];
-}
-
 export async function generateMetadata({
   params,
 }: {

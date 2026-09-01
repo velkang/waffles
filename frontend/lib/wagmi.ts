@@ -17,7 +17,7 @@ export const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ??
 
 export const AMM_FACTORY_ADDRESS = (process.env
   .NEXT_PUBLIC_AMM_FACTORY_ADDRESS ??
-  '0x43563086cE530b20DfEE27A7C57B103C834Cd247') as `0x${string}`
+  '0xf25A11C6D0B2847532d7e246C141f5EDe38BeE3E') as `0x${string}`
 
 export const ROUTER_ADDRESS = (process.env.NEXT_PUBLIC_ROUTER_ADDRESS ??
   '') as `0x${string}`
