@@ -10,7 +10,8 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "test": "jest --config test/jest-e2e.json --runInBand",
-    "test:unit": "jest --config test/jest-unit.json"
+    "test:unit": "jest --config test/jest-unit.json",
+    "rewards:finalize": "ts-node src/rewards/finalize-epoch.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.4.15",
@@ -23,11 +24,13 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "dotenv": "^17.4.2",
+    "drand-client": "^1.4.2",
     "helmet": "^8.0.0",
     "mongodb": "^7.5.0",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "viem": "^2.55.19"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.9",

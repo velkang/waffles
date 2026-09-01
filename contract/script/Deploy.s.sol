@@ -9,6 +9,7 @@ import {WafflesAmmFactory} from "../src/amm/WafflesAmmFactory.sol";
 import {WafflesAmmMigrator} from "../src/amm/WafflesAmmMigrator.sol";
 import {WafflesAmmRouter} from "../src/amm/WafflesAmmRouter.sol";
 import {WafflesLaunchFactory} from "../src/WafflesLaunchFactory.sol";
+import {WafflesRewardsDistributor} from "../src/WafflesRewardsDistributor.sol";
 
 /// @notice Deploys the complete waffles.meme launchpad on a supported network.
 contract Deploy is Script {
@@ -32,8 +33,6 @@ contract Deploy is Script {
     }
 
     error UnsupportedChain(uint256 chainId);
-    error RewardsTreasuryMustDiffer();
-
     function setUp() public {}
 
     function getDeploymentConfig() internal view returns (NetworkConfig memory config) {
@@ -58,15 +57,16 @@ contract Deploy is Script {
         (, address deployer,) = vm.readCallers();
 
         address treasury = vm.envOr("TREASURY_ADDRESS", deployer);
-        address rewardsTreasury = config.deployMockUsdc
-            ? vm.envOr("REWARDS_TREASURY_ADDRESS", address(0xBEEF))
-            : vm.envAddress("REWARDS_TREASURY_ADDRESS");
-        if (rewardsTreasury == treasury) revert RewardsTreasuryMustDiffer();
         address usdc = config.usdcAddress;
         if (config.deployMockUsdc) {
             console2.log("Deploying MockUSDC...");
             usdc = address(new MockUSDC());
         }
+
+        address rewardsFinalizer = vm.envOr("REWARDS_FINALIZER_ADDRESS", deployer);
+        WafflesRewardsDistributor rewardsDistributor =
+            new WafflesRewardsDistributor(IERC20(usdc), deployer, rewardsFinalizer);
+        address rewardsTreasury = address(rewardsDistributor);
 
         WafflesAmmFactory ammFactory = new WafflesAmmFactory(usdc, treasury, rewardsTreasury);
         WafflesAmmMigrator migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
@@ -95,6 +95,7 @@ contract Deploy is Script {
             address(ammFactory),
             address(migrator),
             address(router),
+            address(rewardsDistributor),
             usdc,
             deployer,
             treasury,
@@ -108,6 +109,7 @@ contract Deploy is Script {
         address ammFactory,
         address migrator,
         address router,
+        address rewardsDistributor,
         address usdc,
         address deployer,
         address treasury,
@@ -125,6 +127,7 @@ contract Deploy is Script {
         console2.log("Migrator:", migrator);
         console2.log("Router:", router);
         console2.log("Launch Factory:", launchFactory);
+        console2.log("Rewards Distributor:", rewardsDistributor);
         console2.log("\n--- Launch Configuration (Stored-Reserve) ---");
         console2.log("Creation Fee (USDC units):", WafflesLaunchFactory(launchFactory).creationFee());
         console2.log("Initial Virtual USDC Reserve:", WafflesLaunchFactory(launchFactory).initialVirtualUsdcReserve());

@@ -18,4 +18,6 @@ export const MAX_DEV_BUY_USDC = process.env.NEXT_PUBLIC_MAX_DEV_BUY_USDC
   ? Number(process.env.NEXT_PUBLIC_MAX_DEV_BUY_USDC)
   : 50;
 
+export const REWARDS_DISTRIBUTOR_ADDRESS =
+  (process.env.NEXT_PUBLIC_REWARDS_DISTRIBUTOR_ADDRESS || '') as `0x${string}`;
 

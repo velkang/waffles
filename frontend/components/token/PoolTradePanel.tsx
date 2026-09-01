@@ -5,10 +5,7 @@ import { formatUnits, parseUnits } from 'viem'
 import { useAccount, usePublicClient } from 'wagmi'
 import {
   useReadWafflesAmmFactoryGetPair,
-  useReadWafflesAmmMigratorFactory,
   useReadWafflesAmmPairGetReserves,
-  useReadWafflesAmmPairToken0,
-  useReadWafflesLaunchFactoryMigrator,
   useReadWafflesMemeTokenAllowance,
   useReadWafflesMemeTokenBalanceOf,
   useReadMockUsdcAllowance,
@@ -18,7 +15,11 @@ import {
   useWriteMockUsdcApprove,
 } from '@/generated/contracts-generated'
 import { formatToken, formatUsd } from '@/lib/format'
-import { FACTORY_ADDRESS, ROUTER_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
+import {
+  AMM_FACTORY_ADDRESS,
+  ROUTER_ADDRESS,
+  USDC_ADDRESS,
+} from '@/lib/wagmi'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 
 type Address = `0x${string}`
@@ -55,32 +56,21 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   const [phase, setPhase] = useState<'idle' | 'approve' | 'swap'>('idle')
   const [error, setError] = useState('')
 
-  const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
-    address: FACTORY_ADDRESS,
-  })
-  const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
-    address: migrator,
-    query: { enabled: Boolean(migrator) },
-  })
   const { data: rawPool, isLoading: poolLoading } =
     useReadWafflesAmmFactoryGetPair({
-      address: ammFactory,
+      address: AMM_FACTORY_ADDRESS,
       args: [tokenAddress, USDC_ADDRESS],
-      query: { enabled: Boolean(ammFactory) },
+      query: { enabled: Boolean(AMM_FACTORY_ADDRESS) },
     })
   const pool = rawPool && rawPool !== ZERO_ADDRESS ? rawPool : undefined
 
-  const { data: token0 } = useReadWafflesAmmPairToken0({
-    address: pool,
-    query: { enabled: Boolean(pool) },
-  })
   const reservesQuery = useReadWafflesAmmPairGetReserves({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
   })
 
   const tokenIsToken0 =
-    token0 !== undefined && token0.toLowerCase() === tokenAddress.toLowerCase()
+    tokenAddress.toLowerCase() < USDC_ADDRESS.toLowerCase()
 
   const [r0, r1] = reservesQuery.data ?? []
   const rUsdc = tokenIsToken0 ? r1 : r0

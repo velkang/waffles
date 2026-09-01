@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL('https://waffles.meme'),
   title: 'waffles.meme — Fair Token Launchpad on Arc L1',
   description:
     'Fair launch tokens on waffles.meme: virtual USDC bonding curves, instant trading, and automatic DEX liquidity graduation on Arc L1.',
@@ -33,10 +34,7 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${geistMono.variable} h-full antialiased dark`}
     >
-      <body
-        suppressHydrationWarning
-        className="flex min-h-full flex-col bg-[#0e0f12] text-[#fafafa] selection:bg-[#db9d6a] selection:text-[#0e0f12]"
-      >
+      <body className="flex min-h-full flex-col bg-[#0e0f12] text-[#fafafa] selection:bg-[#db9d6a] selection:text-[#0e0f12]">
         <Providers cookies={null}>
           <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-5 sm:px-6 lg:px-8">
@@ -50,13 +48,6 @@ export default function RootLayout({
                 </span>
                 <span className="text-zinc-600">|</span>
                 <span>USDC-Native Fair Launchpad on Arc L1</span>
-              </div>
-              <div className="flex items-center gap-4 text-zinc-500">
-                <span>Verified Contracts</span>
-                <span>•</span>
-                <span>Permanent AMM Liquidity</span>
-                <span>•</span>
-                <span>Circle USDC Settled</span>
               </div>
             </div>
           </footer>

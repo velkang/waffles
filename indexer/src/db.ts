@@ -43,6 +43,19 @@ export async function getDb(): Promise<Db> {
     { expireAfterSeconds: 0 },
   );
 
+  await db.collection("rewardsEpochs").createIndex({ epochId: 1 }, { unique: true });
+  await db.collection("rewardsEpochs").createIndex({ status: 1, endAt: 1 });
+  await db.collection("epochTraderVolumes").createIndex(
+    { epochId: 1, trader: 1 },
+    { unique: true },
+  );
+  await db.collection("epochTraderVolumes").createIndex({ epochId: 1, tickets: -1 });
+  await db.collection("epochWinners").createIndex(
+    { epochId: 1, trader: 1 },
+    { unique: true },
+  );
+  await db.collection("epochWinners").createIndex({ trader: 1, claimed: 1 });
+
   return db;
 }
 
@@ -96,4 +109,44 @@ export interface TradeDoc {
   txHash: string;
   timestamp: Date;
   source?: "curve" | "pool"; // pool = post-graduation AmmPair swap
+}
+
+export type RewardsEpochStatus = "open" | "snapshotting" | "drawn" | "submitted" | "finalized" | "failed";
+
+export interface RewardsEpochDoc {
+  epochId: number;
+  startAt: Date;
+  endAt: Date;
+  cutoffBlock?: number;
+  totalPoolUsdc: string;
+  snapshotHash?: string;
+  drandRound?: number;
+  drandSignature?: string;
+  drandRandomness?: string;
+  merkleRoot?: string;
+  transactionHash?: string;
+  status: RewardsEpochStatus;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface EpochTraderVolumeDoc {
+  epochId: number;
+  trader: string;
+  volumeUsdc: string;
+  tickets: string;
+  lastTradeAt: Date;
+  excluded?: boolean;
+  exclusionReason?: string;
+}
+
+export interface EpochWinnerDoc {
+  epochId: number;
+  trader: string;
+  prizeUsdc: string;
+  drawIndex: number;
+  merkleLeaf: string;
+  merkleProof: string[];
+  claimed: boolean;
+  claimTransactionHash?: string;
 }

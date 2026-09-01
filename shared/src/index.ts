@@ -82,6 +82,76 @@ export interface PortfolioResponse {
   positions: PortfolioPosition[];
 }
 
+export interface RewardsUserPosition {
+  trader: string;
+  rank: number | null;
+  volumeUsdc: string;
+  tickets: string;
+  volumeToNextTicketUsdc: string;
+  lastTradeAt: string | null;
+}
+
+export interface RewardsCurrentResponse {
+  epochId: number;
+  startAt: string;
+  endAt: string;
+  status: "open";
+  provisional: true;
+  totalPoolUsdc: string;
+  totalVolumeUsdc: string;
+  totalTickets: string;
+  ticketThresholdUsdc: number;
+  winnerCount: number;
+  user: RewardsUserPosition | null;
+}
+
+export interface RewardsLeaderboardRow extends RewardsUserPosition {
+  rank: number;
+  ticketShareBps: number;
+}
+
+export interface RewardsLeaderboardResponse {
+  epochId: number;
+  startAt: string;
+  endAt: string;
+  provisional: true;
+  totalTickets: string;
+  leaderboard: RewardsLeaderboardRow[];
+}
+
+export interface RewardsEpoch {
+  epochId: number;
+  startAt: string;
+  endAt: string;
+  totalPoolUsdc: string;
+  snapshotHash?: string;
+  drandRound?: number;
+  drandChainHash?: string;
+  merkleRoot?: string;
+  transactionHash?: string;
+  status: "submitted" | "finalized";
+}
+
+export interface RewardsEpochsResponse {
+  epochs: RewardsEpoch[];
+}
+
+export interface RewardClaim {
+  epochId: number;
+  trader: string;
+  prizeUsdc: string;
+  drawIndex: number;
+  merkleLeaf: string;
+  merkleProof: string[];
+  claimed: boolean;
+  claimTransactionHash?: string;
+}
+
+export interface RewardsClaimsResponse {
+  trader: string;
+  claims: RewardClaim[];
+}
+
 // Upload contracts
 export interface UploadSignatureRequest {
   folder?: string;

@@ -10,6 +10,10 @@ import {
   UploadSignatureResponse,
   ALLOWED_IMAGE_MIMES,
   MAX_UPLOAD_BYTES,
+  RewardsClaimsResponse,
+  RewardsCurrentResponse,
+  RewardsEpochsResponse,
+  RewardsLeaderboardResponse,
 } from '@waffles/shared';
 import { getOptimizedImageUrl } from './image';
 
@@ -94,6 +98,22 @@ export const apiClient = {
   async getPortfolio(address: string): Promise<PortfolioResponse> {
     const url = buildUrl(`/v1/portfolios/${address.toLowerCase()}`);
     return fetchJson<PortfolioResponse>(url);
+  },
+
+  async getCurrentRewards(address?: string): Promise<RewardsCurrentResponse> {
+    return fetchJson<RewardsCurrentResponse>(buildUrl('/v1/rewards/current', { address }));
+  },
+
+  async getRewardsLeaderboard(limit = 100): Promise<RewardsLeaderboardResponse> {
+    return fetchJson<RewardsLeaderboardResponse>(buildUrl('/v1/rewards/leaderboard', { limit }));
+  },
+
+  async getRewardsEpochs(limit = 20): Promise<RewardsEpochsResponse> {
+    return fetchJson<RewardsEpochsResponse>(buildUrl('/v1/rewards/epochs', { limit }));
+  },
+
+  async getRewardClaims(address: string): Promise<RewardsClaimsResponse> {
+    return fetchJson<RewardsClaimsResponse>(buildUrl(`/v1/rewards/claims/${address.toLowerCase()}`));
   },
 
   async getUploadSignature(): Promise<UploadSignatureResponse> {

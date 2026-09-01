@@ -2,15 +2,12 @@
 
 import {
   useReadWafflesAmmFactoryGetPair,
-  useReadWafflesAmmMigratorFactory,
   useReadWafflesAmmPairGetReserves,
-  useReadWafflesAmmPairToken0,
   useReadWafflesBondingCurveCurrentPrice,
   useReadWafflesBondingCurveGraduated,
   useReadWafflesBondingCurveMarketCap,
-  useReadWafflesLaunchFactoryMigrator,
 } from "@/generated/contracts-generated";
-import { FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
+import { AMM_FACTORY_ADDRESS, USDC_ADDRESS } from "@/lib/wagmi";
 
 type Address = `0x${string}`;
 
@@ -46,33 +43,24 @@ export function useVenuePrice(token: Address, curve: Address | undefined) {
     query: { enabled: Boolean(curve && !graduatedQuery.data) },
   });
 
-  const migrator = useReadWafflesLaunchFactoryMigrator({
-    address: FACTORY_ADDRESS,
-    query: { enabled: Boolean(graduatedQuery.data) },
-  });
-  const ammFactory = useReadWafflesAmmMigratorFactory({
-    address: migrator.data,
-    query: { enabled: Boolean(migrator.data && graduatedQuery.data) },
-  });
   const pair = useReadWafflesAmmFactoryGetPair({
-    address: ammFactory.data,
+    address: AMM_FACTORY_ADDRESS,
     args: [token, USDC_ADDRESS],
-    query: { enabled: Boolean(ammFactory.data && graduatedQuery.data) },
+    query: { enabled: Boolean(AMM_FACTORY_ADDRESS && curve) },
   });
   const pool =
     pair.data && pair.data !== ZERO_ADDRESS ? (pair.data as Address) : undefined;
-  const token0 = useReadWafflesAmmPairToken0({
-    address: pool,
-    query: { enabled: Boolean(pool), refetchInterval: 10_000 },
-  });
   const reserves = useReadWafflesAmmPairGetReserves({
     address: pool,
     query: { enabled: Boolean(pool), refetchInterval: 10_000 },
   });
 
+  const token0 =
+    token.toLowerCase() < USDC_ADDRESS.toLowerCase() ? token : USDC_ADDRESS;
+
   const poolPrice = poolPriceFromReserves(
     token,
-    token0.data as Address | undefined,
+    token0,
     reserves.data,
   );
   const graduated = Boolean(graduatedQuery.data);
@@ -88,7 +76,7 @@ export function useVenuePrice(token: Address, curve: Address | undefined) {
     isLoading:
       graduatedQuery.isLoading ||
       (graduated
-        ? pair.isLoading || token0.isLoading || reserves.isLoading
+        ? pair.isLoading || reserves.isLoading
         : curvePrice.isLoading || curveMcap.isLoading),
   };
 }

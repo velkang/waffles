@@ -17,6 +17,17 @@ export interface AppConfig {
     limit: number;
     uploadLimit: number;
   };
+  rewards: {
+    distributorAddress: string;
+    epochDurationSec: number;
+    epochZeroUnixSec: number;
+    finalityDelaySec: number;
+    ticketThresholdUsdc: number;
+    winnerCount: number;
+    drandChainHash: string;
+    rpcUrl: string;
+    finalizerPrivateKey: string;
+  };
 }
 
 export default (): AppConfig => ({
@@ -40,5 +51,18 @@ export default (): AppConfig => ({
     ttlMs: parseInt(process.env.RATE_LIMIT_TTL_MS || '60000', 10),
     limit: parseInt(process.env.RATE_LIMIT_MAX || '200', 10),
     uploadLimit: parseInt(process.env.UPLOAD_RATE_LIMIT_MAX || '20', 10),
+  },
+  rewards: {
+    distributorAddress: (process.env.REWARDS_DISTRIBUTOR_ADDRESS || '').toLowerCase(),
+    epochDurationSec: parseInt(process.env.REWARDS_EPOCH_DURATION_SEC || '604800', 10),
+    epochZeroUnixSec: parseInt(process.env.REWARDS_EPOCH_ZERO_UNIX_SEC || '1756684800', 10),
+    finalityDelaySec: parseInt(process.env.REWARDS_FINALITY_DELAY_SEC || '60', 10),
+    ticketThresholdUsdc: parseInt(process.env.REWARDS_TICKET_THRESHOLD_USDC || '1000', 10),
+    winnerCount: parseInt(process.env.REWARDS_WINNER_COUNT || '20', 10),
+    drandChainHash:
+      process.env.REWARDS_DRAND_CHAIN_HASH ||
+      '52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971',
+    rpcUrl: process.env.REWARDS_RPC_URL || '',
+    finalizerPrivateKey: process.env.REWARDS_FINALIZER_PRIVATE_KEY || '',
   },
 });

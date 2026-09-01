@@ -294,7 +294,7 @@ contract WafflesBondingCurveTest is Test {
         uint256 progressAfterBuy = curve.graduationProgressBps();
 
         vm.prank(trader);
-        token.transfer(address(curve), bought / 2);
+        assertTrue(token.transfer(address(curve), bought / 2));
 
         assertEq(curve.currentPrice(), priceAfterBuy, "price should not change from donation");
         assertEq(curve.marketCap(), mcapAfterBuy, "mcap should not change from donation");
@@ -318,7 +318,7 @@ contract WafflesBondingCurveTest is Test {
         vm.prank(trader);
         uint256 bought = curve.buy(100e6, 0);
         vm.prank(trader);
-        token.transfer(address(curve), bought / 2);
+        assertTrue(token.transfer(address(curve), bought / 2));
 
         vm.prank(trader);
         curve.buy(100_000e6, 0);

@@ -18,6 +18,15 @@ const W = 600
 const PAD_X = 8
 const PAD_TOP = 14
 
+function formatGraduationTarget(graduationTarget: bigint | undefined) {
+  if (graduationTarget === undefined) return '$— GRADUATION TARGET'
+  const usd = Number(graduationTarget) / 1e6
+  if (usd >= 1000) {
+    return `$${(usd / 1000).toFixed(usd % 1000 === 0 ? 0 : 1)}K GRADUATION TARGET`
+  }
+  return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })} GRADUATION TARGET`
+}
+
 export function CurveChart({
   curveAddress,
   compact = false,
@@ -95,16 +104,7 @@ export function CurveChart({
     return { x: chart.sx(raised), y: chart.sy(mcapNow) }
   }, [chart, virtualUsdcReserve, initialVirtualUsdc])
 
-  // Format graduation target label
-  const gradLabel = useMemo(() => {
-    if (graduationTarget === undefined) return '$— GRADUATION TARGET'
-    // graduationTarget is in raw USDC (6 decimals)
-    const usd = Number(graduationTarget) / 1e6
-    if (usd >= 1000) {
-      return `$${(usd / 1000).toFixed(usd % 1000 === 0 ? 0 : 1)}K GRADUATION TARGET`
-    }
-    return `$${usd.toLocaleString(undefined, { maximumFractionDigits: 0 })} GRADUATION TARGET`
-  }, [graduationTarget])
+  const gradLabel = formatGraduationTarget(graduationTarget)
 
   return (
     <figure className="w-full">

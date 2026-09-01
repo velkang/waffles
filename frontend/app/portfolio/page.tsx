@@ -7,13 +7,11 @@ import { useAccount, usePublicClient, useReadContracts } from 'wagmi'
 import {
   wafflesAmmFactoryAbi,
   wafflesAmmPairAbi,
-  useReadWafflesAmmMigratorFactory,
-  useReadWafflesLaunchFactoryMigrator,
   useWriteWafflesBondingCurveClaimCreatorFees,
 } from '@/generated/contracts-generated'
 import { formatToken, formatUsd } from '@/lib/format'
 import { poolPriceFromReserves } from '@/lib/use-venue-price'
-import { FACTORY_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
+import { AMM_FACTORY_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { useLaunches, usePortfolio } from '@/lib/hooks/queries'
 import { useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
@@ -107,8 +105,6 @@ function PortfolioView() {
       (portfolioLoading ? null : []),
     [portfolioData, portfolioLoading],
   )
-  const [nonce, setNonce] = useState(0)
-
   if (!address) {
     return (
       <div className="mx-auto max-w-md rounded-[10px] border border-[#24262e] bg-[#141519] p-8 text-center font-mono">
@@ -124,13 +120,7 @@ function PortfolioView() {
   }
 
   return (
-    <PortfolioBody
-      key={nonce}
-      address={address}
-      launches={launches}
-      positions={positions}
-      onClaimed={() => setNonce((n) => n + 1)}
-    />
+    <PortfolioBody address={address} launches={launches} positions={positions} />
   )
 }
 
@@ -138,12 +128,10 @@ function PortfolioBody({
   address,
   launches,
   positions,
-  onClaimed,
 }: {
   address: Address
   launches: ApiLaunch[] | null
   positions: Position[] | null
-  onClaimed: () => void
 }) {
   const publicClient = usePublicClient()
   const claimAsync =
@@ -194,24 +182,17 @@ function PortfolioBody({
     query: { enabled: activePositions.length > 0 },
   })
 
-  const { data: migrator } = useReadWafflesLaunchFactoryMigrator({
-    address: FACTORY_ADDRESS,
-    query: { enabled: activePositions.some((p) => p.launch.graduated) },
-  })
-  const { data: ammFactory } = useReadWafflesAmmMigratorFactory({
-    address: migrator,
-    query: { enabled: Boolean(migrator) },
-  })
   const pairQueries = useReadContracts({
     contracts: activePositions.map((p) => ({
-      address: ammFactory ?? ZERO,
+      address: AMM_FACTORY_ADDRESS || ZERO,
       abi: wafflesAmmFactoryAbi,
       functionName: 'getPair' as const,
       args: [p.launch.token as Address, USDC_ADDRESS] as const,
     })),
     query: {
       enabled:
-        Boolean(ammFactory) && activePositions.some((p) => p.launch.graduated),
+        Boolean(AMM_FACTORY_ADDRESS) &&
+        activePositions.some((p) => p.launch.graduated),
       refetchInterval: 10_000,
     },
   })
@@ -220,17 +201,6 @@ function PortfolioBody({
       ? ((pairQueries.data?.[i]?.result as Address | undefined) ?? ZERO)
       : ZERO,
   )
-  const token0Queries = useReadContracts({
-    contracts: pairAddresses.map((pair) => ({
-      address: pair,
-      abi: wafflesAmmPairAbi,
-      functionName: 'token0' as const,
-    })),
-    query: {
-      enabled: pairAddresses.some((pair) => pair !== ZERO),
-      refetchInterval: 10_000,
-    },
-  })
   const reserveQueries = useReadContracts({
     contracts: pairAddresses.map((pair) => ({
       address: pair,
@@ -258,7 +228,9 @@ function PortfolioBody({
     const curvePrice = priceQueries.data?.[i]?.result as bigint | undefined
     const poolPrice = poolPriceFromReserves(
       p.launch.token as Address,
-      token0Queries.data?.[i]?.result as Address | undefined,
+      p.launch.token.toLowerCase() < USDC_ADDRESS.toLowerCase()
+        ? (p.launch.token as Address)
+        : USDC_ADDRESS,
       reserveQueries.data?.[i]?.result as readonly [bigint, bigint] | undefined,
     )
     const priceRaw = p.launch.graduated ? poolPrice : curvePrice
@@ -287,7 +259,7 @@ function PortfolioBody({
       setClaimingCurve(curve)
       const hash = await claimAsync({ address: curve })
       await publicClient.waitForTransactionReceipt({ hash })
-      onClaimed()
+      await earningsQueries.refetch()
     } catch (err) {
       console.error(err)
     } finally {

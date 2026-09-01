@@ -13,7 +13,6 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts'
-import { CurveChart } from '@/components/token/CurveChart'
 import { useReadWafflesBondingCurveTotalSupply } from '@/generated/contracts-generated'
 import { useCandles } from '@/lib/hooks/queries'
 import { useRealtime, useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
@@ -68,7 +67,7 @@ export function PriceChart({
   const [intervalSec, setIntervalSec] = useState<number>(60)
   const [displayMode, setDisplayMode] = useState<DisplayMode>('price')
   const [hovered, setHovered] = useState<Readout | null>(null)
-  const { data, isLoading, isFetching, isError, refetch } = useCandles(
+  const { data, isLoading, isError, refetch } = useCandles(
     token,
     intervalSec,
     240,
@@ -219,26 +218,7 @@ export function PriceChart({
             </p>
           </div>
         )}
-
-        {/* {isFetching && !isLoading && (
-          <span className="absolute right-4 top-2 rounded-[4px] border border-[#24262e] bg-[#0e0f12] px-2 py-1 font-mono text-[10px] text-zinc-500">
-            Syncing
-          </span>
-        )} */}
       </div>
-
-      {/* <div className="border-t border-[#24262e] px-4 py-3">
-        <div className="mb-1 flex items-center justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-bold text-zinc-200">Bonding curve trajectory</h3>
-            <p className="mt-0.5 text-[10px] text-zinc-500">Protocol progress, separate from price history</p>
-          </div>
-          <span className="rounded-[4px] border border-[#24262e] px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-500">
-            Protocol
-          </span>
-        </div>
-        <CurveChart curveAddress={curve} compact />
-      </div> */}
     </section>
   )
 }

@@ -65,3 +65,39 @@ export function usePortfolio(address?: string) {
     staleTime: 10_000,
   });
 }
+
+export function useCurrentRewards(address?: string) {
+  return useQuery({
+    queryKey: ['rewards', 'current', address?.toLowerCase()],
+    queryFn: () => apiClient.getCurrentRewards(address),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useRewardsLeaderboard(limit = 100) {
+  return useQuery({
+    queryKey: ['rewards', 'leaderboard', limit],
+    queryFn: () => apiClient.getRewardsLeaderboard(limit),
+    staleTime: 10_000,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useRewardsEpochs(limit = 20, enabled = true) {
+  return useQuery({
+    queryKey: ['rewards', 'epochs', limit],
+    queryFn: () => apiClient.getRewardsEpochs(limit),
+    enabled,
+    staleTime: 30_000,
+  });
+}
+
+export function useRewardClaims(address?: string) {
+  return useQuery({
+    queryKey: ['rewards', 'claims', address?.toLowerCase()],
+    queryFn: () => apiClient.getRewardClaims(address!),
+    enabled: Boolean(address && /^0x[0-9a-fA-F]{40}$/.test(address)),
+    staleTime: 10_000,
+  });
+}

@@ -37,6 +37,37 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CHAIN_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  @Matches(/^0x[0-9a-fA-F]{40}$/)
+  REWARDS_DISTRIBUTOR_ADDRESS?: string;
+
+  @IsInt()
+  @Min(60)
+  @IsOptional()
+  REWARDS_EPOCH_DURATION_SEC?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  REWARDS_EPOCH_ZERO_UNIX_SEC?: number;
+
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  REWARDS_FINALITY_DELAY_SEC?: number;
+
+  @IsInt()
+  @Min(1)
+  @IsOptional()
+  REWARDS_TICKET_THRESHOLD_USDC?: number;
+
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  @IsOptional()
+  REWARDS_WINNER_COUNT?: number;
 }
 
 export function validate(config: Record<string, unknown>) {

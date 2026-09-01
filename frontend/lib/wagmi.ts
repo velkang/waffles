@@ -15,6 +15,10 @@ if (!projectId) {
 export const FACTORY_ADDRESS = (process.env.NEXT_PUBLIC_FACTORY_ADDRESS ??
   '') as `0x${string}`
 
+export const AMM_FACTORY_ADDRESS = (process.env
+  .NEXT_PUBLIC_AMM_FACTORY_ADDRESS ??
+  '0x43563086cE530b20DfEE27A7C57B103C834Cd247') as `0x${string}`
+
 export const ROUTER_ADDRESS = (process.env.NEXT_PUBLIC_ROUTER_ADDRESS ??
   '') as `0x${string}`
 
