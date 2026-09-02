@@ -1,3 +1,5 @@
+import { parseDateTimestamp } from './hooks/use-countdown';
+
 export function formatUsdc(raw?: string) {
   if (!raw || !/^\d+$/.test(raw)) return '$0.00';
 
@@ -13,8 +15,8 @@ export function shortAddress(address: string) {
 }
 
 export function progressBetween(startAt: string, endAt: string) {
-  const start = Date.parse(startAt);
-  const end = Date.parse(endAt);
+  const start = parseDateTimestamp(startAt);
+  const end = parseDateTimestamp(endAt);
 
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
     return 0;
@@ -24,7 +26,7 @@ export function progressBetween(startAt: string, endAt: string) {
 }
 
 export function relativeTime(value: string) {
-  const parsed = Date.parse(value);
+  const parsed = parseDateTimestamp(value);
   if (!Number.isFinite(parsed)) return '—';
 
   const seconds = Math.max(0, Math.floor((Date.now() - parsed) / 1000));
@@ -35,10 +37,12 @@ export function relativeTime(value: string) {
 }
 
 export function formatDate(value: string) {
+  const parsed = parseDateTimestamp(value);
+  if (!Number.isFinite(parsed)) return '—';
   return new Intl.DateTimeFormat('en', {
     month: 'short',
     day: 'numeric',
     year: 'numeric',
     timeZone: 'UTC',
-  }).format(new Date(value));
+  }).format(new Date(parsed));
 }

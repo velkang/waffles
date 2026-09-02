@@ -17,8 +17,11 @@ export class RewardsService {
   ) {}
 
   getEpochAt(timestamp = new Date()) {
-    const duration = this.config.get<number>('rewards.epochDurationSec', 604800);
-    const zero = this.config.get<number>('rewards.epochZeroUnixSec', 1756684800);
+    const duration = Math.max(60, this.config.get<number>('rewards.epochDurationSec', 604800));
+    let zero = Number(this.config.get<number>('rewards.epochZeroUnixSec', 1756684800));
+    if (zero > 1e11) {
+      zero = Math.floor(zero / 1000);
+    }
     const unix = Math.floor(timestamp.getTime() / 1000);
     const epochId = Math.max(0, Math.floor((unix - zero) / duration));
     const startUnix = zero + epochId * duration;
