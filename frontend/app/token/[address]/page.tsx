@@ -17,6 +17,7 @@ import { formatUsd, shortAddress } from "@/lib/format";
 import { getOptimizedImageUrl } from "@/lib/image";
 import { FACTORY_ADDRESS } from "@/lib/wagmi";
 import { useVenuePrice } from "@/lib/use-venue-price";
+import { useLaunch } from "@/lib/hooks/queries";
 
 type Address = `0x${string}`;
 
@@ -31,6 +32,9 @@ export default function TokenPage() {
         : "";
   const token = resolvedAddress as Address;
 
+  const { data: launchSnapshot } = useLaunch(token);
+  const realtimeLaunch = launchSnapshot?.launch;
+
   const launchQuery = useReadWafflesLaunchFactoryLaunchOfToken({
     address: FACTORY_ADDRESS,
     args: [token],
@@ -39,7 +43,7 @@ export default function TokenPage() {
   const launch = launchQuery.data as
     | readonly [Address, Address, Address, string, string, string, string, string, bigint]
     | undefined;
-  const curve = launch?.[1];
+  const curve = (realtimeLaunch?.curve as Address | undefined) ?? launch?.[1];
 
   const venue = useVenuePrice(token, curve);
   const { data: progressBps } = useReadWafflesBondingCurveGraduationProgressBps({
@@ -55,10 +59,18 @@ export default function TokenPage() {
     query: { enabled: Boolean(token) },
   });
 
+  const graduated = realtimeLaunch?.graduated ?? venue.graduated;
+  const mcap = realtimeLaunch?.mcap
+    ? BigInt(realtimeLaunch.mcap)
+    : venue.mcap;
   const progress =
-    progressBps !== undefined ? Number(progressBps) / 100 : undefined;
-
-  const { graduated, mcap } = venue;
+    graduated
+      ? 100
+      : realtimeLaunch?.progressBps !== undefined
+        ? realtimeLaunch.progressBps / 100
+        : progressBps !== undefined
+          ? Number(progressBps) / 100
+          : undefined;
 
   const [copied, setCopied] = useState(false);
   const copyAddress = () => {
@@ -67,7 +79,7 @@ export default function TokenPage() {
     setTimeout(() => setCopied(false), 1500);
   };
 
-  if (!launchQuery.isLoading && !launch) {
+  if (!launchQuery.isLoading && !launch && !realtimeLaunch) {
     return (
       <div className="mx-auto max-w-lg rounded-[10px] border border-[#24262e] bg-[#141519] p-8 text-center font-mono">
         <h1 className="text-lg font-bold text-white">TOKEN NOT FOUND</h1>
@@ -84,8 +96,18 @@ export default function TokenPage() {
     );
   }
 
-  const [, , , description, imageUri, website, twitter, telegram, createdAt] =
-    launch ?? [null, null, null, "", "", "", "", "", 0n];
+  const description = realtimeLaunch?.description || launch?.[3] || "";
+  const imageUri = realtimeLaunch?.imageUri || launch?.[4] || "";
+  const website = realtimeLaunch?.website || launch?.[5] || "";
+  const twitter = realtimeLaunch?.twitter || launch?.[6] || "";
+  const telegram = realtimeLaunch?.telegram || launch?.[7] || "";
+  const createdAt = realtimeLaunch?.createdAt
+    ? Math.floor(new Date(realtimeLaunch.createdAt).getTime() / 1000)
+    : launch?.[8]
+      ? Number(launch[8])
+      : 0;
+  const displayName = realtimeLaunch?.name || tokenName || "Arc Token";
+  const displaySymbol = realtimeLaunch?.symbol || tokenSymbol;
 
   return (
     <div className="space-y-5">
@@ -106,20 +128,20 @@ export default function TokenPage() {
             />
           ) : (
             <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] bg-[#1a1b21] border border-[#24262e] text-lg font-black text-[#db9d6a]">
-              ${(tokenSymbol ?? token.slice(2, 4)).slice(0, 3)}
+              ${(displaySymbol ?? token.slice(2, 4)).slice(0, 3)}
             </div>
           )}
 
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <h1 className="truncate text-2xl font-black text-white tracking-tight">
-                ${tokenSymbol ?? "…"}
+                ${displaySymbol ?? "…"}
               </h1>
               <StatusBadge graduated={graduated} progress={progress} size="xs" />
             </div>
 
             <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-              <span className="text-zinc-300 font-medium">{tokenName || "Arc Token"}</span>
+              <span className="text-zinc-300 font-medium">{displayName}</span>
               <span>•</span>
               <span className="text-zinc-400">🌿 {createdAt ? timeAgo(Number(createdAt)) : "now"}</span>
             </div>
@@ -204,6 +226,7 @@ export default function TokenPage() {
               tokenAddress={token}
               curveAddress={curve}
               description={description}
+              graduated={graduated}
             />
           ) : (
             <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />

@@ -28,6 +28,7 @@ export const config = {
   circleApiKey: process.env.CIRCLE_API_KEY ?? "",
   circleEntitySecret: process.env.CIRCLE_ENTITY_SECRET ?? "",
   circleBlockchain: process.env.CIRCLE_BLOCKCHAIN ?? "ARC-TESTNET",
+  rpcUrl: process.env.RPC_URL || "https://rpc.testnet.arc.network",
   circleMonitorIntervalMs: numberEnv("CIRCLE_MONITOR_INTERVAL_MS", 60_000, 10_000),
   circleEventLogIntervalMs: numberEnv("CIRCLE_EVENT_LOG_INTERVAL_MS", 60_000, 10_000),
   webhookMaxBodyBytes: numberEnv("WEBHOOK_MAX_BODY_BYTES", 1_048_576, 1_024),

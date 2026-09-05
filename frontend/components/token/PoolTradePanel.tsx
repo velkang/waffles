@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { formatUnits, maxUint256, parseUnits } from 'viem'
 import { useAccount, usePublicClient } from 'wagmi'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   useReadWafflesAmmFactoryGetPair,
   useReadWafflesAmmPairGetReserves,
@@ -47,6 +48,7 @@ function poolQuote(
 }
 
 export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
+  const queryClient = useQueryClient()
   const { address: account } = useAccount()
   const publicClient = usePublicClient()
 
@@ -141,6 +143,19 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     usdcBalance.refetch()
     tokenBalance.refetch()
     tokenAllowance.refetch()
+
+    // Refresh snapshots so the trader's page catches up even if webhook delivery is delayed
+    const tokenLower = tokenAddress.toLowerCase()
+    void queryClient.invalidateQueries({ queryKey: ['trades', tokenLower] })
+    void queryClient.invalidateQueries({ queryKey: ['candles', tokenLower] })
+    void queryClient.invalidateQueries({ queryKey: ['launch', tokenLower] })
+    void queryClient.invalidateQueries({ queryKey: ['launches'] })
+    if (account) {
+      void queryClient.invalidateQueries({
+        queryKey: ['portfolio', account.toLowerCase()],
+      })
+    }
+    void queryClient.invalidateQueries({ queryKey: ['readContract'] })
   }
 
   async function submit(e: React.FormEvent) {

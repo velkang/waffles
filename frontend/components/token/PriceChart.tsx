@@ -15,7 +15,7 @@ import {
 } from 'lightweight-charts'
 import { useReadWafflesBondingCurveTotalSupply } from '@/generated/contracts-generated'
 import { useCandles } from '@/lib/hooks/queries'
-import { useRealtime, useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
+import { useRealtimeTopics } from '@/lib/realtime/RealtimeProvider'
 import type { Candle } from '@waffles/shared'
 
 const INTERVALS = [
@@ -63,7 +63,6 @@ export function PriceChart({
 }) {
   useRealtimeTopics([`token:${token.toLowerCase()}`])
 
-  const { status } = useRealtime()
   const [intervalSec, setIntervalSec] = useState<number>(60)
   const [displayMode, setDisplayMode] = useState<DisplayMode>('price')
   const [hovered, setHovered] = useState<Readout | null>(null)
@@ -95,7 +94,6 @@ export function PriceChart({
               Confirmed trades · UTC candles
             </p>
           </div>
-          <RealtimeStatus status={status} />
         </div>
 
         <div
@@ -467,31 +465,6 @@ function buildDataset(
           }
         : null,
   }
-}
-
-function RealtimeStatus({
-  status,
-}: {
-  status: 'connecting' | 'connected' | 'disconnected'
-}) {
-  const connected = status === 'connected'
-  const connecting = status === 'connecting'
-  const label = connected ? 'Live' : connecting ? 'Connecting' : 'Reconnecting'
-  const dot = connected
-    ? 'bg-[#4ade80]'
-    : connecting
-      ? 'bg-[#db9d6a]'
-      : 'bg-[#ef4444]'
-
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full border border-[#24262e] bg-[#0e0f12] px-2 py-1 font-mono text-[9px] font-bold uppercase tracking-[0.12em] text-zinc-400"
-      aria-live="polite"
-    >
-      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
-      {label}
-    </span>
-  )
 }
 
 function ModeButton({

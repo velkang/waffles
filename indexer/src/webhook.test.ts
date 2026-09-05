@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { generateKeyPairSync, sign } from "node:crypto";
 import test from "node:test";
-import { encodeEventTopics, encodeAbiParameters, getAbiItem } from "viem";
+import { encodeEventTopics, encodeAbiParameters, getAbiItem, type TransactionReceipt } from "viem";
 import { ammPairAbi, factoryAbi, curveAbi } from "./ingest.js";
 import { config } from "./config.js";
 import {
   processCircleWebhookPayload,
+  recoverCreationTrades,
   verifyCircleSignatureWithPublicKey,
   type CircleWebhookNotification,
 } from "./webhook.js";
@@ -33,8 +34,13 @@ function createMockDb() {
             return null;
           },
           async updateOne(filter: any, update: any, options?: any) {
-            const key = filter.token || filter.curve;
+            const key = [...launchesMap.keys()].find((key) => {
+              const doc = launchesMap.get(key);
+              return filter.token ? doc.token === filter.token : doc.curve === filter.curve;
+            }) ?? filter.token ?? filter.curve;
             let doc = launchesMap.get(key) || {};
+            if (filter.price?.$exists === false && doc.price !== undefined) return { matchedCount: 0 };
+            if (filter.graduated?.$ne === true && doc.graduated === true) return { matchedCount: 0 };
             if (update.$set) doc = { ...doc, ...update.$set };
             if (update.$setOnInsert && options?.upsert && !launchesMap.has(key)) {
               doc = { ...doc, ...update.$setOnInsert };
@@ -107,7 +113,7 @@ function createMockDb() {
   return db as any;
 }
 
-test("webhook ingests enriched TokenCreated event with zero RPC calls", async () => {
+function creationFixture() {
   const db = createMockDb();
   const token = "0x1111111111111111111111111111111111111111" as const;
   const curve = "0x2222222222222222222222222222222222222222" as const;
@@ -153,9 +159,40 @@ test("webhook ingests enriched TokenCreated event with zero RPC calls", async ()
     timestamp: "2026-01-26T12:00:01Z",
   };
 
-  const result = await processCircleWebhookPayload(db, payload);
+  return { db, token, curve, creator, payload };
+}
+
+function creationReceipt(payload: CircleWebhookNotification, logs: any[] = []): TransactionReceipt {
+  return {
+    status: "success",
+    transactionHash: payload.notification.txHash,
+    blockNumber: BigInt(payload.notification.blockHeight),
+    blockHash: payload.notification.blockHash,
+    logs,
+  } as TransactionReceipt;
+}
+
+function devBuyLog(curve: `0x${string}`, trader: `0x${string}`) {
+  const event = getAbiItem({ abi: curveAbi, name: "Traded" });
+  return {
+    address: curve,
+    topics: encodeEventTopics({ abi: curveAbi, eventName: "Traded", args: { trader, isBuy: true } }),
+    data: encodeAbiParameters(event.inputs.filter((input) => !input.indexed) as any,
+      [5_000_000n, 10_000_000n * 10n ** 18n, 123n, 123_000_000n, 400n]),
+    logIndex: 8,
+  };
+}
+
+test("creation without a dev buy completes receipt recovery once", async () => {
+  const { db, token, payload } = creationFixture();
+  let reads = 0;
+  const readReceipt = async () => { reads += 1; return creationReceipt(payload); };
+  const result = await processCircleWebhookPayload(db, payload, undefined, { readReceipt });
   assert.equal(result.success, true);
   assert.equal(result.eventName, "TokenCreated");
+  await recoverCreationTrades(db, db._launches.get(token), readReceipt);
+  assert.equal(reads, 1);
+  assert.equal(db._trades.size, 0);
 
   const stored = db._launches.get(token.toLowerCase());
   assert.ok(stored);
@@ -165,6 +202,71 @@ test("webhook ingests enriched TokenCreated event with zero RPC calls", async ()
   assert.equal(stored.twitter, "@supertoken");
   assert.equal(stored.graduated, false);
 });
+
+test("creation recovers the dev buy and deduplicates a later Circle delivery", async () => {
+  const { db, token, curve, creator, payload } = creationFixture();
+  const log = devBuyLog(curve, creator);
+  const receipt = creationReceipt(payload, [
+    { ...log, address: token }, // unrelated emitter must not become a curve trade
+    { ...log, topics: payload.notification.topics, data: payload.notification.data },
+    log,
+  ]);
+  await processCircleWebhookPayload(db, payload, undefined, { readReceipt: async () => receipt });
+  assert.equal(db._trades.size, 1);
+  const trade = [...db._trades.values()][0] as any;
+  assert.equal(trade.trader, creator);
+  assert.equal(trade.usdcAmount, "5000000");
+  assert.equal(trade.logIndex, 8);
+  assert.equal(trade.txHash, payload.notification.txHash);
+  assert.equal(trade.timestamp.getTime(), Date.parse(payload.notification.firstConfirmDate!));
+  assert.equal(db._launches.get(token).price, "123");
+
+  const delivered = await processCircleWebhookPayload(db, {
+    ...payload,
+    notification: { ...payload.notification, contractAddress: curve,
+      topics: log.topics as `0x${string}`[], data: log.data, logIndex: log.logIndex,
+      eventSignatureHash: log.topics[0] as `0x${string}` },
+  });
+  assert.equal(delivered.duplicate, true);
+  assert.equal(db._trades.size, 1);
+});
+
+test("receipt failure is retryable and is not acknowledged as completed", async () => {
+  const { db, token, curve, creator, payload } = creationFixture();
+  await assert.rejects(processCircleWebhookPayload(db, payload, undefined, {
+    readReceipt: async () => { throw new Error("receipt not yet available"); },
+  }), /receipt not yet available/);
+  assert.equal(db._indexedCircleEvents.size, 0);
+  assert.ok(db._launches.get(token), "launch remains discoverable for monitor setup and recovery");
+  const result = await processCircleWebhookPayload(db, payload, undefined, {
+    readReceipt: async () => creationReceipt(payload, [devBuyLog(curve, creator)]),
+  });
+  assert.equal(result.success, true);
+  assert.equal(db._trades.size, 1);
+});
+
+for (const graduated of [false, true]) {
+test(`existing launch recovery preserves newer metrics (graduated=${graduated})`, async () => {
+  const { db, token, curve, creator, payload } = creationFixture();
+  await processCircleWebhookPayload(db, payload, undefined, {
+    readReceipt: async () => creationReceipt(payload),
+  });
+  // Model a launch indexed by the old indexer, without a completed receipt marker.
+  db._indexedCircleEvents.clear();
+  const launch = db._launches.get(token);
+  Object.assign(launch, { price: "999", mcap: "999000000", progressBps: 10000,
+    graduated, pool: "0x6666666666666666666666666666666666666666" });
+  const before = { ...launch };
+  let reads = 0;
+  const readReceipt = async () => { reads += 1; return creationReceipt(payload, [devBuyLog(curve, creator)]); };
+  await recoverCreationTrades(db, launch, readReceipt);
+  await recoverCreationTrades(db, launch, readReceipt);
+  assert.equal(reads, 1);
+  assert.equal(db._trades.size, 1);
+  assert.deepEqual(db._launches.get(token), before);
+});
+
+}
 
 test("webhook ingests Traded event and updates launch metrics", async () => {
   const db = createMockDb();

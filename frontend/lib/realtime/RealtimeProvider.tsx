@@ -101,9 +101,8 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
   // Helper to handle trade event and dispatch updates across caches
   const handleTradeEvent = useCallback(
-    (trade: Trade, tokenAddress?: string, curveAddress?: string) => {
+    (trade: Trade, tokenAddress?: string) => {
       const token = tokenAddress?.toLowerCase();
-      const curve = curveAddress?.toLowerCase();
       if (trade.trader) {
         void queryClient.invalidateQueries({
           queryKey: ['portfolio', trade.trader.toLowerCase()],
@@ -133,36 +132,10 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
           };
         });
 
-        // 2. Update launch detail cache
-        queryClient.setQueryData<LaunchResponse>(['launch', token], (old) => {
-          if (!old || !old.launch) return old;
-          return {
-            launch: {
-              ...old.launch,
-              price: trade.priceAfter ?? old.launch.price,
-              mcap: trade.mcapAfter ?? old.launch.mcap,
-              progressBps: trade.progressBpsAfter ?? old.launch.progressBps,
-            },
-          };
-        });
-
-        // 3. Update all launches lists in cache
-        queryClient.setQueriesData<LaunchesResponse>({ queryKey: ['launches'] }, (old) => {
-          if (!old || !old.launches) return old;
-          return {
-            launches: old.launches.map((l) => {
-              if (l.token.toLowerCase() === token || (curve && l.curve.toLowerCase() === curve)) {
-                return {
-                  ...l,
-                  price: trade.priceAfter ?? l.price,
-                  mcap: trade.mcapAfter ?? l.mcap,
-                  progressBps: trade.progressBpsAfter ?? l.progressBps,
-                };
-              }
-              return l;
-            }),
-          };
-        });
+        // REST derives metrics from the latest trade, even when this event is
+        // a recovered creation trade that predates the current snapshot.
+        void queryClient.invalidateQueries({ queryKey: ['launch', token] });
+        void queryClient.invalidateQueries({ queryKey: ['launches'] });
 
         // 4. Update every candle interval currently open in the UI. A normal
         // confirmed event stays entirely in memory; only a late historical
@@ -267,6 +240,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resyncActiveQueries = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: ['readContract'] });
     for (const topic of activeTopicsRef.current) {
       if (topic === 'launches') {
         void queryClient.invalidateQueries({ queryKey: ['launches'] });
@@ -290,6 +264,9 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
       if (seenEventIds.current.has(envelope.id)) return;
       seenEventIds.current.add(envelope.id);
       if (envelope.type.startsWith('trade.') || envelope.type.startsWith('launch.')) {
+        // Header and trading-panel metrics use Wagmi contract reads, whose
+        // cache is separate from the API snapshots updated below.
+        void queryClient.invalidateQueries({ queryKey: ['readContract'] });
         lastEventIdRef.current = envelope.id;
       }
 
@@ -301,7 +278,7 @@ export function RealtimeProvider({ children }: { children: React.ReactNode }) {
 
       switch (envelope.type) {
         case 'trade.upserted':
-          handleTradeEvent(envelope.data as Trade, envelope.token, envelope.curve);
+          handleTradeEvent(envelope.data as Trade, envelope.token);
           break;
         case 'launch.created':
         case 'launch.updated':

@@ -1,9 +1,11 @@
 import type { Db } from "mongodb";
 import type { EventLog } from "@circle-fin/smart-contract-platform";
 import { config } from "./config.js";
+import type { LaunchDoc } from "./db.js";
 import { CircleMonitorManager } from "./circle-monitors.js";
 import {
   processCircleWebhookPayload,
+  recoverCreationTrades,
   type CircleWebhookNotification,
 } from "./webhook.js";
 
@@ -43,6 +45,19 @@ export class CircleEventLogReconciler {
   ) {}
 
   async reconcile(): Promise<number> {
+    // Includes launches indexed before receipt recovery was introduced, and
+    // retries receipts unavailable during webhook delivery. Completed receipts
+    // are skipped without an RPC call.
+    const launches = await this.db.collection<LaunchDoc>("launches")
+      .find({ factory: config.factoryAddress.toLowerCase() }).toArray();
+    for (const launch of launches) {
+      try {
+        await recoverCreationTrades(this.db, launch);
+      } catch (error) {
+        console.error(`[circle] creation recovery failed for ${launch.token}:`,
+          error instanceof Error ? error.message : error);
+      }
+    }
     let processed = await this.reconcilePass();
     // Factory history can discover launches whose curve monitors and histories
     // did not exist in the first pass.

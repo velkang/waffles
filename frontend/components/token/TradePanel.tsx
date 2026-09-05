@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatUnits, maxUint256, parseUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   useReadWafflesBondingCurveCreator,
   useReadWafflesBondingCurveCreatorEarnings,
@@ -22,7 +23,7 @@ import {
   useWriteWafflesMemeTokenApprove,
 } from "@/generated/contracts-generated";
 import { PoolTradePanel } from "./PoolTradePanel";
-import { useTrades } from "@/lib/hooks/queries";
+import { useLaunch, useTrades } from "@/lib/hooks/queries";
 import { formatToken, formatUsd, shortAddress } from "@/lib/format";
 import { USDC_ADDRESS } from "@/lib/wagmi";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -51,19 +52,27 @@ export function TradePanel({
   tokenAddress,
   curveAddress,
   description,
+  graduated = false,
 }: {
   tokenAddress: Address;
   curveAddress: Address;
   description?: string;
+  graduated?: boolean;
 }) {
-  const { data: graduated, isLoading } = useReadWafflesBondingCurveGraduated({
+  const { data: launchSnapshot } = useLaunch(tokenAddress);
+  const realtimeLaunch = launchSnapshot?.launch;
+
+  const graduatedQuery = useReadWafflesBondingCurveGraduated({
     address: curveAddress,
+    query: { enabled: Boolean(curveAddress && !realtimeLaunch?.graduated && !graduated) },
   });
 
-  if (graduated) {
+  const isGraduated = realtimeLaunch?.graduated ?? graduatedQuery.data ?? graduated;
+
+  if (isGraduated) {
     return <PoolTradePanel tokenAddress={tokenAddress} />;
   }
-  if (isLoading) {
+  if (graduatedQuery.isLoading && isGraduated === undefined) {
     return <div className="h-96 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />;
   }
   return (
@@ -84,6 +93,10 @@ function CurveTradePanel({
   curveAddress: Address;
   description?: string;
 }) {
+  const queryClient = useQueryClient();
+  const { data: launchSnapshot } = useLaunch(tokenAddress);
+  const realtimeLaunch = launchSnapshot?.launch;
+
   const { address: account } = useAccount();
   const publicClient = usePublicClient();
 
@@ -155,7 +168,18 @@ function CurveTradePanel({
 
   const quote = mode === "buy" ? quoteBuy.data : quoteSell.data;
   const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
-  const progress = progressBps !== undefined ? Number(progressBps) / 100 : 0;
+  const displayedMcap = realtimeLaunch?.mcap
+    ? BigInt(realtimeLaunch.mcap)
+    : marketCap;
+  const progress =
+    realtimeLaunch?.progressBps !== undefined
+      ? realtimeLaunch.progressBps / 100
+      : progressBps !== undefined
+        ? Number(progressBps) / 100
+        : 0;
+  const activePrice = realtimeLaunch?.price
+    ? BigInt(realtimeLaunch.price)
+    : currentPrice;
 
   const graduationTargetUsd =
     graduationMarketCapTarget === undefined
@@ -204,8 +228,8 @@ function CurveTradePanel({
     if (filtered.length > 0) {
       const oldest = filtered[filtered.length - 1];
       const oldestPrice = oldest.priceAfter ? BigInt(oldest.priceAfter) : undefined;
-      if (oldestPrice && currentPrice && oldestPrice > 0n) {
-        const diff = Number(currentPrice) - Number(oldestPrice);
+      if (oldestPrice && activePrice && oldestPrice > 0n) {
+        const diff = Number(activePrice) - Number(oldestPrice);
         priceChangePct = (diff / Number(oldestPrice)) * 100;
       }
     }
@@ -228,7 +252,7 @@ function CurveTradePanel({
       buyVolPct,
       sellVolPct,
     };
-  }, [trades, statsTimeframe, currentPrice, now]);
+  }, [trades, statsTimeframe, activePrice, now]);
 
   const needsApproval =
     mode === "sell" &&
@@ -283,6 +307,19 @@ function CurveTradePanel({
       tokenAllowance.refetch();
       quoteBuy.refetch();
       quoteSell.refetch();
+
+      // Refresh snapshots so the trader's page catches up even if webhook delivery is delayed
+      const tokenLower = tokenAddress.toLowerCase();
+      void queryClient.invalidateQueries({ queryKey: ["trades", tokenLower] });
+      void queryClient.invalidateQueries({ queryKey: ["candles", tokenLower] });
+      void queryClient.invalidateQueries({ queryKey: ["launch", tokenLower] });
+      void queryClient.invalidateQueries({ queryKey: ["launches"] });
+      if (account) {
+        void queryClient.invalidateQueries({
+          queryKey: ["portfolio", account.toLowerCase()],
+        });
+      }
+      void queryClient.invalidateQueries({ queryKey: ["readContract"] });
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Transaction rejected";
@@ -644,7 +681,7 @@ function CurveTradePanel({
       <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-2.5 text-xs">
         <div className="flex items-center justify-between font-bold">
           <span className="text-zinc-400">
-            MC <span className="text-white">{marketCap ? formatUsd(marketCap) : "—"}</span>
+            MC <span className="text-white">{displayedMcap ? formatUsd(displayedMcap) : "—"}</span>
           </span>
           <span className="text-zinc-400">
             ATH <span className="text-[#db9d6a]">

@@ -81,11 +81,6 @@ export function TradeFeed({ token }: { token: `0x${string}` }) {
             </button>
           )}
         </div>
-
-        <div className="flex items-center gap-1.5 text-xs text-[#4ade80] font-bold">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#4ade80] animate-pulse" />
-          <span className="text-[10px] uppercase tracking-wider text-zinc-400">Live</span>
-        </div>
       </div>
 
       {/* Content */}

@@ -4,13 +4,16 @@ The indexer receives Circle Smart Contract Platform `contracts.eventLog`
 webhooks for the live path, persists the decoded events in MongoDB, and lets
 the Nest backend stream MongoDB changes to browsers over SSE. It periodically
 reads Circle event logs to recover webhook delivery gaps. Normal operation does
-not scan Arc blocks or call `eth_getLogs`.
+not scan Arc blocks or call `eth_getLogs`. It reads creation transaction
+receipts over `RPC_URL` to recover dev buys emitted before
+the new curve monitor existed.
 
 ## Configuration
 
 Copy `.env.example` to `.env` and configure MongoDB, the deployed factory,
-USDC, `CIRCLE_API_KEY`, and `CIRCLE_ENTITY_SECRET`. The running indexer does
-not require an Arc RPC URL or block-scanning configuration.
+USDC, `CIRCLE_API_KEY`, and `CIRCLE_ENTITY_SECRET`. The running indexer uses
+`RPC_URL` for creation receipts (defaults to the public Arc testnet RPC);
+no block-scanning configuration is required.
 
 Webhook signatures are verified by default using Circle's
 `X-Circle-Key-Id` and `X-Circle-Signature` headers. Set
@@ -57,3 +60,8 @@ The live delivery path is Circle webhook → MongoDB → Nest SSE → browser. C
 event-log reconciliation runs every `CIRCLE_EVENT_LOG_INTERVAL_MS` (60 seconds
 by default) only as a durability path. `circle:monitors` is not a second service
 you need to keep running.
+
+Creation receipt recovery also runs for existing launches of the configured
+factory during reconciliation. Successful receipts are marked complete, including
+creations without a buy. Failures retry on the next pass. Recovery uses the
+existing trade identity, and never overwrites newer launch metrics.

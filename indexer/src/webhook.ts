@@ -1,6 +1,12 @@
 import { createHash, createPublicKey, verify } from 'node:crypto'
 import http from 'node:http'
-import { decodeEventLog } from 'viem'
+import {
+  createPublicClient,
+  decodeEventLog,
+  http as rpcHttp,
+  toEventSelector,
+  type TransactionReceipt,
+} from 'viem'
 import { config } from './config.js'
 import { getDb, type LaunchDoc, type TradeDoc } from './db.js'
 import {
@@ -20,6 +26,62 @@ const P256_SPKI_PREFIX = Buffer.from(
 )
 
 type IndexerDb = Awaited<ReturnType<typeof getDb>>
+
+const receiptClient = createPublicClient({ transport: rpcHttp(config.rpcUrl) })
+const tradedTopic = toEventSelector(curveAbi[0])
+type CreationReceiptReader = (hash: `0x${string}`) => Promise<TransactionReceipt>
+const readCreationReceipt: CreationReceiptReader = (hash) =>
+  receiptClient.getTransactionReceipt({ hash })
+
+// The curve's monitor starts after creation, so Circle cannot supply the dev buy.
+// Reuse canonical event identities so later webhook deliveries remain idempotent.
+export async function recoverCreationTrades(
+  db: IndexerDb,
+  launch: Pick<LaunchDoc, 'curve' | 'txHash' | 'createdBlock' | 'createdAt'>,
+  readReceipt: CreationReceiptReader = readCreationReceipt,
+): Promise<void> {
+  const completed = db.collection<{ _id: string; processedAt: Date }>('indexedCircleEvents')
+  const id = `creation:${config.circleBlockchain}:${launch.txHash.toLowerCase()}`
+  if (await completed.findOne({ _id: id })) return
+
+  const receipt = await readReceipt(launch.txHash as `0x${string}`)
+  if (
+    receipt.status !== 'success' ||
+    receipt.transactionHash.toLowerCase() !== launch.txHash.toLowerCase() ||
+    Number(receipt.blockNumber) !== launch.createdBlock
+  ) {
+    throw new Error(`Invalid creation receipt for ${launch.txHash}`)
+  }
+  const timestamp = launch.createdAt.toISOString()
+  for (const log of receipt.logs) {
+    if (
+      log.address.toLowerCase() !== launch.curve.toLowerCase() ||
+      log.topics[0] !== tradedTopic
+    ) continue
+    const result = await processCircleWebhookPayload(db, {
+      notificationType: 'contracts.eventLog',
+      notification: {
+        contractAddress: log.address,
+        blockchain: config.circleBlockchain,
+        txHash: receipt.transactionHash,
+        blockHash: receipt.blockHash,
+        blockHeight: Number(receipt.blockNumber),
+        logIndex: log.logIndex,
+        eventSignatureHash: log.topics[0],
+        topics: log.topics,
+        data: log.data,
+        firstConfirmDate: timestamp,
+      },
+      timestamp,
+    }, undefined, { recoveringCreation: true })
+    if (!result.success) throw new Error(result.error ?? 'Creation trade recovery failed')
+  }
+  await completed.updateOne(
+    { _id: id },
+    { $setOnInsert: { processedAt: new Date() } },
+    { upsert: true },
+  )
+}
 
 export interface CircleWebhookNotification {
   subscriptionId?: string
@@ -188,6 +250,7 @@ export async function processCircleWebhookPayload(
   db: IndexerDb,
   body: CircleWebhookNotification,
   resolveLogIndex?: CircleLogIndexResolver,
+  options: { readReceipt?: CreationReceiptReader; recoveringCreation?: boolean } = {},
 ): Promise<{
   success: boolean
   eventName?: string
@@ -280,6 +343,12 @@ export async function processCircleWebhookPayload(
         { token },
         { $set: { token0IsToken: token < config.usdcAddress } },
       )
+    await recoverCreationTrades(db, {
+      curve: String(args.curve),
+      txHash,
+      createdBlock: blockHeight,
+      createdAt: timestamp,
+    }, options.readReceipt)
     return complete({ success: true, eventName })
   }
 
@@ -331,7 +400,13 @@ export async function processCircleWebhookPayload(
         { upsert: true },
       ),
       db.collection<LaunchDoc>('launches').updateOne(
-        { curve: curveAddress },
+        {
+          curve: curveAddress,
+          // Historical creation trades may initialize metrics, never rewind them.
+          ...(options.recoveringCreation
+            ? { price: { $exists: false }, graduated: { $ne: true } }
+            : {}),
+        },
         {
           $set: {
             price: doc.priceAfter,
