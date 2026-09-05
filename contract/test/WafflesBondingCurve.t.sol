@@ -4,7 +4,6 @@ pragma solidity ^0.8.26;
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {MockMigrator} from "../src/mocks/MockMigrator.sol";
 import {WafflesMemeToken} from "../src/WafflesMemeToken.sol";
@@ -16,10 +15,10 @@ contract WafflesBondingCurveTest is Test {
     MockMigrator migrator;
     WafflesLaunchFactory factory;
 
-    address treasury = makeAddr("treasury");
-    address rewardsTreasury = makeAddr("rewardsTreasury");
-    address creator = makeAddr("creator");
-    address trader = makeAddr("trader");
+    address treasury;
+    address rewardsTreasury;
+    address creator;
+    address trader;
 
     uint256 constant INITIAL_VIRTUAL_USDC = 2_986e6;
     uint256 constant INITIAL_VIRTUAL_TOKENS = 1_060_569_000 ether;
@@ -34,6 +33,10 @@ contract WafflesBondingCurveTest is Test {
     WafflesBondingCurve curve;
 
     function setUp() public {
+        treasury = makeAddr("treasury");
+        rewardsTreasury = makeAddr("rewardsTreasury");
+        creator = makeAddr("creator");
+        trader = makeAddr("trader");
         usdc = new MockUSDC();
         migrator = new MockMigrator(address(usdc));
         factory = new WafflesLaunchFactory(
@@ -54,11 +57,9 @@ contract WafflesBondingCurveTest is Test {
         token = WafflesMemeToken(tokenAddr);
         curve = WafflesBondingCurve(curveAddr);
 
-        usdc.mint(trader, 1_000_000e6);
+        vm.deal(trader, 1_000_000 ether);
         vm.prank(trader);
-        usdc.approve(address(curve), type(uint256).max);
-        vm.prank(trader);
-        token.approve(address(curve), type(uint256).max);
+        assertTrue(token.approve(address(curve), type(uint256).max));
     }
 
     // ========== DEPLOYMENT ==========
@@ -121,7 +122,7 @@ contract WafflesBondingCurveTest is Test {
 
     function test_ExactCompletionMarketCap() public {
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated(), "should have graduated");
         assertApproxEqAbs(curve.graduationMarketCap(), 50_000e6, 500e6, "graduation mcap should be ~$50,000");
@@ -131,7 +132,7 @@ contract WafflesBondingCurveTest is Test {
 
     function test_Buy() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(100e6, 0);
+        uint256 bought = curve.buy{value: 100e18}(0, trader);
 
         assertGt(bought, 0);
         assertEq(token.balanceOf(trader), bought);
@@ -139,29 +140,36 @@ contract WafflesBondingCurveTest is Test {
         assertGt(curve.graduationProgressBps(), 0);
 
         uint256 fee = (100e6 * FEE_BPS) / 10_000;
-        uint256 creatorFee = (fee * CREATOR_FEE_SHARE_BPS) / 10_000;
-        uint256 platformFee = (fee * PLATFORM_FEE_SHARE_BPS) / 10_000;
+        uint256 creatorFee = Math.mulDiv(fee, CREATOR_FEE_SHARE_BPS, 10_000);
+        uint256 platformFee = Math.mulDiv(fee, PLATFORM_FEE_SHARE_BPS, 10_000);
         uint256 rewardsFee = fee - creatorFee - platformFee;
-        assertEq(usdc.balanceOf(treasury), platformFee);
-        assertEq(usdc.balanceOf(rewardsTreasury), rewardsFee);
+        assertEq(treasury.balance / 1e12, platformFee);
+        assertEq(rewardsTreasury.balance / 1e12, rewardsFee);
         assertEq(curve.creatorEarnings(creator), creatorFee);
+    }
+
+    function test_BuyRejectsNativeAmountBelowUsdcPrecision() public {
+        vm.prank(trader);
+        vm.expectRevert(WafflesBondingCurve.InvalidNativeUsdcAmount.selector);
+        uint256 bought = curve.buy{value: 1}(0, trader);
+        assertEq(bought, 0);
     }
 
     function test_PriceRisesAfterBuy() public {
         uint256 p0 = curve.currentPrice();
         vm.prank(trader);
-        curve.buy(500e6, 0);
+        assertGt(curve.buy{value: 500e18}(0, trader), 0);
         uint256 p1 = curve.currentPrice();
         assertGt(p1, p0);
     }
 
     function test_PriceFallsAfterSell() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(500e6, 0);
+        uint256 bought = curve.buy{value: 500e18}(0, trader);
         uint256 pricePeak = curve.currentPrice();
 
         vm.prank(trader);
-        curve.sell(bought / 2, 0);
+        assertGt(curve.sell(bought / 2, 0), 0);
         uint256 priceAfter = curve.currentPrice();
 
         assertLt(priceAfter, pricePeak, "price should fall after sell");
@@ -170,15 +178,15 @@ contract WafflesBondingCurveTest is Test {
     // ========== BUY/SELL ROUND-TRIP ==========
 
     function test_BuySellRoundTrip() public {
-        uint256 traderUsdcBefore = usdc.balanceOf(trader);
+        uint256 traderUsdcBefore = trader.balance;
 
         vm.prank(trader);
-        uint256 bought = curve.buy(1_000e6, 0);
+        uint256 bought = curve.buy{value: 1_000e18}(0, trader);
 
         vm.prank(trader);
         uint256 received = curve.sell(bought, 0);
 
-        uint256 traderUsdcAfter = usdc.balanceOf(trader);
+        uint256 traderUsdcAfter = trader.balance;
         assertLt(traderUsdcAfter, traderUsdcBefore);
         assertGt(received, 900e6);
     }
@@ -189,14 +197,14 @@ contract WafflesBondingCurveTest is Test {
         uint256 k0 = curve.virtualUsdcReserve() * curve.virtualTokenReserve();
 
         vm.prank(trader);
-        uint256 bought = curve.buy(2_000e6, 0);
+        uint256 bought = curve.buy{value: 2_000e18}(0, trader);
 
         uint256 kAfterBuy = curve.virtualUsdcReserve() * curve.virtualTokenReserve();
         // k should stay >= k0 due to ceiling rounding
         assertGe(kAfterBuy, k0, "k should not decrease after buy");
 
         vm.prank(trader);
-        curve.sell(bought / 2, 0);
+        assertGt(curve.sell(bought / 2, 0), 0);
 
         uint256 kAfterSell = curve.virtualUsdcReserve() * curve.virtualTokenReserve();
         assertGe(kAfterSell, k0, "k should not decrease after sell");
@@ -205,15 +213,15 @@ contract WafflesBondingCurveTest is Test {
     // ========== DRAINING BUY ==========
 
     function test_FinalBuyCappingAndRefund() public {
-        uint256 balBefore = usdc.balanceOf(trader);
+        uint256 balBefore = trader.balance;
 
         vm.prank(trader);
-        uint256 bought = curve.buy(100_000e6, 0);
+        uint256 bought = curve.buy{value: 100_000e18}(0, trader);
 
         assertEq(bought, SELLABLE, "draining buy should output exactly sellable tokens");
         assertTrue(curve.graduated(), "should have graduated");
 
-        uint256 consumed = balBefore - usdc.balanceOf(trader);
+        uint256 consumed = (balBefore - trader.balance) / 1e12;
         assertLt(consumed, 100_000e6, "should have refunded excess USDC");
     }
 
@@ -228,7 +236,7 @@ contract WafflesBondingCurveTest is Test {
         assertEq(curve.graduationProgressBps(), 0, "initial progress should be 0");
 
         vm.prank(trader);
-        curve.buy(500e6, 0);
+        assertGt(curve.buy{value: 500e18}(0, trader), 0);
         uint256 prog = curve.graduationProgressBps();
         assertGt(prog, 0, "progress should increase after buy");
         assertLt(prog, 10_000, "progress should be less than 100%");
@@ -245,14 +253,15 @@ contract WafflesBondingCurveTest is Test {
         // Before graduation
         assertFalse(curve.canGraduate());
         vm.expectRevert(WafflesBondingCurve.ThresholdNotReached.selector);
-        curve.graduate();
+        address pool = curve.graduate();
+        assertEq(pool, address(0));
 
         vm.prank(trader);
-        curve.buy(1_000e6, 0);
+        assertGt(curve.buy{value: 1_000e18}(0, trader), 0);
         assertFalse(curve.canGraduate(), "should not graduate after partial buy");
 
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
         assertTrue(curve.graduated());
         assertEq(curve.virtualTokenReserve(), MIN_VIRTUAL_TOKENS, "should be at min reserve");
     }
@@ -260,7 +269,7 @@ contract WafflesBondingCurveTest is Test {
     function test_GraduationOnCrossingBuy() public {
         vm.recordLogs();
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated());
         assertGt(curve.graduationPrice(), 0);
@@ -268,14 +277,16 @@ contract WafflesBondingCurveTest is Test {
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 signature = keccak256("Graduated(address,address,uint256,uint256)");
-        bool found;
-        for (uint256 i; i < logs.length; ++i) {
+        bool found = false;
+        uint256 graduationPrice = curve.graduationPrice();
+        uint256 graduationMarketCap = curve.graduationMarketCap();
+        for (uint256 i = 0; i < logs.length; ++i) {
             if (logs[i].topics.length == 3 && logs[i].topics[0] == signature) {
                 assertEq(logs[i].emitter, address(curve));
                 assertEq(logs[i].topics[2], bytes32(uint256(uint160(address(token)))));
                 (uint256 price, uint256 mcap) = abi.decode(logs[i].data, (uint256, uint256));
-                assertEq(price, curve.graduationPrice());
-                assertEq(mcap, curve.graduationMarketCap());
+                assertEq(price, graduationPrice);
+                assertEq(mcap, graduationMarketCap);
                 found = true;
                 break;
             }
@@ -287,7 +298,7 @@ contract WafflesBondingCurveTest is Test {
 
     function test_DonatedTokensNoEffect() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(100e6, 0);
+        uint256 bought = curve.buy{value: 100e18}(0, trader);
 
         uint256 priceAfterBuy = curve.currentPrice();
         uint256 mcapAfterBuy = curve.marketCap();
@@ -303,7 +314,7 @@ contract WafflesBondingCurveTest is Test {
 
     function test_DonatedUsdcNoEffect() public {
         vm.prank(trader);
-        curve.buy(100e6, 0);
+        assertGt(curve.buy{value: 100e18}(0, trader), 0);
 
         uint256 priceBefore = curve.currentPrice();
         uint256 mcapBefore = curve.marketCap();
@@ -316,12 +327,12 @@ contract WafflesBondingCurveTest is Test {
 
     function test_DonatedTokensNotInMigration() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(100e6, 0);
+        uint256 bought = curve.buy{value: 100e18}(0, trader);
         vm.prank(trader);
         assertTrue(token.transfer(address(curve), bought / 2));
 
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated());
 
@@ -336,27 +347,28 @@ contract WafflesBondingCurveTest is Test {
 
     function test_SellCannotExceedInitialReserve() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(100e6, 0);
+        uint256 bought = curve.buy{value: 100e18}(0, trader);
         vm.expectRevert(WafflesBondingCurve.ExcessiveSell.selector);
-        curve.quoteSell(bought + 1 ether);
+        uint256 quoted = curve.quoteSell(bought + 1 ether);
+        assertEq(quoted, 0);
     }
 
     // ========== FEES ==========
 
     function test_SellUsesExactFeeSplit() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(1_000e6, 0);
+        uint256 bought = curve.buy{value: 1_000e18}(0, trader);
 
         uint256 creatorBefore = curve.creatorEarnings(creator);
-        uint256 platformBefore = usdc.balanceOf(treasury);
-        uint256 rewardsBefore = usdc.balanceOf(rewardsTreasury);
+        uint256 platformBefore = treasury.balance / 1e12;
+        uint256 rewardsBefore = rewardsTreasury.balance / 1e12;
 
         vm.prank(trader);
-        curve.sell(bought / 2, 0);
+        assertGt(curve.sell(bought / 2, 0), 0);
 
         uint256 creatorFee = curve.creatorEarnings(creator) - creatorBefore;
-        uint256 platformFee = usdc.balanceOf(treasury) - platformBefore;
-        uint256 rewardsFee = usdc.balanceOf(rewardsTreasury) - rewardsBefore;
+        uint256 platformFee = treasury.balance / 1e12 - platformBefore;
+        uint256 rewardsFee = rewardsTreasury.balance / 1e12 - rewardsBefore;
         uint256 totalFee = creatorFee + platformFee + rewardsFee;
 
         assertGt(totalFee, 0);
@@ -367,16 +379,16 @@ contract WafflesBondingCurveTest is Test {
 
     function test_FeeRoundingRemainderGoesToRewards() public {
         vm.prank(trader);
-        curve.buy(100, 0);
+        assertGt(curve.buy{value: 100 * 1e12}(0, trader), 0);
 
         assertEq(curve.creatorEarnings(creator), 0);
-        assertEq(usdc.balanceOf(treasury), 0);
-        assertEq(usdc.balanceOf(rewardsTreasury), 1);
+        assertEq(treasury.balance, 0);
+        assertEq(rewardsTreasury.balance, 1e12);
     }
 
     function test_ClaimCreatorFees() public {
         vm.prank(trader);
-        curve.buy(1_000e6, 0);
+        assertGt(curve.buy{value: 1_000e18}(0, trader), 0);
 
         uint256 earned = curve.creatorEarnings(creator);
         assertGt(earned, 0);
@@ -384,7 +396,7 @@ contract WafflesBondingCurveTest is Test {
         vm.prank(creator);
         curve.claimCreatorFees();
 
-        assertEq(usdc.balanceOf(creator), earned);
+        assertEq(creator.balance / 1e12, earned);
         assertEq(curve.creatorEarnings(creator), 0);
     }
 
@@ -394,17 +406,18 @@ contract WafflesBondingCurveTest is Test {
         uint256 quote = curve.quoteBuy(100e6);
         vm.prank(trader);
         vm.expectRevert(WafflesBondingCurve.Slippage.selector);
-        curve.buy(100e6, quote + 1);
+        uint256 bought = curve.buy{value: 100e18}(quote + 1, trader);
+        assertEq(bought, 0);
     }
 
     // ========== FUZZ ==========
 
     function testFuzz_BuySellInvariant(uint128 usdcIn) public {
         vm.assume(usdcIn >= 1e6 && usdcIn <= 10_000e6);
-        usdc.mint(trader, usdcIn);
+        vm.deal(trader, uint256(usdcIn) * 1e12);
 
         vm.startPrank(trader);
-        uint256 bought = curve.buy(usdcIn, 0);
+        uint256 bought = curve.buy{value: uint256(usdcIn) * 1e12}(0, trader);
         assertGt(bought, 0);
         assertLe(bought, SELLABLE);
 

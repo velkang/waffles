@@ -2,6 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Script} from "forge-std/Script.sol";
+import {VmSafe} from "forge-std/Vm.sol";
 import {console2} from "forge-std/console2.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
@@ -33,28 +34,27 @@ contract Deploy is Script {
     }
 
     error UnsupportedChain(uint256 chainId);
-    function setUp() public {}
-
-    function getDeploymentConfig() internal view returns (NetworkConfig memory config) {
-        if (block.chainid == ARC_TESTNET_CHAIN_ID) {
-            return NetworkConfig({networkName: "Arc Testnet", usdcAddress: ARC_TESTNET_USDC, deployMockUsdc: false});
-        }
-        if (block.chainid == ANVIL_CHAIN_ID) {
-            return NetworkConfig({networkName: "Local Anvil", usdcAddress: address(0), deployMockUsdc: true});
-        }
-
-        revert UnsupportedChain(block.chainid);
-    }
+    error InvalidBroadcastContext();
 
     function run() external {
-        NetworkConfig memory config = getDeploymentConfig();
+        NetworkConfig memory config;
+        if (block.chainid == ARC_TESTNET_CHAIN_ID) {
+            config = NetworkConfig({networkName: "Arc Testnet", usdcAddress: ARC_TESTNET_USDC, deployMockUsdc: false});
+        } else if (block.chainid == ANVIL_CHAIN_ID) {
+            config = NetworkConfig({networkName: "Local Anvil", usdcAddress: address(0), deployMockUsdc: true});
+        } else {
+            revert UnsupportedChain(block.chainid);
+        }
 
         console2.log("=== waffles.meme Deployment ===");
         console2.log("Network:", config.networkName);
         console2.log("Chain ID:", block.chainid);
 
         vm.startBroadcast();
-        (, address deployer,) = vm.readCallers();
+        (VmSafe.CallerMode callerMode, address deployer, address origin) = vm.readCallers();
+        if (callerMode != VmSafe.CallerMode.RecurrentBroadcast || origin == address(0)) {
+            revert InvalidBroadcastContext();
+        }
 
         address treasury = vm.envOr("TREASURY_ADDRESS", deployer);
         address usdc = config.usdcAddress;
@@ -90,32 +90,6 @@ contract Deploy is Script {
         migrator.setLaunchFactory(address(factory));
         vm.stopBroadcast();
 
-        logDeployment(
-            address(factory),
-            address(ammFactory),
-            address(migrator),
-            address(router),
-            address(rewardsDistributor),
-            usdc,
-            deployer,
-            treasury,
-            rewardsTreasury,
-            config
-        );
-    }
-
-    function logDeployment(
-        address launchFactory,
-        address ammFactory,
-        address migrator,
-        address router,
-        address rewardsDistributor,
-        address usdc,
-        address deployer,
-        address treasury,
-        address rewardsTreasury,
-        NetworkConfig memory config
-    ) internal view {
         console2.log("\n=== Deployment Summary ===");
         console2.log("Network:", config.networkName);
         console2.log("Deployer / Owner:", deployer);
@@ -123,17 +97,17 @@ contract Deploy is Script {
         console2.log("Rewards Treasury:", rewardsTreasury);
         console2.log("\n--- Contract Addresses ---");
         console2.log("USDC:", usdc);
-        console2.log("AMM Factory:", ammFactory);
-        console2.log("Migrator:", migrator);
-        console2.log("Router:", router);
-        console2.log("Launch Factory:", launchFactory);
-        console2.log("Rewards Distributor:", rewardsDistributor);
+        console2.log("AMM Factory:", address(ammFactory));
+        console2.log("Migrator:", address(migrator));
+        console2.log("Router:", address(router));
+        console2.log("Launch Factory:", address(factory));
+        console2.log("Rewards Distributor:", address(rewardsDistributor));
         console2.log("\n--- Launch Configuration (Stored-Reserve) ---");
-        console2.log("Creation Fee (USDC units):", WafflesLaunchFactory(launchFactory).creationFee());
-        console2.log("Initial Virtual USDC Reserve:", WafflesLaunchFactory(launchFactory).initialVirtualUsdcReserve());
-        console2.log("Initial Virtual Token Reserve:", WafflesLaunchFactory(launchFactory).initialVirtualTokenReserve());
-        console2.log("Min Virtual Token Reserve:", WafflesLaunchFactory(launchFactory).minVirtualTokenReserve());
-        console2.log("Trade Fee (bps):", WafflesLaunchFactory(launchFactory).feeBps());
+        console2.log("Creation Fee (USDC units):", factory.creationFee());
+        console2.log("Initial Virtual USDC Reserve:", factory.initialVirtualUsdcReserve());
+        console2.log("Initial Virtual Token Reserve:", factory.initialVirtualTokenReserve());
+        console2.log("Min Virtual Token Reserve:", factory.minVirtualTokenReserve());
+        console2.log("Trade Fee (bps):", factory.feeBps());
         console2.log("Creator Fee Share (bps):", CREATOR_FEE_SHARE_BPS);
         console2.log("Platform Fee Share (bps):", PLATFORM_FEE_SHARE_BPS);
         console2.log("Rewards Fee Share (bps):", REWARDS_FEE_SHARE_BPS);

@@ -7,9 +7,5 @@ interface ILiquidityMigrator {
     /// @param tokenAmount Tokens to seed liquidity with.
     /// @param usdcAmount USDC to seed liquidity with.
     /// @return pool Address of the created/used liquidity pool (0 if N/A).
-    function migrate(
-        address token,
-        uint256 tokenAmount,
-        uint256 usdcAmount
-    ) external returns (address pool);
+    function migrate(address token, uint256 tokenAmount, uint256 usdcAmount) external payable returns (address pool);
 }

@@ -13,13 +13,21 @@ contract WafflesLaunchFactoryTest is Test {
     MockMigrator migrator;
     WafflesLaunchFactory factory;
 
-    address treasury = makeAddr("treasury");
-    address rewardsTreasury = makeAddr("rewardsTreasury");
-    address creator = makeAddr("creator");
+    address treasury;
+    address rewardsTreasury;
+    address creator;
 
     uint256 constant CREATION_FEE = 1e6;
+    uint256 constant CREATION_FEE_NATIVE = CREATION_FEE * 1e12;
+    uint256 constant INITIAL_VIRTUAL_USDC = 2_986e6;
+    uint256 constant INITIAL_VIRTUAL_TOKENS = 1_060_569_000 ether;
+    uint256 constant MIN_VIRTUAL_TOKENS = 251_660_441 ether;
+    uint256 constant FEE_BPS = 100;
 
     function setUp() public {
+        treasury = makeAddr("treasury");
+        rewardsTreasury = makeAddr("rewardsTreasury");
+        creator = makeAddr("creator");
         usdc = new MockUSDC();
         migrator = new MockMigrator(address(usdc));
         factory = new WafflesLaunchFactory(
@@ -28,14 +36,12 @@ contract WafflesLaunchFactoryTest is Test {
             rewardsTreasury,
             address(migrator),
             CREATION_FEE,
-            2_986e6,
-            1_060_569_000 ether,
-            251_660_441 ether,
-            100
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
+            FEE_BPS
         );
-        usdc.mint(creator, 1_000e6);
-        vm.prank(creator);
-        usdc.approve(address(factory), type(uint256).max);
+        vm.deal(creator, 1_000 ether);
     }
 
     event TokenCreated(
@@ -68,12 +74,13 @@ contract WafflesLaunchFactoryTest is Test {
             "https://x",
             "@x",
             "t.me/x",
-            100,
+            FEE_BPS,
             CREATION_FEE
         );
         vm.prank(creator);
-        (address token, address curve) =
-            factory.createToken("Ghost", "GHOST", "spooky", "ipfs://img", "https://x", "@x", "t.me/x");
+        (address token, address curve) = factory.createToken{value: CREATION_FEE_NATIVE}(
+            "Ghost", "GHOST", "spooky", "ipfs://img", "https://x", "@x", "t.me/x"
+        );
 
         assertTrue(token != address(0) && curve != address(0));
 
@@ -99,15 +106,15 @@ contract WafflesLaunchFactoryTest is Test {
         assertEq(tg, "t.me/x");
         assertGt(createdAt, 0);
 
-        assertEq(usdc.balanceOf(treasury), CREATION_FEE);
+        assertEq(treasury.balance, CREATION_FEE_NATIVE);
         assertEq(WafflesMemeToken(token).balanceOf(curve), 1_000_000_000 ether);
         assertEq(factory.tokenOfCurve(curve), token);
 
         // Verify stored-reserve parameters
         WafflesBondingCurve c = WafflesBondingCurve(curve);
-        assertEq(c.initialVirtualUsdcReserve(), 2_986e6);
-        assertEq(c.initialVirtualTokenReserve(), 1_060_569_000 ether);
-        assertEq(c.minVirtualTokenReserve(), 251_660_441 ether);
+        assertEq(c.initialVirtualUsdcReserve(), INITIAL_VIRTUAL_USDC);
+        assertEq(c.initialVirtualTokenReserve(), INITIAL_VIRTUAL_TOKENS);
+        assertEq(c.minVirtualTokenReserve(), MIN_VIRTUAL_TOKENS);
         assertEq(c.rewardsTreasury(), rewardsTreasury);
         assertEq(factory.creatorOfToken(token), creator);
     }
@@ -115,16 +122,31 @@ contract WafflesLaunchFactoryTest is Test {
     function test_CreateTokenWithoutFee() public {
         factory.setCreationFee(0);
         vm.prank(creator);
-        (address token,) = factory.createToken("Free", "FREE", "", "", "", "", "");
+        (address token, address curve) = factory.createToken("Free", "FREE", "", "", "", "", "");
         assertTrue(token != address(0));
-        assertEq(usdc.balanceOf(treasury), 0);
+        assertTrue(curve != address(0));
+        assertEq(treasury.balance, 0);
     }
 
-    function test_CreateTokenRequiresFeeAllowance() public {
+    function test_CreateTokenRequiresExactNativeFee() public {
         address broke = makeAddr("broke");
         vm.prank(broke);
-        vm.expectRevert();
-        factory.createToken("Broke", "BROKE", "", "", "", "", "");
+        vm.expectRevert(WafflesLaunchFactory.InvalidNativeUsdcAmount.selector);
+        (address token, address curve) = factory.createToken("Broke", "BROKE", "", "", "", "", "");
+        assertEq(token, address(0));
+        assertEq(curve, address(0));
+    }
+
+    function test_CreateTokenAndBuyInOneTransaction() public {
+        vm.prank(creator);
+        (address token, address curve, uint256 bought) = factory.createTokenAndBuy{value: 101 ether}(
+            "Ghost", "GHOST", "spooky", "ipfs://img", "https://x", "@x", "t.me/x", 100e6, 0
+        );
+
+        assertGt(bought, 0);
+        assertEq(WafflesMemeToken(token).balanceOf(creator), bought);
+        assertEq(treasury.balance, CREATION_FEE_NATIVE + 250_000 * 1e12);
+        assertEq(WafflesBondingCurve(curve).creator(), creator);
     }
 
     function test_NonOnePercentFeeConfigurationReverts() public {
@@ -135,9 +157,9 @@ contract WafflesLaunchFactoryTest is Test {
             rewardsTreasury,
             address(migrator),
             CREATION_FEE,
-            2_986e6,
-            1_060_569_000 ether,
-            251_660_441 ether,
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
             99
         );
     }
@@ -150,10 +172,10 @@ contract WafflesLaunchFactoryTest is Test {
             address(0),
             address(migrator),
             CREATION_FEE,
-            2_986e6,
-            1_060_569_000 ether,
-            251_660_441 ether,
-            100
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
+            FEE_BPS
         );
     }
 
@@ -165,10 +187,10 @@ contract WafflesLaunchFactoryTest is Test {
             treasury,
             address(migrator),
             CREATION_FEE,
-            2_986e6,
-            1_060_569_000 ether,
-            251_660_441 ether,
-            100
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            MIN_VIRTUAL_TOKENS,
+            FEE_BPS
         );
     }
 
@@ -181,10 +203,10 @@ contract WafflesLaunchFactoryTest is Test {
             rewardsTreasury,
             address(migrator),
             CREATION_FEE,
-            2_986e6,
-            1_060_569_000 ether,
-            1_060_569_000 ether, // min == initial → invalid
-            100
+            INITIAL_VIRTUAL_USDC,
+            INITIAL_VIRTUAL_TOKENS,
+            INITIAL_VIRTUAL_TOKENS, // min == initial → invalid
+            FEE_BPS
         );
     }
 
@@ -196,10 +218,10 @@ contract WafflesLaunchFactoryTest is Test {
             rewardsTreasury,
             address(migrator),
             CREATION_FEE,
-            2_986e6,
+            INITIAL_VIRTUAL_USDC,
             1_500_000_001 ether,
             500_000_000 ether,
-            100
+            FEE_BPS
         );
     }
 

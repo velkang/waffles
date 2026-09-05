@@ -58,14 +58,15 @@ contract WafflesRewardsDistributor is ReentrancyGuard {
     error AmountOverflow();
 
     modifier onlyOwner() {
-        if (msg.sender != owner) revert Unauthorized();
+        _checkOwner();
         _;
     }
 
-    modifier onlyFinalizer() {
-        if (msg.sender != finalizer) revert Unauthorized();
-        _;
+    function _checkOwner() private view {
+        if (msg.sender != owner) revert Unauthorized();
     }
+
+    receive() external payable {}
 
     constructor(IERC20 usdc_, address owner_, address finalizer_) {
         if (address(usdc_) == address(0) || owner_ == address(0) || finalizer_ == address(0)) {
@@ -83,7 +84,8 @@ contract WafflesRewardsDistributor is ReentrancyGuard {
         bytes32 snapshotHash,
         uint256 drandRound,
         bytes calldata drandSignature
-    ) external onlyFinalizer {
+    ) external {
+        if (msg.sender != finalizer) revert Unauthorized();
         if (merkleRoot == bytes32(0) || totalAmount == 0 || snapshotHash == bytes32(0) || drandSignature.length == 0) {
             revert InvalidEpoch();
         }
@@ -117,8 +119,8 @@ contract WafflesRewardsDistributor is ReentrancyGuard {
         uint256 length = epochIds.length;
         if (length == 0 || length != amounts.length || length != proofs.length) revert InvalidBatch();
 
-        uint256 totalAmount;
-        for (uint256 i; i < length; ++i) {
+        uint256 totalAmount = 0;
+        for (uint256 i = 0; i < length; ++i) {
             _claim(epochIds[i], msg.sender, amounts[i], proofs[i]);
             totalAmount += amounts[i];
         }
@@ -136,8 +138,9 @@ contract WafflesRewardsDistributor is ReentrancyGuard {
 
     function setFinalizer(address newFinalizer) external onlyOwner {
         if (newFinalizer == address(0)) revert InvalidAddress();
-        emit FinalizerUpdated(finalizer, newFinalizer);
+        address previousFinalizer = finalizer;
         finalizer = newFinalizer;
+        emit FinalizerUpdated(previousFinalizer, newFinalizer);
     }
 
     function transferOwnership(address newOwner) external onlyOwner {

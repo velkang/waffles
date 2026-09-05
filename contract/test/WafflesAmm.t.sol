@@ -3,7 +3,6 @@ pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {WafflesMemeToken} from "../src/WafflesMemeToken.sol";
 import {WafflesAmmFactory} from "../src/amm/WafflesAmmFactory.sol";
@@ -15,16 +14,22 @@ contract WafflesAmmTest is Test {
     WafflesAmmFactory factory;
     WafflesAmmPair pair;
 
-    address alice = makeAddr("alice");
-    address creator = makeAddr("creator");
-    address treasury = makeAddr("treasury");
-    address rewardsTreasury = makeAddr("rewardsTreasury");
+    address alice;
+    address creator;
+    address treasury;
+    address rewardsTreasury;
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     uint256 constant FEE_DENOM = 10_000;
     uint256 constant FEE_NUM = 9_900; // 1% fee
 
+    receive() external payable {}
+
     function setUp() public {
+        alice = makeAddr("alice");
+        creator = makeAddr("creator");
+        treasury = makeAddr("treasury");
+        rewardsTreasury = makeAddr("rewardsTreasury");
         usdc = new MockUSDC();
         token = new WafflesMemeToken("A", "A", 1_000_000_000 ether, address(this));
         factory = new WafflesAmmFactory(address(usdc), treasury, rewardsTreasury);
@@ -32,10 +37,10 @@ contract WafflesAmmTest is Test {
         pair = WafflesAmmPair(factory.createPair(address(token), address(usdc), creator));
 
         assertTrue(token.transfer(alice, 50_000_000 ether));
-        usdc.mint(alice, 10_000e6);
+        vm.deal(alice, 10_000 ether);
+        vm.deal(address(this), 100_000 ether);
         vm.startPrank(alice);
-        token.approve(address(pair), type(uint256).max);
-        usdc.approve(address(pair), type(uint256).max);
+        assertTrue(token.approve(address(pair), type(uint256).max));
         vm.stopPrank();
     }
 
@@ -59,7 +64,7 @@ contract WafflesAmmTest is Test {
         uint256 usdcAmount = 20_000e6;
 
         assertTrue(token.transfer(address(pair), tokenAmount));
-        usdc.mint(address(pair), usdcAmount);
+        pair.depositUsdc{value: usdcAmount * 1e12}();
 
         uint256 liquidity = pair.mint(address(this));
         uint256 expectedLiquidity = Math.sqrt(tokenAmount * usdcAmount) - pair.MINIMUM_LIQUIDITY();
@@ -74,12 +79,12 @@ contract WafflesAmmTest is Test {
 
     function test_MintProportional() public {
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
-        pair.mint(address(this));
+        pair.depositUsdc{value: 20_000e18}();
+        assertGt(pair.mint(address(this)), 0);
 
         vm.startPrank(alice);
         assertTrue(token.transfer(address(pair), 20_000_000 ether));
-        assertTrue(usdc.transfer(address(pair), 2_000e6));
+        pair.depositUsdc{value: 2_000e18}();
         uint256 aliceLp = pair.mint(alice);
         vm.stopPrank();
 
@@ -88,7 +93,7 @@ contract WafflesAmmTest is Test {
 
     function test_BurnRedeemsProRata() public {
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
+        pair.depositUsdc{value: 20_000e18}();
         uint256 lp = pair.mint(address(this));
 
         assertTrue(pair.transfer(address(pair), lp));
@@ -100,14 +105,14 @@ contract WafflesAmmTest is Test {
 
     function test_SwapExactIn() public {
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
-        pair.mint(address(this));
+        pair.depositUsdc{value: 20_000e18}();
+        assertGt(pair.mint(address(this)), 0);
 
         address t0 = pair.token0();
         bool usdcIsToken0 = t0 == address(usdc);
 
         uint256 usdcIn = 100e6;
-        usdc.mint(address(pair), usdcIn);
+        pair.depositUsdc{value: usdcIn * 1e12}();
 
         (uint256 r0, uint256 r1) = pair.getReserves();
         (uint256 rIn, uint256 rOut) = usdcIsToken0 ? (r0, r1) : (r1, r0);
@@ -122,19 +127,19 @@ contract WafflesAmmTest is Test {
 
         assertEq(token.balanceOf(alice), 50_000_000 ether + expectedOut);
         uint256 fee = (usdcIn * pair.FEE_BPS()) / FEE_DENOM;
-        uint256 creatorFee = (fee * pair.CREATOR_FEE_SHARE_BPS()) / FEE_DENOM;
-        uint256 platformFee = (fee * pair.PLATFORM_FEE_SHARE_BPS()) / FEE_DENOM;
-        assertEq(usdc.balanceOf(creator), creatorFee);
-        assertEq(usdc.balanceOf(treasury), platformFee);
-        assertEq(usdc.balanceOf(rewardsTreasury), fee - creatorFee - platformFee);
+        uint256 creatorFee = Math.mulDiv(fee, pair.CREATOR_FEE_SHARE_BPS(), FEE_DENOM);
+        uint256 platformFee = Math.mulDiv(fee, pair.PLATFORM_FEE_SHARE_BPS(), FEE_DENOM);
+        assertEq(creator.balance / 1e12, creatorFee);
+        assertEq(treasury.balance / 1e12, platformFee);
+        assertEq(rewardsTreasury.balance / 1e12, fee - creatorFee - platformFee);
     }
 
     function test_SwapGreedyOutputReverts() public {
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
-        pair.mint(address(this));
+        pair.depositUsdc{value: 20_000e18}();
+        assertGt(pair.mint(address(this)), 0);
 
-        usdc.mint(address(pair), 100e6);
+        pair.depositUsdc{value: 100e18}();
         bool usdcIsToken0 = pair.token0() == address(usdc);
 
         (uint256 r0, uint256 r1) = pair.getReserves();
@@ -152,8 +157,8 @@ contract WafflesAmmTest is Test {
         vm.assume(usdcIn >= 1e6 && usdcIn <= 5_000e6);
 
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
-        pair.mint(address(this));
+        pair.depositUsdc{value: 20_000e18}();
+        assertGt(pair.mint(address(this)), 0);
 
         (uint256 r0Before, uint256 r1Before) = pair.getReserves();
         uint256 kBefore = r0Before * r1Before;
@@ -161,7 +166,7 @@ contract WafflesAmmTest is Test {
         bool usdcIsToken0 = pair.token0() == address(usdc);
         (uint256 rIn, uint256 rOut) = usdcIsToken0 ? (r0Before, r1Before) : (r1Before, r0Before);
 
-        usdc.mint(address(pair), usdcIn);
+        pair.depositUsdc{value: uint256(usdcIn) * 1e12}();
         uint256 amountOut = (uint256(usdcIn) * FEE_NUM * rOut) / (rIn * FEE_DENOM + uint256(usdcIn) * FEE_NUM);
 
         if (usdcIsToken0) {

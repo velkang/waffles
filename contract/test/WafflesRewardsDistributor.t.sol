@@ -9,12 +9,16 @@ contract WafflesRewardsDistributorTest is Test {
     MockUSDC internal usdc;
     WafflesRewardsDistributor internal distributor;
 
-    address internal owner = makeAddr("owner");
-    address internal finalizer = makeAddr("finalizer");
-    address internal alice = makeAddr("alice");
-    address internal bob = makeAddr("bob");
+    address internal owner;
+    address internal finalizer;
+    address internal alice;
+    address internal bob;
 
     function setUp() public {
+        owner = makeAddr("owner");
+        finalizer = makeAddr("finalizer");
+        alice = makeAddr("alice");
+        bob = makeAddr("bob");
         usdc = new MockUSDC();
         distributor = new WafflesRewardsDistributor(usdc, owner, finalizer);
         usdc.mint(address(distributor), 1_000e6);
@@ -36,8 +40,22 @@ contract WafflesRewardsDistributorTest is Test {
         assertEq(usdc.balanceOf(alice), 60e6);
         assertEq(distributor.totalReserved(), 40e6);
         assertTrue(distributor.claimed(1, alice));
-        (,,,, uint128 claimedAmount,,) = distributor.epochs(1);
+        (
+            bytes32 merkleRoot,
+            bytes32 snapshotHash,
+            bytes32 drandSignatureHash,
+            uint128 totalAmount,
+            uint128 claimedAmount,
+            uint64 drandRound,
+            uint64 finalizedAt
+        ) = distributor.epochs(1);
+        assertEq(merkleRoot, root);
+        assertEq(snapshotHash, keccak256("snapshot"));
+        assertEq(drandSignatureHash, keccak256(hex"aabbcc"));
+        assertEq(totalAmount, 100e6);
         assertEq(claimedAmount, 60e6);
+        assertEq(drandRound, 12_345);
+        assertGt(finalizedAt, 0);
     }
 
     function test_OnlyFinalizerCanFinalize() public {

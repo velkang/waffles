@@ -2,9 +2,10 @@
 pragma solidity ^0.8.26;
 
 import {WafflesAmmPair} from "./WafflesAmmPair.sol";
+import {IWafflesAmmFactory} from "../interfaces/IWafflesAmmFactory.sol";
 
 /// @notice Minimal Uniswap-V2-style factory for waffles.meme: one WafflesAmmPair per token pair.
-contract WafflesAmmFactory {
+contract WafflesAmmFactory is IWafflesAmmFactory {
     mapping(address => mapping(address => address)) public getPair;
     address[] public allPairs;
 
@@ -17,6 +18,7 @@ contract WafflesAmmFactory {
     event PairCreated(
         address indexed token0, address indexed token1, address indexed creator, address pair, uint256 pairCount
     );
+    event PairCreatorConfigured(address indexed pairCreator);
 
     error IdenticalAddresses();
     error ZeroAddress();
@@ -48,6 +50,7 @@ contract WafflesAmmFactory {
         if (pairCreator != address(0)) revert AlreadyConfigured();
         if (pairCreator_ == address(0)) revert ZeroAddress();
         pairCreator = pairCreator_;
+        emit PairCreatorConfigured(pairCreator_);
     }
 
     function parameters() external view returns (address, address, address, address, address, address) {

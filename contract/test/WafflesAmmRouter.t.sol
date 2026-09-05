@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {Test} from "forge-std/Test.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {MockUSDC} from "../src/mocks/MockUSDC.sol";
 import {WafflesMemeToken} from "../src/WafflesMemeToken.sol";
 import {WafflesAmmFactory} from "../src/amm/WafflesAmmFactory.sol";
@@ -15,12 +15,16 @@ contract WafflesAmmRouterTest is Test {
     WafflesAmmFactory factory;
     WafflesAmmPair pair;
     WafflesAmmRouter router;
-    address trader = makeAddr("trader");
-    address creator = makeAddr("creator");
-    address treasury = makeAddr("treasury");
-    address rewardsTreasury = makeAddr("rewardsTreasury");
+    address trader;
+    address creator;
+    address treasury;
+    address rewardsTreasury;
 
     function setUp() public {
+        trader = makeAddr("trader");
+        creator = makeAddr("creator");
+        treasury = makeAddr("treasury");
+        rewardsTreasury = makeAddr("rewardsTreasury");
         usdc = new MockUSDC();
         token = new WafflesMemeToken("Arc", "ARC", 1_000_000_000 ether, address(this));
         factory = new WafflesAmmFactory(address(usdc), treasury, rewardsTreasury);
@@ -29,15 +33,15 @@ contract WafflesAmmRouterTest is Test {
         router = new WafflesAmmRouter(factory);
 
         assertTrue(token.transfer(address(pair), 200_000_000 ether));
-        usdc.mint(address(pair), 20_000e6);
-        pair.mint(address(0xdead));
+        vm.deal(address(this), 20_000 ether);
+        pair.depositUsdc{value: 20_000e18}();
+        assertGt(pair.mint(address(0xdead)), 0);
 
-        usdc.mint(trader, 10_000e6);
+        vm.deal(trader, 10_000 ether);
         assertTrue(token.transfer(trader, 10_000_000 ether));
 
         vm.startPrank(trader);
-        usdc.approve(address(router), type(uint256).max);
-        token.approve(address(router), type(uint256).max);
+        assertTrue(token.approve(address(router), type(uint256).max));
         vm.stopPrank();
     }
 
@@ -47,18 +51,25 @@ contract WafflesAmmRouterTest is Test {
         assertGt(quote, 0);
 
         uint256 tokenBefore = token.balanceOf(trader);
-        uint256 usdcBefore = usdc.balanceOf(trader);
+        uint256 usdcBefore = trader.balance;
 
         vm.prank(trader);
         uint256 out =
-            router.swapExactTokensForTokens(address(pair), address(usdc), usdcIn, quote, trader, block.timestamp + 10);
+            router.swapExactUsdcForTokens{value: usdcIn * 1e12}(address(pair), quote, trader, block.timestamp + 10);
 
         assertEq(out, quote);
         assertEq(token.balanceOf(trader) - tokenBefore, quote);
-        assertEq(usdcBefore - usdc.balanceOf(trader), usdcIn);
-        assertEq(usdc.balanceOf(creator), 700_000);
-        assertEq(usdc.balanceOf(treasury), 250_000);
-        assertEq(usdc.balanceOf(rewardsTreasury), 50_000);
+        assertEq((usdcBefore - trader.balance) / 1e12, usdcIn);
+        assertEq(creator.balance, 700_000 * 1e12);
+        assertEq(treasury.balance, 250_000 * 1e12);
+        assertEq(rewardsTreasury.balance, 50_000 * 1e12);
+    }
+
+    function test_SwapUsdcRejectsNativeAmountBelowUsdcPrecision() public {
+        vm.prank(trader);
+        vm.expectRevert(WafflesAmmRouter.InvalidNativeUsdcAmount.selector);
+        uint256 output = router.swapExactUsdcForTokens{value: 1}(address(pair), 0, trader, block.timestamp + 10);
+        assertEq(output, 0);
     }
 
     function test_SwapTokenForUsdcAtomically() public {
@@ -67,7 +78,7 @@ contract WafflesAmmRouterTest is Test {
         assertGt(quote, 0);
 
         uint256 tokenBefore = token.balanceOf(trader);
-        uint256 usdcBefore = usdc.balanceOf(trader);
+        uint256 usdcBefore = trader.balance;
 
         vm.prank(trader);
         uint256 out = router.swapExactTokensForTokens(
@@ -76,28 +87,30 @@ contract WafflesAmmRouterTest is Test {
 
         assertEq(out, quote);
         assertEq(tokenBefore - token.balanceOf(trader), tokenIn);
-        assertEq(usdc.balanceOf(trader) - usdcBefore, quote);
-        uint256 totalFee = usdc.balanceOf(creator) + usdc.balanceOf(treasury) + usdc.balanceOf(rewardsTreasury);
+        assertEq((trader.balance - usdcBefore) / 1e12, quote);
+        uint256 totalFee = (creator.balance + treasury.balance + rewardsTreasury.balance) / 1e12;
         assertGt(totalFee, 0);
-        assertEq(usdc.balanceOf(creator), (totalFee * 7_000) / 10_000);
-        assertEq(usdc.balanceOf(treasury), (totalFee * 2_500) / 10_000);
-        assertEq(usdc.balanceOf(rewardsTreasury), totalFee - usdc.balanceOf(creator) - usdc.balanceOf(treasury));
+        assertEq(creator.balance / 1e12, Math.mulDiv(totalFee, 7_000, 10_000));
+        assertEq(treasury.balance / 1e12, Math.mulDiv(totalFee, 2_500, 10_000));
+        assertEq(rewardsTreasury.balance / 1e12, totalFee - creator.balance / 1e12 - treasury.balance / 1e12);
     }
 
     function test_ExpiredSwapReverts() public {
         vm.warp(100);
         vm.prank(trader);
         vm.expectRevert(WafflesAmmRouter.Expired.selector);
-        router.swapExactTokensForTokens(address(pair), address(usdc), 10e6, 0, trader, 99);
+        uint256 output = router.swapExactUsdcForTokens{value: 10e18}(address(pair), 0, trader, 99);
+        assertEq(output, 0);
     }
 
     function test_FailedSwapRollsBackInputTransfer() public {
-        uint256 usdcBefore = usdc.balanceOf(trader);
+        uint256 usdcBefore = trader.balance;
         vm.prank(trader);
         vm.expectRevert(WafflesAmmRouter.Slippage.selector);
-        router.swapExactTokensForTokens(
-            address(pair), address(usdc), 100e6, type(uint256).max, trader, block.timestamp + 10
+        uint256 output = router.swapExactUsdcForTokens{value: 100e18}(
+            address(pair), type(uint256).max, trader, block.timestamp + 10
         );
-        assertEq(usdc.balanceOf(trader), usdcBefore);
+        assertEq(output, 0);
+        assertEq(trader.balance, usdcBefore);
     }
 }

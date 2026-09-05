@@ -6,20 +6,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
-
-interface IAmmFactory {
-    function parameters()
-        external
-        view
-        returns (
-            address token0,
-            address token1,
-            address usdc,
-            address creator,
-            address treasury,
-            address rewardsTreasury
-        );
-}
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {IWafflesAmmFactory} from "../interfaces/IWafflesAmmFactory.sol";
 
 /// @notice Constant-product pool for graduated waffles.meme tokens. Every swap
 ///         charges a 1% USDC fee split 70/25/5 between the token creator, the
@@ -33,6 +21,7 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
     uint256 public constant CREATOR_FEE_SHARE_BPS = 7_000;
     uint256 public constant PLATFORM_FEE_SHARE_BPS = 2_500;
     uint256 public constant REWARDS_FEE_SHARE_BPS = 500;
+    uint256 public constant NATIVE_USDC_SCALE = 1e12;
 
     address public immutable factory;
     address public immutable token0;
@@ -72,14 +61,19 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
     error InsufficientInputAmount();
     error InvalidTo();
     error K();
+    error InvalidNativeUsdcAmount();
 
     constructor() ERC20("Waffles LP", "WFLP") {
         factory = msg.sender;
-        (token0, token1, usdc, creator, treasury, rewardsTreasury) = IAmmFactory(msg.sender).parameters();
+        (token0, token1, usdc, creator, treasury, rewardsTreasury) = IWafflesAmmFactory(msg.sender).parameters();
     }
 
     function getReserves() public view returns (uint256, uint256) {
         return (reserve0, reserve1);
+    }
+
+    function depositUsdc() external payable {
+        if (msg.value == 0 || msg.value % NATIVE_USDC_SCALE != 0) revert InvalidNativeUsdcAmount();
     }
 
     function _update(uint256 balance0, uint256 balance1) private {
@@ -90,8 +84,8 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
 
     function mint(address to) external nonReentrant returns (uint256 liquidity) {
         (uint256 r0, uint256 r1) = (reserve0, reserve1);
-        uint256 b0 = IERC20(token0).balanceOf(address(this));
-        uint256 b1 = IERC20(token1).balanceOf(address(this));
+        uint256 b0 = _balanceOf(token0);
+        uint256 b1 = _balanceOf(token1);
         uint256 a0 = b0 - r0;
         uint256 a1 = b1 - r1;
 
@@ -109,8 +103,8 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
     }
 
     function burn(address to) external nonReentrant returns (uint256 amount0, uint256 amount1) {
-        uint256 b0 = IERC20(token0).balanceOf(address(this));
-        uint256 b1 = IERC20(token1).balanceOf(address(this));
+        uint256 b0 = _balanceOf(token0);
+        uint256 b1 = _balanceOf(token1);
         uint256 liquidity = balanceOf(address(this));
 
         uint256 _totalSupply = totalSupply();
@@ -119,11 +113,11 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
         if (amount0 == 0 || amount1 == 0) revert InsufficientLiquidityBurned();
 
         _burn(address(this), liquidity);
-        IERC20(token0).safeTransfer(to, amount0);
-        IERC20(token1).safeTransfer(to, amount1);
+        _transferAsset(token0, to, amount0);
+        _transferAsset(token1, to, amount1);
 
-        b0 = IERC20(token0).balanceOf(address(this));
-        b1 = IERC20(token1).balanceOf(address(this));
+        b0 = _balanceOf(token0);
+        b1 = _balanceOf(token1);
         _update(b0, b1);
         emit Burn(msg.sender, to, amount0, amount1);
     }
@@ -137,8 +131,8 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
         if (amount0Out > 0) _transferOutput(token0, amount0Out, to);
         if (amount1Out > 0) _transferOutput(token1, amount1Out, to);
 
-        uint256 b0 = IERC20(token0).balanceOf(address(this));
-        uint256 b1 = IERC20(token1).balanceOf(address(this));
+        uint256 b0 = _balanceOf(token0);
+        uint256 b1 = _balanceOf(token1);
 
         uint256 gross0In = b0 > r0 - amount0Out ? b0 - (r0 - amount0Out) : 0;
         uint256 gross1In = b1 > r1 - amount1Out ? b1 - (r1 - amount1Out) : 0;
@@ -149,8 +143,8 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
             _allocateFee(to, gross1In);
         }
 
-        b0 = IERC20(token0).balanceOf(address(this));
-        b1 = IERC20(token1).balanceOf(address(this));
+        b0 = _balanceOf(token0);
+        b1 = _balanceOf(token1);
         uint256 a0In = b0 > r0 - amount0Out ? b0 - (r0 - amount0Out) : 0;
         uint256 a1In = b1 > r1 - amount1Out ? b1 - (r1 - amount1Out) : 0;
         if (a0In == 0 && a1In == 0) revert InsufficientInputAmount();
@@ -170,19 +164,19 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
         }
 
         uint256 fee = _allocateFee(to, grossAmount);
-        IERC20(outputToken).safeTransfer(to, grossAmount - fee);
+        _transferAsset(outputToken, to, grossAmount - fee);
     }
 
     function _allocateFee(address trader, uint256 grossUsdcAmount) private returns (uint256 fee) {
         fee = (grossUsdcAmount * FEE_BPS) / BPS_DENOM;
-        uint256 creatorFee = (fee * CREATOR_FEE_SHARE_BPS) / BPS_DENOM;
-        uint256 platformFee = (fee * PLATFORM_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 creatorFee = Math.mulDiv(fee, CREATOR_FEE_SHARE_BPS, BPS_DENOM);
+        uint256 platformFee = Math.mulDiv(fee, PLATFORM_FEE_SHARE_BPS, BPS_DENOM);
         uint256 rewardsFee = fee - creatorFee - platformFee;
 
-        if (creatorFee > 0) IERC20(usdc).safeTransfer(creator, creatorFee);
-        if (platformFee > 0) IERC20(usdc).safeTransfer(treasury, platformFee);
+        if (creatorFee > 0) _transferAsset(usdc, creator, creatorFee);
+        if (platformFee > 0) _transferAsset(usdc, treasury, platformFee);
         if (rewardsFee > 0) {
-            IERC20(usdc).safeTransfer(rewardsTreasury, rewardsFee);
+            _transferAsset(usdc, rewardsTreasury, rewardsFee);
         }
 
         emit FeeAllocated(trader, grossUsdcAmount, fee, creatorFee, platformFee, rewardsFee);
@@ -191,11 +185,24 @@ contract WafflesAmmPair is ERC20, ReentrancyGuard {
     function skim(address to) external nonReentrant {
         address _token0 = token0;
         address _token1 = token1;
-        IERC20(_token0).safeTransfer(to, IERC20(_token0).balanceOf(address(this)) - reserve0);
-        IERC20(_token1).safeTransfer(to, IERC20(_token1).balanceOf(address(this)) - reserve1);
+        _transferAsset(_token0, to, _balanceOf(_token0) - reserve0);
+        _transferAsset(_token1, to, _balanceOf(_token1) - reserve1);
     }
 
     function sync() external nonReentrant {
-        _update(IERC20(token0).balanceOf(address(this)), IERC20(token1).balanceOf(address(this)));
+        _update(_balanceOf(token0), _balanceOf(token1));
+    }
+
+    function _balanceOf(address asset) private view returns (uint256) {
+        return asset == usdc ? address(this).balance / NATIVE_USDC_SCALE : IERC20(asset).balanceOf(address(this));
+    }
+
+    function _transferAsset(address asset, address to, uint256 amount) private {
+        if (amount == 0) return;
+        if (asset != usdc) {
+            IERC20(asset).safeTransfer(to, amount);
+            return;
+        }
+        Address.sendValue(payable(to), amount * NATIVE_USDC_SCALE);
     }
 }

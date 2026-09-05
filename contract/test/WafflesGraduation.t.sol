@@ -19,10 +19,10 @@ contract WafflesGraduationTest is Test {
     WafflesAmmMigrator migrator;
     WafflesLaunchFactory factory;
 
-    address treasury = makeAddr("treasury");
-    address rewardsTreasury = makeAddr("rewardsTreasury");
-    address creator = makeAddr("creator");
-    address trader = makeAddr("trader");
+    address treasury;
+    address rewardsTreasury;
+    address creator;
+    address trader;
     address constant DEAD = 0x000000000000000000000000000000000000dEaD;
 
     uint256 constant INITIAL_VIRTUAL_USDC = 2_986e6;
@@ -38,6 +38,10 @@ contract WafflesGraduationTest is Test {
     WafflesBondingCurve curve;
 
     function setUp() public {
+        treasury = makeAddr("treasury");
+        rewardsTreasury = makeAddr("rewardsTreasury");
+        creator = makeAddr("creator");
+        trader = makeAddr("trader");
         usdc = new MockUSDC();
         ammFactory = new WafflesAmmFactory(address(usdc), treasury, rewardsTreasury);
         migrator = new WafflesAmmMigrator(ammFactory, IERC20(usdc));
@@ -60,16 +64,14 @@ contract WafflesGraduationTest is Test {
         token = WafflesMemeToken(tokenAddr);
         curve = WafflesBondingCurve(curveAddr);
 
-        usdc.mint(trader, 1_000_000e6);
+        vm.deal(trader, 1_000_000 ether);
         vm.prank(trader);
-        usdc.approve(address(curve), type(uint256).max);
-        vm.prank(trader);
-        token.approve(address(curve), type(uint256).max);
+        assertTrue(token.approve(address(curve), type(uint256).max));
     }
 
     function test_PoolSeededWithReserveAndRaisedUsdc() public {
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated());
         address pool = curve.graduationPool();
@@ -82,12 +84,12 @@ contract WafflesGraduationTest is Test {
 
         assertEq(token.balanceOf(address(curve)), 0, "curve should have 0 tokens post-graduation");
 
-        assertEq(usdc.balanceOf(address(curve)), curve.creatorEarnings(creator));
+        assertEq(address(curve).balance / 1e12, curve.creatorEarnings(creator));
     }
 
     function test_LiquidityPermanentlyBurned() public {
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         address pool = curve.graduationPool();
         WafflesAmmPair pair = WafflesAmmPair(pool);
@@ -100,24 +102,25 @@ contract WafflesGraduationTest is Test {
 
     function test_TradingContinuesOnPoolAfterGraduation() public {
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         address pool = curve.graduationPool();
         WafflesAmmPair pair = WafflesAmmPair(pool);
 
         vm.prank(trader);
         vm.expectRevert(WafflesBondingCurve.CurveClosed.selector);
-        curve.buy(100e6, 0);
+        uint256 boughtAfterGraduation = curve.buy{value: 100e18}(0, trader);
+        assertEq(boughtAfterGraduation, 0);
 
         address alice = makeAddr("alice");
-        usdc.mint(alice, 100e6);
-        uint256 creatorFeesBefore = usdc.balanceOf(creator);
-        uint256 platformFeesBefore = usdc.balanceOf(treasury);
-        uint256 rewardsFeesBefore = usdc.balanceOf(rewardsTreasury);
+        vm.deal(alice, 100 ether);
+        uint256 creatorFeesBefore = creator.balance;
+        uint256 platformFeesBefore = treasury.balance;
+        uint256 rewardsFeesBefore = rewardsTreasury.balance;
 
         vm.startPrank(alice);
         uint256 usdcIn = 100e6;
-        assertTrue(usdc.transfer(pool, usdcIn));
+        pair.depositUsdc{value: usdcIn * 1e12}();
 
         (uint256 r0, uint256 r1) = pair.getReserves();
         bool usdcIs0 = pair.token0() == address(usdc);
@@ -133,18 +136,18 @@ contract WafflesGraduationTest is Test {
         }
         vm.stopPrank();
 
-        uint256 expectedCreatorFee = (fee * CREATOR_FEE_SHARE_BPS) / BPS_DENOM;
-        uint256 expectedPlatformFee = (fee * PLATFORM_FEE_SHARE_BPS) / BPS_DENOM;
+        uint256 expectedCreatorFee = Math.mulDiv(fee, CREATOR_FEE_SHARE_BPS, BPS_DENOM);
+        uint256 expectedPlatformFee = Math.mulDiv(fee, PLATFORM_FEE_SHARE_BPS, BPS_DENOM);
         uint256 expectedRewardsFee = fee - expectedCreatorFee - expectedPlatformFee;
         assertEq(token.balanceOf(alice), expectedOut);
-        assertEq(usdc.balanceOf(creator) - creatorFeesBefore, expectedCreatorFee);
-        assertEq(usdc.balanceOf(treasury) - platformFeesBefore, expectedPlatformFee);
-        assertEq(usdc.balanceOf(rewardsTreasury) - rewardsFeesBefore, expectedRewardsFee);
+        assertEq((creator.balance - creatorFeesBefore) / 1e12, expectedCreatorFee);
+        assertEq((treasury.balance - platformFeesBefore) / 1e12, expectedPlatformFee);
+        assertEq((rewardsTreasury.balance - rewardsFeesBefore) / 1e12, expectedRewardsFee);
     }
 
     function test_PoolOpeningPriceCloseToFinalCurvePrice() public {
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated());
         uint256 curveGradPrice = curve.graduationPrice();
@@ -164,11 +167,11 @@ contract WafflesGraduationTest is Test {
 
     function test_DonatedTokensExcludedFromMigration() public {
         vm.prank(trader);
-        uint256 bought = curve.buy(100e6, 0);
+        uint256 bought = curve.buy{value: 100e18}(0, trader);
         vm.prank(trader);
         assertTrue(token.transfer(address(curve), bought / 2));
         vm.prank(trader);
-        curve.buy(100_000e6, 0);
+        assertGt(curve.buy{value: 100_000e18}(0, trader), 0);
 
         assertTrue(curve.graduated());
         address pool = curve.graduationPool();
@@ -183,12 +186,14 @@ contract WafflesGraduationTest is Test {
     function test_AttackerCannotPrecreateGraduationPair() public {
         vm.prank(trader);
         vm.expectRevert(WafflesAmmFactory.Unauthorized.selector);
-        ammFactory.createPair(address(token), address(usdc), creator);
+        address pool = ammFactory.createPair(address(token), address(usdc), creator);
+        assertEq(pool, address(0));
     }
 
     function test_AttackerCannotCallMigrator() public {
         vm.prank(trader);
         vm.expectRevert(WafflesAmmMigrator.Unauthorized.selector);
-        migrator.migrate(address(token), 1, 1);
+        address pool = migrator.migrate(address(token), 1, 1);
+        assertEq(pool, address(0));
     }
 }
