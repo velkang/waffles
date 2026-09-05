@@ -321,6 +321,19 @@ export const wafflesAmmFactoryAbi = [
     ],
     name: 'PairCreated',
   },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'pairCreator',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'PairCreatorConfigured',
+  },
   { type: 'error', inputs: [], name: 'AlreadyConfigured' },
   { type: 'error', inputs: [], name: 'IdenticalAddresses' },
   { type: 'error', inputs: [], name: 'PairExists' },
@@ -355,6 +368,13 @@ export const wafflesAmmMigratorAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'NATIVE_USDC_SCALE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'factory',
     outputs: [
       { name: '', internalType: 'contract WafflesAmmFactory', type: 'address' },
@@ -377,7 +397,7 @@ export const wafflesAmmMigratorAbi = [
     ],
     name: 'migrate',
     outputs: [{ name: 'pool', internalType: 'address', type: 'address' }],
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -401,6 +421,19 @@ export const wafflesAmmMigratorAbi = [
     name: 'usdc',
     outputs: [{ name: '', internalType: 'contract IERC20', type: 'address' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'event',
+    anonymous: false,
+    inputs: [
+      {
+        name: 'launchFactory',
+        internalType: 'address',
+        type: 'address',
+        indexed: true,
+      },
+    ],
+    name: 'LaunchFactoryConfigured',
   },
   { type: 'error', inputs: [], name: 'AlreadyConfigured' },
   { type: 'error', inputs: [], name: 'InvalidAddress' },
@@ -445,6 +478,13 @@ export const wafflesAmmPairAbi = [
     type: 'function',
     inputs: [],
     name: 'MINIMUM_LIQUIDITY',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'NATIVE_USDC_SCALE',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
@@ -512,6 +552,13 @@ export const wafflesAmmPairAbi = [
     name: 'decimals',
     outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'depositUsdc',
+    outputs: [],
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -873,8 +920,10 @@ export const wafflesAmmPairAbi = [
   { type: 'error', inputs: [], name: 'InsufficientLiquidityBurned' },
   { type: 'error', inputs: [], name: 'InsufficientLiquidityMinted' },
   { type: 'error', inputs: [], name: 'InsufficientOutputAmount' },
+  { type: 'error', inputs: [], name: 'InvalidNativeUsdcAmount' },
   { type: 'error', inputs: [], name: 'InvalidTo' },
   { type: 'error', inputs: [], name: 'K' },
+  { type: 'error', inputs: [], name: 'NativeTransferFailed' },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   {
     type: 'error',
@@ -916,6 +965,13 @@ export const wafflesAmmRouterAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'NATIVE_USDC_SCALE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'factory',
     outputs: [
       { name: '', internalType: 'contract WafflesAmmFactory', type: 'address' },
@@ -946,6 +1002,18 @@ export const wafflesAmmRouterAbi = [
     name: 'swapExactTokensForTokens',
     outputs: [{ name: 'amountOut', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'pair', internalType: 'address', type: 'address' },
+      { name: 'minAmountOut', internalType: 'uint256', type: 'uint256' },
+      { name: 'to', internalType: 'address', type: 'address' },
+      { name: 'deadline', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'swapExactUsdcForTokens',
+    outputs: [{ name: 'amountOut', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'payable',
   },
   {
     type: 'event',
@@ -982,6 +1050,7 @@ export const wafflesAmmRouterAbi = [
   },
   { type: 'error', inputs: [], name: 'Expired' },
   { type: 'error', inputs: [], name: 'InvalidAddress' },
+  { type: 'error', inputs: [], name: 'InvalidNativeUsdcAmount' },
   { type: 'error', inputs: [], name: 'InvalidPair' },
   { type: 'error', inputs: [], name: 'InvalidToken' },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
@@ -1044,6 +1113,13 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'NATIVE_USDC_SCALE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'PLATFORM_FEE_SHARE_BPS',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
@@ -1072,12 +1148,12 @@ export const wafflesBondingCurveAbi = [
   {
     type: 'function',
     inputs: [
-      { name: 'usdcIn', internalType: 'uint256', type: 'uint256' },
       { name: 'minTokensOut', internalType: 'uint256', type: 'uint256' },
+      { name: 'recipient', internalType: 'address', type: 'address' },
     ],
     name: 'buy',
     outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -1454,7 +1530,9 @@ export const wafflesBondingCurveAbi = [
   { type: 'error', inputs: [], name: 'CurveClosed' },
   { type: 'error', inputs: [], name: 'ExcessiveSell' },
   { type: 'error', inputs: [], name: 'InsufficientReserve' },
+  { type: 'error', inputs: [], name: 'InvalidNativeUsdcAmount' },
   { type: 'error', inputs: [], name: 'InvalidParameters' },
+  { type: 'error', inputs: [], name: 'NativeTransferFailed' },
   { type: 'error', inputs: [], name: 'NotCreator' },
   { type: 'error', inputs: [], name: 'ReentrancyGuardReentrantCall' },
   {
@@ -1498,6 +1576,13 @@ export const wafflesLaunchFactoryAbi = [
       { name: 'feeBps_', internalType: 'uint256', type: 'uint256' },
     ],
     stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'NATIVE_USDC_SCALE',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
   },
   {
     type: 'function',
@@ -1550,7 +1635,28 @@ export const wafflesLaunchFactoryAbi = [
       { name: 'token', internalType: 'address', type: 'address' },
       { name: 'curve', internalType: 'address', type: 'address' },
     ],
-    stateMutability: 'nonpayable',
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'name', internalType: 'string', type: 'string' },
+      { name: 'symbol', internalType: 'string', type: 'string' },
+      { name: 'description', internalType: 'string', type: 'string' },
+      { name: 'imageUri', internalType: 'string', type: 'string' },
+      { name: 'website', internalType: 'string', type: 'string' },
+      { name: 'twitter', internalType: 'string', type: 'string' },
+      { name: 'telegram', internalType: 'string', type: 'string' },
+      { name: 'initialBuyUsdc', internalType: 'uint256', type: 'uint256' },
+      { name: 'minTokensOut', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'createTokenAndBuy',
+    outputs: [
+      { name: 'token', internalType: 'address', type: 'address' },
+      { name: 'curve', internalType: 'address', type: 'address' },
+      { name: 'tokensBought', internalType: 'uint256', type: 'uint256' },
+    ],
+    stateMutability: 'payable',
   },
   {
     type: 'function',
@@ -1806,7 +1912,17 @@ export const wafflesLaunchFactoryAbi = [
     name: 'TokenCreated',
   },
   { type: 'error', inputs: [], name: 'InvalidAddress' },
+  { type: 'error', inputs: [], name: 'InvalidNativeUsdcAmount' },
   { type: 'error', inputs: [], name: 'InvalidParameters' },
+  { type: 'error', inputs: [], name: 'NativeTransferFailed' },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'bits', internalType: 'uint8', type: 'uint8' },
+      { name: 'value', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'SafeCastOverflowedUintDowncast',
+  },
   {
     type: 'error',
     inputs: [{ name: 'token', internalType: 'address', type: 'address' }],
@@ -2302,6 +2418,15 @@ export const useWatchWafflesAmmFactoryPairCreatedEvent =
   })
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmFactoryAbi}__ and `eventName` set to `"PairCreatorConfigured"`
+ */
+export const useWatchWafflesAmmFactoryPairCreatorConfiguredEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmFactoryAbi,
+    eventName: 'PairCreatorConfigured',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__
  */
 export const useReadWafflesAmmMigrator = /*#__PURE__*/ createUseReadContract({
@@ -2315,6 +2440,15 @@ export const useReadWafflesAmmMigratorDeadAddress =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesAmmMigratorAbi,
     functionName: 'DEAD_ADDRESS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `functionName` set to `"NATIVE_USDC_SCALE"`
+ */
+export const useReadWafflesAmmMigratorNativeUsdcScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmMigratorAbi,
+    functionName: 'NATIVE_USDC_SCALE',
   })
 
 /**
@@ -2403,6 +2537,21 @@ export const useSimulateWafflesAmmMigratorSetLaunchFactory =
   })
 
 /**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__
+ */
+export const useWatchWafflesAmmMigratorEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({ abi: wafflesAmmMigratorAbi })
+
+/**
+ * Wraps __{@link useWatchContractEvent}__ with `abi` set to __{@link wafflesAmmMigratorAbi}__ and `eventName` set to `"LaunchFactoryConfigured"`
+ */
+export const useWatchWafflesAmmMigratorLaunchFactoryConfiguredEvent =
+  /*#__PURE__*/ createUseWatchContractEvent({
+    abi: wafflesAmmMigratorAbi,
+    eventName: 'LaunchFactoryConfigured',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__
  */
 export const useReadWafflesAmmPair = /*#__PURE__*/ createUseReadContract({
@@ -2442,6 +2591,15 @@ export const useReadWafflesAmmPairMinimumLiquidity =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesAmmPairAbi,
     functionName: 'MINIMUM_LIQUIDITY',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"NATIVE_USDC_SCALE"`
+ */
+export const useReadWafflesAmmPairNativeUsdcScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'NATIVE_USDC_SCALE',
   })
 
 /**
@@ -2604,6 +2762,15 @@ export const useWriteWafflesAmmPairBurn = /*#__PURE__*/ createUseWriteContract({
 })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"depositUsdc"`
+ */
+export const useWriteWafflesAmmPairDepositUsdc =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'depositUsdc',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"mint"`
  */
 export const useWriteWafflesAmmPairMint = /*#__PURE__*/ createUseWriteContract({
@@ -2675,6 +2842,15 @@ export const useSimulateWafflesAmmPairBurn =
   /*#__PURE__*/ createUseSimulateContract({
     abi: wafflesAmmPairAbi,
     functionName: 'burn',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmPairAbi}__ and `functionName` set to `"depositUsdc"`
+ */
+export const useSimulateWafflesAmmPairDepositUsdc =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmPairAbi,
+    functionName: 'depositUsdc',
   })
 
 /**
@@ -2826,6 +3002,15 @@ export const useReadWafflesAmmRouterFeeBps =
   })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"NATIVE_USDC_SCALE"`
+ */
+export const useReadWafflesAmmRouterNativeUsdcScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'NATIVE_USDC_SCALE',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"factory"`
  */
 export const useReadWafflesAmmRouterFactory =
@@ -2860,6 +3045,15 @@ export const useWriteWafflesAmmRouterSwapExactTokensForTokens =
   })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"swapExactUsdcForTokens"`
+ */
+export const useWriteWafflesAmmRouterSwapExactUsdcForTokens =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'swapExactUsdcForTokens',
+  })
+
+/**
  * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__
  */
 export const useSimulateWafflesAmmRouter =
@@ -2872,6 +3066,15 @@ export const useSimulateWafflesAmmRouterSwapExactTokensForTokens =
   /*#__PURE__*/ createUseSimulateContract({
     abi: wafflesAmmRouterAbi,
     functionName: 'swapExactTokensForTokens',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesAmmRouterAbi}__ and `functionName` set to `"swapExactUsdcForTokens"`
+ */
+export const useSimulateWafflesAmmRouterSwapExactUsdcForTokens =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesAmmRouterAbi,
+    functionName: 'swapExactUsdcForTokens',
   })
 
 /**
@@ -2912,6 +3115,15 @@ export const useReadWafflesBondingCurveCreatorFeeShareBps =
   /*#__PURE__*/ createUseReadContract({
     abi: wafflesBondingCurveAbi,
     functionName: 'CREATOR_FEE_SHARE_BPS',
+  })
+
+/**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesBondingCurveAbi}__ and `functionName` set to `"NATIVE_USDC_SCALE"`
+ */
+export const useReadWafflesBondingCurveNativeUsdcScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesBondingCurveAbi,
+    functionName: 'NATIVE_USDC_SCALE',
   })
 
 /**
@@ -3354,6 +3566,15 @@ export const useReadWafflesLaunchFactory = /*#__PURE__*/ createUseReadContract({
 })
 
 /**
+ * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"NATIVE_USDC_SCALE"`
+ */
+export const useReadWafflesLaunchFactoryNativeUsdcScale =
+  /*#__PURE__*/ createUseReadContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'NATIVE_USDC_SCALE',
+  })
+
+/**
  * Wraps __{@link useReadContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"TOKEN_SUPPLY"`
  */
 export const useReadWafflesLaunchFactoryTokenSupply =
@@ -3540,6 +3761,15 @@ export const useWriteWafflesLaunchFactoryCreateToken =
   })
 
 /**
+ * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"createTokenAndBuy"`
+ */
+export const useWriteWafflesLaunchFactoryCreateTokenAndBuy =
+  /*#__PURE__*/ createUseWriteContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'createTokenAndBuy',
+  })
+
+/**
  * Wraps __{@link useWriteContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"setCreationFee"`
  */
 export const useWriteWafflesLaunchFactorySetCreationFee =
@@ -3579,6 +3809,15 @@ export const useSimulateWafflesLaunchFactoryCreateToken =
   /*#__PURE__*/ createUseSimulateContract({
     abi: wafflesLaunchFactoryAbi,
     functionName: 'createToken',
+  })
+
+/**
+ * Wraps __{@link useSimulateContract}__ with `abi` set to __{@link wafflesLaunchFactoryAbi}__ and `functionName` set to `"createTokenAndBuy"`
+ */
+export const useSimulateWafflesLaunchFactoryCreateTokenAndBuy =
+  /*#__PURE__*/ createUseSimulateContract({
+    abi: wafflesLaunchFactoryAbi,
+    functionName: 'createTokenAndBuy',
   })
 
 /**

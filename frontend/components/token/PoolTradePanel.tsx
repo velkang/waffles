@@ -1,18 +1,17 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { formatUnits, parseUnits } from 'viem'
+import { formatUnits, maxUint256, parseUnits } from 'viem'
 import { useAccount, usePublicClient } from 'wagmi'
 import {
   useReadWafflesAmmFactoryGetPair,
   useReadWafflesAmmPairGetReserves,
   useReadWafflesMemeTokenAllowance,
   useReadWafflesMemeTokenBalanceOf,
-  useReadMockUsdcAllowance,
   useReadMockUsdcBalanceOf,
+  useWriteWafflesAmmRouterSwapExactUsdcForTokens,
   useWriteWafflesAmmRouterSwapExactTokensForTokens,
   useWriteWafflesMemeTokenApprove,
-  useWriteMockUsdcApprove,
 } from '@/generated/contracts-generated'
 import { formatToken, formatUsd } from '@/lib/format'
 import {
@@ -29,6 +28,7 @@ const BUY_PRESETS = [25, 100, 250] as const
 const SELL_PRESETS = [25, 50, 100] as const
 const BPS_DENOM = 10_000n
 const FEE_BPS = 100n
+const NATIVE_USDC_SCALE = 10n ** 12n
 const ZERO_ADDRESS = '0x0000000000000000000000000000000000000000' as Address
 
 function poolQuote(
@@ -85,11 +85,6 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
   })
-  const usdcAllowance = useReadMockUsdcAllowance({
-    address: USDC_ADDRESS,
-    args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
-    query: { enabled: Boolean(account && ROUTER_ADDRESS) },
-  })
   const tokenAllowance = useReadWafflesMemeTokenAllowance({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS, ROUTER_ADDRESS || ZERO_ADDRESS],
@@ -106,7 +101,6 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   }, [amount, mode])
 
   const balance = mode === 'buy' ? usdcBalance.data : tokenBalance.data
-  const allowance = mode === 'buy' ? usdcAllowance.data : tokenAllowance.data
 
   const quote = useMemo(() => {
     if (
@@ -121,9 +115,10 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
   }, [parsedAmount, rUsdc, rToken, mode])
 
   const needsApproval =
+    mode === 'sell' &&
     parsedAmount !== undefined &&
-    allowance !== undefined &&
-    allowance < parsedAmount
+    tokenAllowance.data !== undefined &&
+    tokenAllowance.data < parsedAmount
 
   const insufficientBalance =
     parsedAmount !== undefined &&
@@ -135,16 +130,16 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
       ? (quote * (BPS_DENOM - BigInt(slippageBps))) / BPS_DENOM
       : undefined
 
-  const approveUsdcAsync = useWriteMockUsdcApprove().writeContractAsync
   const approveTokenAsync = useWriteWafflesMemeTokenApprove().writeContractAsync
-  const swapAsync =
+  const swapTokensAsync =
     useWriteWafflesAmmRouterSwapExactTokensForTokens().writeContractAsync
+  const swapUsdcAsync =
+    useWriteWafflesAmmRouterSwapExactUsdcForTokens().writeContractAsync
 
   function refetchAll() {
     reservesQuery.refetch()
     usdcBalance.refetch()
     tokenBalance.refetch()
-    usdcAllowance.refetch()
     tokenAllowance.refetch()
   }
 
@@ -163,31 +158,26 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
     try {
       if (needsApproval) {
         setPhase('approve')
-        const hash =
-          mode === 'buy'
-            ? await approveUsdcAsync({
-                address: USDC_ADDRESS,
-                args: [ROUTER_ADDRESS, parsedAmount],
-              })
-            : await approveTokenAsync({
-                address: tokenAddress,
-                args: [ROUTER_ADDRESS, parsedAmount],
-              })
+        const hash = await approveTokenAsync({
+          address: tokenAddress,
+          args: [ROUTER_ADDRESS, maxUint256],
+        })
         await publicClient.waitForTransactionReceipt({ hash })
       }
 
       setPhase('swap')
-      const swapHash = await swapAsync({
-        address: ROUTER_ADDRESS,
-        args: [
-          pool,
-          mode === 'buy' ? USDC_ADDRESS : tokenAddress,
-          parsedAmount,
-          minOut,
-          account,
-          BigInt(Math.floor(Date.now() / 1000) + 20 * 60),
-        ],
-      })
+      const deadline = BigInt(Math.floor(Date.now() / 1000) + 20 * 60)
+      const swapHash =
+        mode === 'buy'
+          ? await swapUsdcAsync({
+              address: ROUTER_ADDRESS,
+              args: [pool, minOut, account, deadline],
+              value: parsedAmount * NATIVE_USDC_SCALE,
+            })
+          : await swapTokensAsync({
+              address: ROUTER_ADDRESS,
+              args: [pool, tokenAddress, parsedAmount, minOut, account, deadline],
+            })
       await publicClient.waitForTransactionReceipt({ hash: swapHash })
 
       setAmount('')
@@ -404,7 +394,7 @@ export function PoolTradePanel({ tokenAddress }: { tokenAddress: Address }) {
                 : !parsedAmount || parsedAmount === 0n
                   ? 'Enter an amount'
                   : needsApproval
-                    ? `Approve & ${mode === 'buy' ? 'Buy' : 'Sell'}`
+                    ? 'Approve & Sell'
                     : `${mode === 'buy' ? 'Buy' : 'Sell'} on DEX`}
           </button>
         </form>

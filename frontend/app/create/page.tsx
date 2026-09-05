@@ -8,10 +8,9 @@ import {
   wafflesLaunchFactoryAbi,
   useReadWafflesLaunchFactoryCreationFee,
   useWriteWafflesLaunchFactoryCreateToken,
-  useWriteMockUsdcApprove,
-  useWriteWafflesBondingCurveBuy,
+  useWriteWafflesLaunchFactoryCreateTokenAndBuy,
 } from '@/generated/contracts-generated'
-import { FACTORY_ADDRESS, USDC_ADDRESS } from '@/lib/wagmi'
+import { FACTORY_ADDRESS } from '@/lib/wagmi'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { ProgressBar } from '@/components/ui/ProgressBar'
 import { ImageUpload } from '@/components/ui/ImageUpload'
@@ -21,7 +20,9 @@ import {
   MAX_DEV_BUY_USDC,
 } from '@/lib/config'
 
-type Status = 'idle' | 'approving' | 'creating' | 'buying' | 'done' | 'error'
+type Status = 'idle' | 'creating' | 'done' | 'error'
+
+const NATIVE_USDC_SCALE = 10n ** 12n
 
 const inputClass =
   'w-full rounded-[6px] border border-[#24262e] bg-[#1a1b21] px-3 py-2 text-xs font-mono text-white outline-none transition placeholder:text-zinc-500 focus:border-[#db9d6a]'
@@ -34,10 +35,10 @@ export default function CreatePage() {
     address: FACTORY_ADDRESS,
   })
 
-  const approveAsync = useWriteMockUsdcApprove().writeContractAsync
   const createAsync =
     useWriteWafflesLaunchFactoryCreateToken().writeContractAsync
-  const buyAsync = useWriteWafflesBondingCurveBuy().writeContractAsync
+  const createAndBuyAsync =
+    useWriteWafflesLaunchFactoryCreateTokenAndBuy().writeContractAsync
 
   const [status, setStatus] = useState<Status>('idle')
   const [error, setError] = useState('')
@@ -80,37 +81,33 @@ export default function CreatePage() {
       const initialBuyRaw =
         initialBuyNum > 0 ? parseUnits(initialBuyAmount, 6) : 0n
 
-      // 1. Approve factory creation fee if needed
-      if (fee > 0n) {
-        setStatus('approving')
-        const hash = await approveAsync({
-          address: USDC_ADDRESS,
-          args: [FACTORY_ADDRESS, fee],
-        })
-        await publicClient.waitForTransactionReceipt({ hash })
-      }
-
-      // 2. Deploy token & bonding curve via factory
       setStatus('creating')
-      const createHash = await createAsync({
-        address: FACTORY_ADDRESS,
-        args: [
-          form.name.trim(),
-          form.symbol.trim(),
-          form.description,
-          form.imageUri,
-          form.website,
-          form.twitter,
-          form.telegram,
-        ],
-      })
+      const metadataArgs = [
+        form.name.trim(),
+        form.symbol.trim(),
+        form.description,
+        form.imageUri,
+        form.website,
+        form.twitter,
+        form.telegram,
+      ] as const
+      const createHash =
+        initialBuyRaw > 0n
+          ? await createAndBuyAsync({
+              address: FACTORY_ADDRESS,
+              args: [...metadataArgs, initialBuyRaw, 0n],
+              value: (fee + initialBuyRaw) * NATIVE_USDC_SCALE,
+            })
+          : await createAsync({
+              address: FACTORY_ADDRESS,
+              args: metadataArgs,
+              value: fee * NATIVE_USDC_SCALE,
+            })
       const receipt = await publicClient.waitForTransactionReceipt({
         hash: createHash,
       })
 
       let createdToken = ''
-      let createdCurve = '' as `0x${string}`
-
       for (const log of receipt.logs) {
         try {
           const ev = {
@@ -121,7 +118,6 @@ export default function CreatePage() {
           const { eventName, args } = decodeEventLog(ev)
           if (eventName === 'TokenCreated') {
             createdToken = (args as { token: string }).token
-            createdCurve = (args as { curve: `0x${string}` }).curve
             break
           }
         } catch {
@@ -133,24 +129,6 @@ export default function CreatePage() {
         setStatus('done')
         router.push('/')
         return
-      }
-
-      // 3. Execute Initial Dev Buy if specified
-      if (initialBuyRaw > 0n && createdCurve) {
-        setStatus('buying')
-        // Approve curve to spend USDC
-        const approveBuyHash = await approveAsync({
-          address: USDC_ADDRESS,
-          args: [createdCurve, initialBuyRaw],
-        })
-        await publicClient.waitForTransactionReceipt({ hash: approveBuyHash })
-
-        // Execute buy on bonding curve
-        const buyHash = await buyAsync({
-          address: createdCurve,
-          args: [initialBuyRaw, 0n],
-        })
-        await publicClient.waitForTransactionReceipt({ hash: buyHash })
       }
 
       setStatus('done')
@@ -352,15 +330,11 @@ export default function CreatePage() {
             disabled={!canSubmit}
             className="w-full rounded-[6px] bg-[#db9d6a] py-2.5 text-xs font-mono font-bold text-[#0e0f12] transition hover:bg-[#e5ab7a] active:scale-98 disabled:opacity-40 disabled:cursor-not-allowed uppercase tracking-wider"
           >
-            {status === 'approving'
-              ? 'Approving USDC Fee…'
-              : status === 'creating'
-                ? 'Deploying Token on Arc…'
-                : status === 'buying'
-                  ? `Purchasing Initial ${initialBuyAmount} USDC Bag…`
-                  : totalCostUsd > 0
-                    ? `Deploy Token & Buy ($${totalCostUsd.toFixed(2)} USDC Total)`
-                    : 'Deploy Token'}
+            {status === 'creating'
+              ? 'Deploying Token on Arc…'
+              : totalCostUsd > 0
+                ? `Deploy Token & Buy ($${totalCostUsd.toFixed(2)} USDC Total)`
+                : 'Deploy Token'}
           </button>
         </form>
 

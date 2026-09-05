@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { formatUnits, parseUnits } from "viem";
+import { formatUnits, maxUint256, parseUnits } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
 import {
   useReadWafflesBondingCurveCreator,
@@ -13,7 +13,6 @@ import {
   useReadWafflesBondingCurveQuoteBuy,
   useReadWafflesBondingCurveQuoteSell,
   useReadWafflesBondingCurveGraduationMarketCapTarget,
-  useReadMockUsdcAllowance,
   useReadMockUsdcBalanceOf,
   useReadWafflesMemeTokenAllowance,
   useReadWafflesMemeTokenBalanceOf,
@@ -21,7 +20,6 @@ import {
   useWriteWafflesBondingCurveClaimCreatorFees,
   useWriteWafflesBondingCurveSell,
   useWriteWafflesMemeTokenApprove,
-  useWriteMockUsdcApprove,
 } from "@/generated/contracts-generated";
 import { PoolTradePanel } from "./PoolTradePanel";
 import { useTrades } from "@/lib/hooks/queries";
@@ -46,6 +44,7 @@ const SLIPPAGE_OPTIONS = [50, 100, 300] as const;
 const BUY_PRESETS = [25, 100, 250] as const;
 const SELL_PRESETS = [25, 50, 100] as const;
 const BPS_DENOM = 10_000n;
+const NATIVE_USDC_SCALE = 10n ** 12n;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as Address;
 
 export function TradePanel({
@@ -120,11 +119,6 @@ function CurveTradePanel({
     args: [account ?? ZERO_ADDRESS],
     query: { enabled: Boolean(account) },
   });
-  const usdcAllowance = useReadMockUsdcAllowance({
-    address: USDC_ADDRESS,
-    args: [account ?? ZERO_ADDRESS, curveAddress],
-    query: { enabled: Boolean(account) },
-  });
   const tokenAllowance = useReadWafflesMemeTokenAllowance({
     address: tokenAddress,
     args: [account ?? ZERO_ADDRESS, curveAddress],
@@ -161,7 +155,6 @@ function CurveTradePanel({
 
   const quote = mode === "buy" ? quoteBuy.data : quoteSell.data;
   const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
-  const allowance = mode === "buy" ? usdcAllowance.data : tokenAllowance.data;
   const progress = progressBps !== undefined ? Number(progressBps) / 100 : 0;
 
   const graduationTargetUsd =
@@ -238,9 +231,10 @@ function CurveTradePanel({
   }, [trades, statsTimeframe, currentPrice, now]);
 
   const needsApproval =
+    mode === "sell" &&
     parsedAmount !== undefined &&
-    allowance !== undefined &&
-    allowance < parsedAmount;
+    tokenAllowance.data !== undefined &&
+    tokenAllowance.data < parsedAmount;
 
   const insufficientBalance =
     parsedAmount !== undefined && balance !== undefined && balance < parsedAmount;
@@ -250,29 +244,22 @@ function CurveTradePanel({
       ? (quote * (BPS_DENOM - BigInt(slippageBps))) / BPS_DENOM
       : undefined;
 
-  const approveAsync = useWriteMockUsdcApprove().writeContractAsync;
   const approveTokenAsync = useWriteWafflesMemeTokenApprove().writeContractAsync;
   const buyAsync = useWriteWafflesBondingCurveBuy().writeContractAsync;
   const sellAsync = useWriteWafflesBondingCurveSell().writeContractAsync;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!publicClient || parsedAmount === undefined || minOut === undefined)
+    if (!publicClient || !account || parsedAmount === undefined || minOut === undefined)
       return;
     setError("");
     try {
       if (needsApproval) {
         setPhase("approve");
-        const hash =
-          mode === "buy"
-            ? await approveAsync({
-                address: USDC_ADDRESS,
-                args: [curveAddress, parsedAmount],
-              })
-            : await approveTokenAsync({
-                address: tokenAddress,
-                args: [curveAddress, parsedAmount],
-              });
+        const hash = await approveTokenAsync({
+          address: tokenAddress,
+          args: [curveAddress, maxUint256],
+        });
         await publicClient.waitForTransactionReceipt({ hash });
       }
 
@@ -281,7 +268,8 @@ function CurveTradePanel({
         mode === "buy"
           ? await buyAsync({
               address: curveAddress,
-              args: [parsedAmount, minOut],
+              args: [minOut, account],
+              value: parsedAmount * NATIVE_USDC_SCALE,
             })
           : await sellAsync({
               address: curveAddress,
@@ -292,7 +280,6 @@ function CurveTradePanel({
       setAmount("");
       usdcBalance.refetch();
       tokenBalance.refetch();
-      usdcAllowance.refetch();
       tokenAllowance.refetch();
       quoteBuy.refetch();
       quoteSell.refetch();
@@ -489,7 +476,7 @@ function CurveTradePanel({
                 : !parsedAmount || parsedAmount === 0n
                   ? "Enter an amount"
                   : needsApproval
-                    ? `Approve & ${mode === "buy" ? "Buy" : "Sell"}`
+                    ? "Approve & Sell"
                     : `${mode === "buy" ? "Buy" : "Sell"} Now`}
           </button>
         </form>
