@@ -9,11 +9,8 @@ import {
   useReadWafflesBondingCurveCreatorEarnings,
   useReadWafflesBondingCurveCurrentPrice,
   useReadWafflesBondingCurveGraduated,
-  useReadWafflesBondingCurveGraduationProgressBps,
-  useReadWafflesBondingCurveMarketCap,
   useReadWafflesBondingCurveQuoteBuy,
   useReadWafflesBondingCurveQuoteSell,
-  useReadWafflesBondingCurveGraduationMarketCapTarget,
   useReadMockUsdcBalanceOf,
   useReadWafflesMemeTokenAllowance,
   useReadWafflesMemeTokenBalanceOf,
@@ -26,7 +23,6 @@ import { PoolTradePanel } from "./PoolTradePanel";
 import { useLaunch, useTrades } from "@/lib/hooks/queries";
 import { formatToken, formatUsd, shortAddress } from "@/lib/format";
 import { USDC_ADDRESS } from "@/lib/wagmi";
-import { ProgressBar } from "@/components/ui/ProgressBar";
 
 type Address = `0x${string}`;
 type Mode = "buy" | "sell";
@@ -152,39 +148,15 @@ function CurveTradePanel({
   const { data: currentPrice } = useReadWafflesBondingCurveCurrentPrice({
     address: curveAddress,
   });
-  const { data: marketCap } = useReadWafflesBondingCurveMarketCap({
-    address: curveAddress,
-  });
-  const { data: progressBps } = useReadWafflesBondingCurveGraduationProgressBps({
-    address: curveAddress,
-  });
   const { data: creator } = useReadWafflesBondingCurveCreator({
     address: curveAddress,
   });
-  const { data: graduationMarketCapTarget } =
-    useReadWafflesBondingCurveGraduationMarketCapTarget({
-      address: curveAddress,
-    });
-
   const quote = mode === "buy" ? quoteBuy.data : quoteSell.data;
   const balance = mode === "buy" ? usdcBalance.data : tokenBalance.data;
-  const displayedMcap = realtimeLaunch?.mcap
-    ? BigInt(realtimeLaunch.mcap)
-    : marketCap;
-  const progress =
-    realtimeLaunch?.progressBps !== undefined
-      ? realtimeLaunch.progressBps / 100
-      : progressBps !== undefined
-        ? Number(progressBps) / 100
-        : 0;
   const activePrice = realtimeLaunch?.price
     ? BigInt(realtimeLaunch.price)
     : currentPrice;
 
-  const graduationTargetUsd =
-    graduationMarketCapTarget === undefined
-      ? undefined
-      : Number(formatUnits(graduationMarketCapTarget, 6));
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -647,21 +619,15 @@ function CurveTradePanel({
           <div className="space-y-2 text-xs">
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
               <span className="text-zinc-400">Mint Authority</span>
-              <span className="font-bold text-[#4ade80] flex items-center gap-1">
-                <span>✓</span> Fixed 1.0B Supply
-              </span>
+              <span className="font-bold text-[#4ade80]">Fixed 1.0B Supply</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
               <span className="text-zinc-400">Freeze Authority</span>
-              <span className="font-bold text-[#4ade80] flex items-center gap-1">
-                <span>✓</span> Immutable ERC20
-              </span>
+              <span className="font-bold text-[#4ade80]">Immutable ERC20</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
               <span className="text-zinc-400">LP Lock</span>
-              <span className="font-bold text-[#4ade80] flex items-center gap-1">
-                <span>✓</span> 100% Burned at Graduation
-              </span>
+              <span className="font-bold text-[#4ade80]">100% Burned at Graduation</span>
             </div>
             <div className="flex items-center justify-between py-1 border-b border-[#1f2128]">
               <span className="text-zinc-400">Team Pre-mine</span>
@@ -675,32 +641,6 @@ function CurveTradePanel({
             </div>
           </div>
         )}
-      </div>
-
-      {/* 3. Bonding Curve Progress Card */}
-      <div className="rounded-[10px] bg-[#141519] border border-[#24262e] p-4 space-y-2.5 text-xs">
-        <div className="flex items-center justify-between font-bold">
-          <span className="text-zinc-400">
-            MC <span className="text-white">{displayedMcap ? formatUsd(displayedMcap) : "—"}</span>
-          </span>
-          <span className="text-zinc-400">
-            ATH <span className="text-[#db9d6a]">
-              {graduationTargetUsd !== undefined
-                ? graduationTargetUsd >= 1000
-                  ? `$${(graduationTargetUsd / 1000).toFixed(graduationTargetUsd % 1000 === 0 ? 0 : 1)}K`
-                  : `$${graduationTargetUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
-                : "—"}
-            </span>
-          </span>
-        </div>
-        <ProgressBar progress={progress} graduated={false} size="md" />
-        <div className="flex items-center justify-between text-[10px] text-zinc-500">
-          <span>Graduation target: {graduationTargetUsd !== undefined
-            ? `$${graduationTargetUsd.toLocaleString(undefined, { maximumFractionDigits: 0 })} USDC`
-            : "—"}
-          </span>
-          <span className="font-bold text-[#db9d6a]">{progress.toFixed(1)}%</span>
-        </div>
       </div>
 
       {/* 4. Description Card */}
@@ -752,9 +692,7 @@ function CreatorRewardsCard({
 
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-2">
-          <div className="h-6 w-6 rounded-full bg-[#1a1b21] border border-[#24262e] flex items-center justify-center text-xs">
-            👨‍💻
-          </div>
+          <div className="h-6 w-6 rounded-full bg-[#1a1b21] border border-[#24262e] flex items-center justify-center text-[9px] font-bold text-[#db9d6a]">CR</div>
           <div>
             <span className="font-bold text-zinc-200 block">
               {creator ? shortAddress(creator) : "Deployer"}

@@ -6,6 +6,9 @@ export enum LaunchSortOrder {
   NEW = 'new',
   MCAP = 'mcap',
   VOLUME = 'volume',
+  TRENDING = 'trending',
+  GRADUATING = 'graduating',
+  GRADUATED = 'graduated',
 }
 
 export class LaunchesQueryDto {

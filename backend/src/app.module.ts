@@ -13,6 +13,7 @@ import { PortfoliosModule } from './portfolios/portfolios.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { RealtimeModule } from './realtime/realtime.module';
 import { RequestIdMiddleware } from './common/middleware/request-id.middleware';
+import { AnalyticsModule } from './analytics/analytics.module';
 import { RewardsModule } from './rewards/rewards.module';
 
 @Module({
@@ -41,6 +42,7 @@ import { RewardsModule } from './rewards/rewards.module';
     UploadsModule,
     RealtimeModule,
     RewardsModule,
+    AnalyticsModule,
   ],
   providers: [
     {

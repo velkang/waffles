@@ -34,7 +34,7 @@ export function StatusBadge({
         className={`inline-flex items-center gap-1 rounded-full border border-[#db9d6a]/40 bg-[#3b2718] font-mono font-bold text-[#db9d6a] uppercase tracking-wider ${sizeClass}`}
       >
         <span className="h-1.5 w-1.5 rounded-full bg-[#db9d6a]" />
-        {progress.toFixed(0)}% HOT
+        {progress.toFixed(1)}% CURVE
       </span>
     );
   }

@@ -2,6 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
+  AnalyticsRange,
   LaunchesQuery,
 } from '@waffles/shared';
 import { apiClient } from '../api-client';
@@ -99,5 +100,24 @@ export function useRewardClaims(address?: string) {
     queryFn: () => apiClient.getRewardClaims(address!),
     enabled: Boolean(address && /^0x[0-9a-fA-F]{40}$/.test(address)),
     staleTime: 10_000,
+  });
+}
+
+export function useAnalytics(range: AnalyticsRange) {
+  return useQuery({
+    queryKey: ['analytics', range],
+    queryFn: () => apiClient.getAnalytics(range),
+    staleTime: 30_000,
+    refetchInterval: 60_000,
+  });
+}
+
+// Discovery ranks refresh together, rather than reshuffling on individual SSE trades.
+export function useExploreLaunches(sort: LaunchesQuery['sort']) {
+  return useQuery({
+    queryKey: ['explore', sort],
+    queryFn: () => apiClient.getLaunches({ sort, limit: 60 }),
+    staleTime: 30_000,
+    refetchInterval: 30_000,
   });
 }

@@ -133,7 +133,7 @@ export function ImageUpload({ value, onChange, onUploadingChange }: ImageUploadP
                   • Uploading…
                 </span>
               ) : (
-                <span className="text-[10px] text-[#4ade80]">✓ Ready</span>
+                <span className="text-[10px] text-[#4ade80]">Ready</span>
               )}
             </div>
             <p className="text-[11px] text-zinc-400 mt-0.5 truncate font-sans">

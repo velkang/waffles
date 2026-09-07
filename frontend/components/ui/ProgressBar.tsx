@@ -33,7 +33,7 @@ export function ProgressBar({
         : "bg-[#db9d6a]/80"; // Sand Copper
 
   return (
-    <div className={`relative w-full overflow-hidden rounded-full bg-[#1a1b21] border border-[#24262e] ${heightClass} ${className}`}>
+    <div role="progressbar" aria-label="Curve allocation purchased" aria-valuemin={0} aria-valuemax={100} aria-valuenow={clamped} className={`relative w-full overflow-hidden rounded-full bg-[#1a1b21] border border-[#24262e] ${heightClass} ${className}`}>
       {/* Milestone tick marks at 25%, 50%, 75% */}
       {showTicks && !graduated && (
         <>

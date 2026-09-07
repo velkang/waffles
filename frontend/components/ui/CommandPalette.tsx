@@ -158,7 +158,7 @@ export function CommandPalette({
                   <div className="text-right shrink-0">
                     {item.graduated ? (
                       <span className="text-[10px] font-bold text-[#4ade80]">
-                        🎓 GRADUATED
+                        GRADUATED
                       </span>
                     ) : (
                       <span className="text-[10px] text-[#db9d6a]">

@@ -21,6 +21,9 @@ export interface LaunchSummary {
   mcap: string;
   volume24h: string;
   progressBps: number;
+  volume1h?: string;
+  traders1h?: number;
+  previousVolume1h?: string;
 }
 
 export interface Trade {
@@ -211,7 +214,7 @@ export interface ControlEventDoc {
 }
 
 // Query / Filter definitions
-export type LaunchSort = "new" | "mcap" | "volume";
+export type LaunchSort = "new" | "mcap" | "volume" | "trending" | "graduating" | "graduated";
 
 export interface LaunchesQuery {
   sort?: LaunchSort;
@@ -258,4 +261,26 @@ export function buildEventId(
     return `${chainId}:${blockNumber}:${logIndex}:${type}${extra ? `:${extra}` : ""}`;
   }
   return `${chainId}:${Date.now()}:${Math.random().toString(36).slice(2, 8)}:${type}${extra ? `:${extra}` : ""}`;
+}
+
+export type AnalyticsRange = '24h' | '7d' | '30d' | 'all';
+export interface AnalyticsTotals {
+  volume: string;
+  wallets: number;
+  launches: number;
+  graduations: number;
+  fees: string | null;
+  creatorFees: string | null;
+  platformFees: string | null;
+  rewardsFees: string | null;
+}
+export interface AnalyticsResponse {
+  range: AnalyticsRange;
+  from: string;
+  asOf: string;
+  latestTradeAt: string | null;
+  current: AnalyticsTotals;
+  previous: AnalyticsTotals | null;
+  series: { time: string; curveVolume: string; poolVolume: string; launches: number; graduations: number }[];
+  markets: { token: string; name: string; symbol: string; volume: string; wallets: number; graduated: boolean }[];
 }

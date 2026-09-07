@@ -5,6 +5,8 @@ import { PortfoliosService } from '../src/portfolios/portfolios.service';
 import { UploadsService } from '../src/uploads/uploads.service';
 import { DatabaseService } from '../src/database/database.service';
 import { ConfigService } from '@nestjs/config';
+import { summarizeAnalytics } from '../src/analytics/analytics.service';
+import { LaunchSortOrder } from '../src/launches/dto/launches-query.dto';
 
 describe('API Contract & Data Transformation Tests', () => {
   let mockDb: any;
@@ -111,9 +113,81 @@ describe('API Contract & Data Transformation Tests', () => {
           price: '1200000',
           mcap: '12000000000',
           volume24h: '500000',
+          volume1h: '0',
+          previousVolume1h: '0',
+          traders1h: 0,
           progressBps: 5500,
         });
       }
+    });
+  });
+
+  describe('Market discovery', () => {
+    it('ranks all launches by hourly wallets, then volume, and excludes inactive tokens', async () => {
+      const docs = Array.from({ length: 601 }, (_, i) => ({ token: `token${i}`, curve: `curve${i}` }));
+      const find = jest.fn().mockReturnValue({ toArray: async () => docs });
+      mockDb.collection.mockReturnValue({ find });
+      const service = new LaunchesService(mockDbService as DatabaseService, mockConfigService as ConfigService);
+      jest.spyOn(service, 'enrichLaunches').mockResolvedValue(docs.map((doc, i) => ({ ...doc,
+        traders1h: i === 600 ? 5 : i === 0 || i === 1 ? 2 : 0,
+        volume1h: i === 1 ? '200' : '100', mcap: '0', progressBps: 0,
+      })) as any);
+      const result = await service.getLaunches({ sort: LaunchSortOrder.TRENDING, limit: 3 });
+      expect('launches' in result && result.launches.map((row) => row.token)).toEqual(['token600', 'token1', 'token0']);
+      expect(service.enrichLaunches).toHaveBeenCalledWith(mockDb, docs);
+    });
+
+    it('separates open curves and ranks by progress before market cap', async () => {
+      const find = jest.fn().mockReturnValue({ toArray: async () => [] });
+      mockDb.collection.mockReturnValue({ find });
+      const service = new LaunchesService(mockDbService as DatabaseService, mockConfigService as ConfigService);
+      jest.spyOn(service, 'enrichLaunches').mockResolvedValue([
+        { token: 'large', mcap: '999999', progressBps: 3000 },
+        { token: 'close', mcap: '100', progressBps: 9000 },
+      ] as any);
+      const result = await service.getLaunches({ sort: LaunchSortOrder.GRADUATING });
+      expect(find).toHaveBeenCalledWith({ factory: '0xfactory', graduated: { $ne: true } });
+      expect('launches' in result && result.launches[0].token).toBe('close');
+    });
+  });
+
+  describe('Analytics accounting', () => {
+    const now = new Date('2026-09-07T12:00:00Z');
+    const from = now.getTime() - 86400000;
+    const launches = [{ token: 'token', curve: 'curve', name: 'Coin', symbol: 'COIN',
+      createdAt: new Date(from - 1000), graduatedAt: new Date(from + 1000), graduated: true }];
+    async function* records(rows: any[]) { yield* rows; }
+    const trade = (time: number, extra = {}) => ({ curveAddress: 'curve', trader: '0xABC',
+      timestamp: new Date(time), usdcAmount: '90', usdcGrossAmount: '100', feeAmount: '11', ...extra });
+
+    it('uses half-open windows, deduplicates wallets, separates venues and preserves fee rounding', async () => {
+      const result = await summarizeAnalytics(launches, records([
+        trade(from - 1), trade(from), trade(from + 1, { trader: '0xabc', source: 'pool' }),
+        trade(now.getTime()), trade(from + 1, { curveAddress: 'unrelated' }),
+      ]), '24h', now, from);
+      expect(result.current).toEqual({ volume: '200', wallets: 1, launches: 0, graduations: 1,
+        fees: '22', creatorFees: '14', platformFees: '4', rewardsFees: '4' });
+      expect(result.previous?.volume).toBe('100');
+      expect(result.previous?.launches).toBe(1);
+      expect(result.series[0]).toMatchObject({ curveVolume: '100', poolVolume: '100', graduations: 1 });
+      expect(result.series).toHaveLength(24);
+      expect(result.markets).toHaveLength(1);
+    });
+
+    it('does not turn missing fee records into zero fees', async () => {
+      const result = await summarizeAnalytics(launches, records([trade(from, { feeAmount: undefined })]), '24h', now, from);
+      expect(result.current.volume).toBe('100');
+      expect(result.current.fees).toBeNull();
+      expect(result.current.creatorFees).toBeNull();
+      expect(result.current.rewardsFees).toBeNull();
+    });
+
+    it('returns honest empty history without a comparison for all time', async () => {
+      const result = await summarizeAnalytics([], records([]), 'all', now, now.getTime());
+      expect(result.current.volume).toBe('0');
+      expect(result.previous).toBeNull();
+      expect(result.latestTradeAt).toBeNull();
+      expect(result.series).toEqual([]);
     });
   });
 

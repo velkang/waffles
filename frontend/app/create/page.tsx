@@ -263,10 +263,10 @@ export default function CreatePage() {
                   <button
                     type="button"
                     onClick={() => setInitialBuyAmount('')}
-                    className="rounded-[4px] border border-[#24262e] px-1.5 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 transition"
+                    className="rounded-[4px] border border-[#24262e] px-2.5 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 transition"
                     title="Clear"
                   >
-                    ✕
+                    Clear
                   </button>
                 )}
               </div>

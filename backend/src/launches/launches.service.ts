@@ -30,6 +30,9 @@ interface TradeMetrics {
   mcap?: string;
   volume24h?: string;
   progressBps?: number;
+  volume1h?: string;
+  traders1h?: number;
+  previousVolume1h?: string;
 }
 
 @Injectable()
@@ -59,6 +62,9 @@ export class LaunchesService {
       price: metrics.price ?? d.price ?? '0',
       mcap: metrics.mcap ?? d.mcap ?? '0',
       volume24h: metrics.volume24h ?? '0',
+      volume1h: metrics.volume1h ?? '0',
+      traders1h: metrics.traders1h ?? 0,
+      previousVolume1h: metrics.previousVolume1h ?? '0',
       progressBps: d.graduated
         ? 10_000
         : (metrics.progressBps ?? d.progressBps ?? 0),
@@ -68,11 +74,14 @@ export class LaunchesService {
   async enrichLaunches(db: Db, docs: LaunchDoc[]): Promise<LaunchSummary[]> {
     if (docs.length === 0) return [];
     const curves = docs.map((d) => d.curve);
-    const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const now = new Date();
+    const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const hour = new Date(now.getTime() - 60 * 60 * 1000);
+    const previousHour = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
-    const [volumes, latest] = await Promise.all([
+    const [volumes, latest, activity] = await Promise.all([
       db.collection('trades').aggregate([
-        { $match: { curveAddress: { $in: curves }, timestamp: { $gte: since } } },
+        { $match: { curveAddress: { $in: curves }, timestamp: { $gte: since, $lt: now } } },
         {
           $group: {
             _id: '$curveAddress',
@@ -96,6 +105,15 @@ export class LaunchesService {
           },
         },
       ]).toArray(),
+      db.collection('trades').aggregate([
+        { $match: { curveAddress: { $in: curves }, timestamp: { $gte: previousHour, $lt: now } } },
+        { $group: {
+          _id: '$curveAddress',
+          volume1h: { $sum: { $cond: [{ $gte: ['$timestamp', hour] }, { $toDecimal: { $ifNull: ['$usdcGrossAmount', '$usdcAmount'] } }, 0] } },
+          previousVolume1h: { $sum: { $cond: [{ $lt: ['$timestamp', hour] }, { $toDecimal: { $ifNull: ['$usdcGrossAmount', '$usdcAmount'] } }, 0] } },
+          wallets: { $addToSet: { $cond: [{ $gte: ['$timestamp', hour] }, { $toLower: '$trader' }, null] } },
+        } },
+      ]).toArray(),
     ]);
 
     const metricsByCurve = new Map<string, TradeMetrics>();
@@ -115,6 +133,15 @@ export class LaunchesService {
       });
     }
 
+    for (const row of activity) {
+      const curve = String(row._id);
+      metricsByCurve.set(curve, {
+        ...metricsByCurve.get(curve),
+        volume1h: row.volume1h?.toString() ?? '0',
+        previousVolume1h: row.previousVolume1h?.toString() ?? '0',
+        traders1h: (row.wallets ?? []).filter(Boolean).length,
+      });
+    }
     return docs.map((doc) => this.mapLaunch(doc, metricsByCurve.get(doc.curve)));
   }
 
@@ -135,17 +162,28 @@ export class LaunchesService {
     const sort = query.sort ?? LaunchSortOrder.NEW;
     const limit = query.limit ?? 50;
 
-    if (sort === LaunchSortOrder.VOLUME || sort === LaunchSortOrder.MCAP) {
-      const docs = await launches.find(filter).limit(500).toArray();
+    if (sort === LaunchSortOrder.GRADUATING) filter.graduated = { $ne: true };
+    if (sort === LaunchSortOrder.GRADUATED) filter.graduated = true;
+
+    if (sort !== LaunchSortOrder.NEW) {
+      const docs = await launches.find(filter).toArray();
       const enriched = await this.enrichLaunches(db, docs);
 
-      enriched.sort((a, b) =>
-        sort === LaunchSortOrder.MCAP
-          ? Number(BigInt(b.mcap || 0) - BigInt(a.mcap || 0))
-          : Number(BigInt(b.volume24h || 0) - BigInt(a.volume24h || 0)),
-      );
+      enriched.sort((a, b) => {
+        if (sort === LaunchSortOrder.TRENDING && a.traders1h !== b.traders1h) {
+          return (b.traders1h ?? 0) - (a.traders1h ?? 0);
+        }
+        if (sort === LaunchSortOrder.GRADUATING && a.progressBps !== b.progressBps) {
+          return b.progressBps - a.progressBps;
+        }
+        const key = sort === LaunchSortOrder.TRENDING ? 'volume1h'
+          : sort === LaunchSortOrder.VOLUME ? 'volume24h' : 'mcap';
+        const left = BigInt(a[key] ?? '0');
+        const right = BigInt(b[key] ?? '0');
+        return left === right ? a.token.localeCompare(b.token) : left > right ? -1 : 1;
+      });
 
-      return { launches: enriched.slice(0, limit) };
+      return { launches: enriched.filter((row) => sort !== LaunchSortOrder.TRENDING || (row.traders1h ?? 0) > 0).slice(0, limit) };
     }
 
     const docs = await launches

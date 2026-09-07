@@ -1,4 +1,6 @@
 import {
+  AnalyticsRange,
+  AnalyticsResponse,
   CandlesQuery,
   CandlesResponse,
   LaunchesQuery,
@@ -64,6 +66,9 @@ export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> 
 }
 
 export const apiClient = {
+  async getAnalytics(range: AnalyticsRange): Promise<AnalyticsResponse> {
+    return fetchJson<AnalyticsResponse>(buildUrl('/v1/analytics', { range }));
+  },
   async getLaunches(query?: LaunchesQuery): Promise<LaunchesResponse> {
     const url = buildUrl('/v1/launches', {
       sort: query?.sort,

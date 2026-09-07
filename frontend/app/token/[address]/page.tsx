@@ -1,5 +1,8 @@
 "use client";
 
+import { useReadContracts } from "wagmi";
+import { ProgressBar } from "@/components/ui/ProgressBar";
+import { wafflesBondingCurveAbi } from "@/generated/contracts-generated";
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -110,11 +113,9 @@ export default function TokenPage() {
   const displaySymbol = realtimeLaunch?.symbol || tokenSymbol;
 
   return (
-    <div className="space-y-5">
-      {/* 1. Token Top Header (Pump.fun style) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-1">
-        {/* Left: Avatar, $Symbol, Name, Holders */}
-        <div className="flex items-center gap-3 min-w-0">
+    <div className="token-detail-page">
+      <section className="token-detail-header" aria-labelledby="token-title">
+        <div className="token-detail-identity">
           {imageUri ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -124,96 +125,51 @@ export default function TokenPage() {
                 quality: 80,
               })}
               alt=""
-              className="h-14 w-14 rounded-[10px] border border-[#24262e] bg-[#1a1b21] object-cover shrink-0"
+              className="token-detail-image"
             />
           ) : (
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] bg-[#1a1b21] border border-[#24262e] text-lg font-black text-[#db9d6a]">
+            <div className="token-detail-image token-detail-image-fallback">
               ${(displaySymbol ?? token.slice(2, 4)).slice(0, 3)}
             </div>
           )}
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="truncate text-2xl font-black text-white tracking-tight">
-                ${displaySymbol ?? "…"}
-              </h1>
+          <div className="token-detail-name">
+            <div className="token-detail-title-row">
+              <h1 id="token-title">{displayName}</h1>
               <StatusBadge graduated={graduated} progress={progress} size="xs" />
             </div>
-
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-xs text-zinc-400">
-              <span className="text-zinc-300 font-medium">{displayName}</span>
-              <span>•</span>
-              <span className="text-zinc-400">🌿 {createdAt ? timeAgo(Number(createdAt)) : "now"}</span>
-            </div>
+            <p>${displaySymbol ?? "…"}<span>·</span>{createdAt ? timeAgo(Number(createdAt)) : "Just launched"}</p>
           </div>
         </div>
 
-        {/* Right: Huge Market Cap Readout & Action Icons */}
-        <div className="flex sm:flex-col sm:items-end justify-between items-center gap-1 font-mono">
-          <div className="flex items-baseline gap-2">
-            <span className="text-xs text-zinc-400">Market cap. ⇄</span>
-            <span className="text-2xl sm:text-3xl font-black text-white">
-              {formatUsd(mcap)}
-            </span>
-          </div>
+        <dl className="token-detail-stats">
+          <div><dt>Market cap</dt><dd>{formatUsd(mcap)}</dd></div>
+          <div><dt>24h volume</dt><dd>{formatUsd(realtimeLaunch?.volume24h ? BigInt(realtimeLaunch.volume24h) : undefined)}</dd></div>
+          <div><dt>Curve progress</dt><dd>{graduated ? "Complete" : progress === undefined ? "—" : `${progress.toFixed(1)}%`}</dd></div>
+          <div><dt>Market</dt><dd>{graduated ? "Liquidity pool" : "Bonding curve"}</dd></div>
+        </dl>
 
-          <div className="flex items-center gap-2 text-xs">
-            {/* Copy CA */}
-            <button
-              type="button"
-              onClick={copyAddress}
-              className="flex items-center gap-1 rounded-[4px] bg-[#141519] border border-[#24262e] px-2 py-0.5 text-zinc-300 hover:border-[#db9d6a] transition"
-              title="Copy Contract Address"
-            >
-              <span>{shortAddress(token)}</span>
-              <span className="text-[#db9d6a]">{copied ? "✓" : "📋"}</span>
-            </button>
-
-            {/* Social Links */}
-            {twitter && (
-              <a
-                href={`https://x.com/${twitter.replace("@", "")}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex h-6 w-6 items-center justify-center rounded-[4px] bg-[#141519] border border-[#24262e] text-zinc-400 hover:text-white hover:border-[#db9d6a] transition"
-              >
-                𝕏
-              </a>
-            )}
-            {website && (
-              <a
-                href={website}
-                target="_blank"
-                rel="noreferrer"
-                className="flex h-6 w-6 items-center justify-center rounded-[4px] bg-[#141519] border border-[#24262e] text-zinc-400 hover:text-white hover:border-[#db9d6a] transition"
-              >
-                🌐
-              </a>
-            )}
-            {telegram && (
-              <a
-                href={`https://t.me/${telegram.replace("t.me/", "")}`}
-                target="_blank"
-                rel="noreferrer"
-                className="flex h-6 w-6 items-center justify-center rounded-[4px] bg-[#141519] border border-[#24262e] text-zinc-400 hover:text-white hover:border-[#db9d6a] transition"
-              >
-                ✈
-              </a>
-            )}
-          </div>
+        <div className="token-detail-actions">
+          <button type="button" onClick={copyAddress} title="Copy contract address">
+            <span>{shortAddress(token)}</span><strong>{copied ? "Copied" : "Copy contract"}</strong>
+          </button>
+          {twitter && <a href={`https://x.com/${twitter.replace("@", "")}`} target="_blank" rel="noreferrer">X</a>}
+          {website && <a href={website} target="_blank" rel="noreferrer">Website</a>}
+          {telegram && <a href={`https://t.me/${telegram.replace("t.me/", "")}`} target="_blank" rel="noreferrer">Telegram</a>}
         </div>
-      </div>
+      </section>
 
-      {/* 2. Main 2-Column Grid (Left: Chart + Community/Holders, Right: Order Slip) */}
       <div className="grid gap-5 lg:grid-cols-[1fr_360px]">
         {/* Left Column: Chart on top, Holders & Callouts below */}
-        <div className="space-y-5">
+        <div className="min-w-0 space-y-5">
           {/* Price & Curve Chart */}
           {curve ? (
             <PriceChart token={token} curve={curve} />
           ) : (
             <div className="h-80 animate-pulse rounded-[10px] bg-[#141519] border border-[#24262e]" />
           )}
+
+          {curve && <GraduationDetails curve={curve} />}
 
           {/* Real Live Transaction History Feed */}
           <TradeFeed token={token} />
@@ -243,4 +199,32 @@ function timeAgo(timestamp: number): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+}
+
+function GraduationDetails({ curve }: { curve: Address }) {
+  const functions = ['graduated', 'graduationProgressBps', 'marketCap', 'graduationMarketCapTarget', 'targetVirtualUsdcReserve', 'virtualUsdcReserve', 'feeBps'] as const;
+  const query = useReadContracts({
+    contracts: functions.map((functionName) => ({ address: curve, abi: wafflesBondingCurveAbi, functionName })),
+    allowFailure: false,
+    query: { refetchInterval: 15_000 },
+  });
+  const values = query.data;
+  const isGraduated = values?.[0] === true;
+  const progress = values ? Number(values[1]) / 100 : undefined;
+  const marketCap = values?.[2] as bigint | undefined;
+  const target = values?.[3] as bigint | undefined;
+  const reserveTarget = values?.[4] as bigint | undefined;
+  const reserve = values?.[5] as bigint | undefined;
+  const fee = values?.[6] as bigint | undefined;
+  const netNeeded = reserveTarget !== undefined && reserve !== undefined ? (reserveTarget > reserve ? reserveTarget - reserve : 0n) : undefined;
+  const needed = netNeeded !== undefined && fee !== undefined && fee < 10000n ? (netNeeded * 10000n + (10000n - fee) - 1n) / (10000n - fee) : undefined;
+  return <section className="analytics-panel">
+    <h2 className="text-lg">{isGraduated ? 'Graduated · Trading in pool' : 'Toward graduation'}</h2>
+    {query.isError ? <><p>Curve details couldn’t be loaded.</p><button className="market-button mt-3" onClick={() => void query.refetch()}>Retry</button></> : isGraduated ? <p>This token completed its curve. Trading continues in its liquidity pool.</p> : <>
+      <p>{progress === undefined ? 'Reading curve state…' : `${progress.toFixed(1)}% of the curve allocation purchased`}</p>
+      {progress !== undefined && <div className="mt-4"><ProgressBar progress={progress} showTicks={false} /></div>}
+      <dl className="analytics-fees"><div><dt>Curve market cap</dt><dd>{formatUsd(marketCap)}</dd></div><div><dt>Graduation target</dt><dd>{formatUsd(target)}</dd></div><div><dt>Buy to complete · est.</dt><dd>{formatUsd(needed)}</dd></div></dl>
+      <p>Estimated USDC buy includes the trading fee and changes with trades. Selling can reduce progress. Graduation is confirmed onchain.</p>
+    </>}
+  </section>;
 }
