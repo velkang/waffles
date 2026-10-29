@@ -957,3 +957,96 @@ it("retains verified empty ranges while waiting for the next produced block", as
     )?.value,
   ).toBe("11");
 });
+
+it("pauses D1 work until the UTC reset and retains the pause across restart", async () => {
+  const id = env.COORDINATOR.idFromName(crypto.randomUUID());
+  let stub = env.COORDINATOR.get(id);
+  const now = new Date();
+  const resetAt =
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) +
+    5000;
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const work = instance as unknown as {
+      apply(): Promise<void>;
+      discover(): Promise<void>;
+    };
+    const apply = vi
+      .spyOn(work, "apply")
+      .mockRejectedValue(
+        new Error(
+          "D1_ERROR: Your account has exceeded D1's free tier daily row read limit.",
+        ),
+      );
+    const discover = vi.spyOn(work, "discover").mockResolvedValue();
+    try {
+      await instance.alarm();
+      expect(discover).not.toHaveBeenCalled();
+      expect(await state.storage.get("d1-resume-at")).toBe(resetAt);
+      expect(await state.storage.getAlarm()).toBe(resetAt);
+    } finally {
+      apply.mockRestore();
+      discover.mockRestore();
+    }
+  });
+  await expect(
+    runInDurableObject<Coordinator, void>(stub, (_instance, state) => {
+      state.abort("quota test restart");
+    }),
+  ).rejects.toThrow("quota test restart");
+  stub = env.COORDINATOR.get(id);
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const work = instance as unknown as {
+      apply(): Promise<void>;
+      discover(): Promise<void>;
+    };
+    const apply = vi.spyOn(work, "apply").mockResolvedValue();
+    const discover = vi.spyOn(work, "discover").mockResolvedValue();
+    try {
+      await instance.alarm();
+      expect(apply).not.toHaveBeenCalled();
+      expect(discover).not.toHaveBeenCalled();
+      expect(await state.storage.getAlarm()).toBe(resetAt);
+      await state.storage.put("d1-resume-at", Date.now() - 1);
+      await state.storage.put("maintenance-at", Date.now());
+      await instance.alarm();
+      expect(apply).toHaveBeenCalledOnce();
+      expect(discover).toHaveBeenCalledOnce();
+    } finally {
+      apply.mockRestore();
+      discover.mockRestore();
+      await state.storage.deleteAlarm();
+    }
+  });
+});
+
+it("defers quota-blocked queue messages without acknowledging or writing retry state", async () => {
+  const fetch = vi
+    .spyOn(ingestion, "fetchBlock")
+    .mockRejectedValue(
+      new Error(
+        "D1_ERROR: Your account has exceeded D1's free tier daily row read limit.",
+      ),
+    );
+  const message = { body: { slot: 12 }, ack: vi.fn(), retry: vi.fn() };
+  try {
+    await jobs.queue(
+      { messages: [message] } as unknown as MessageBatch<{ slot: number }>,
+      env as unknown as JobsEnv,
+    );
+    expect(message.ack).not.toHaveBeenCalled();
+    expect(message.retry).toHaveBeenCalledOnce();
+    const delay = message.retry.mock.calls[0][0].delaySeconds;
+    const now = new Date();
+    const resetAt =
+      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) +
+      5000;
+    expect(
+      Math.abs(delay - Math.ceil((resetAt - Date.now()) / 1000)),
+    ).toBeLessThanOrEqual(1);
+    expect(
+      await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
+    ).toBeNull();
+  } finally {
+    fetch.mockRestore();
+  }
+});

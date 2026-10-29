@@ -49,12 +49,18 @@ export class Coordinator extends DurableObject<Env> {
   }
   async alarm() {
     await this.serial(async () => {
+      const resumeAt = await this.ctx.storage.get<number>("d1-resume-at");
+      if (resumeAt && resumeAt > Date.now()) {
+        await this.ctx.storage.setAlarm(resumeAt);
+        return;
+      }
       // Rearm before work so failures cannot silently stop scheduling.
       await this.ctx.storage.setAlarm(Date.now() + 2000);
       for (const work of [() => this.apply(), () => this.discover()]) {
         try {
           await work();
         } catch (error) {
+          if (await this.pauseForQuota(error)) return;
           console.error("ingestion", String(error));
         }
       }
@@ -64,10 +70,19 @@ export class Coordinator extends DurableObject<Env> {
         try {
           await maintain(this.env);
         } catch (error) {
+          if (await this.pauseForQuota(error)) return;
           console.error("maintenance", String(error));
         }
       }
     });
+  }
+  private async pauseForQuota(error: unknown) {
+    const resumeAt = quotaResetAt(error);
+    if (!resumeAt) return false;
+    await this.ctx.storage.put("d1-resume-at", resumeAt);
+    await this.ctx.storage.setAlarm(resumeAt);
+    console.warn(json({ event: "d1_quota_pause", resumeAt }));
+    return true;
   }
   private async discover() {
     if (!this.env.GENESIS_HASH || Number(this.env.START_SLOT) <= 0)
@@ -149,8 +164,15 @@ export class Coordinator extends DurableObject<Env> {
     ).first<{ value: string }>();
     let previous = saved ? Number(saved.value) : null;
     const ready = await this.env.DB.prepare(
-      "SELECT slot,parent,object_key,hash FROM pending_blocks WHERE applied=0 ORDER BY slot LIMIT 1",
-    ).all<{ slot: number; parent: number; object_key: string; hash: string }>();
+      "SELECT slot,parent,object_key,hash FROM pending_blocks WHERE applied=0 AND slot>? ORDER BY slot LIMIT 1",
+    )
+      .bind(previous ?? Number(this.env.START_SLOT) - 1)
+      .all<{
+        slot: number;
+        parent: number;
+        object_key: string;
+        hash: string;
+      }>();
     for (const row of ready.results) {
       if (previous === null && row.slot !== Number(this.env.START_SLOT)) break;
       if (previous !== null && row.parent !== previous) break;
@@ -245,6 +267,21 @@ async function maintain(env: Env) {
   }
 }
 
+function quotaResetAt(error: unknown): number | null {
+  const message =
+    String(error) + (error instanceof Error ? String(error.cause ?? "") : "");
+  if (
+    !/D1/i.test(message) ||
+    !/free tier daily row (read|write) limit/i.test(message)
+  )
+    return null;
+  const now = new Date();
+  return (
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) +
+    5000
+  );
+}
+
 async function runFetchJob(env: Env, slot: number) {
   try {
     await fetchBlock(env, slot);
@@ -252,6 +289,7 @@ async function runFetchJob(env: Env, slot: number) {
       .bind(slot)
       .run();
   } catch (error) {
+    if (quotaResetAt(error)) throw error;
     const job = await env.DB.prepare(
       "SELECT attempts FROM fetch_jobs WHERE slot=?",
     )
@@ -288,8 +326,19 @@ async function runFetchJob(env: Env, slot: number) {
 export default {
   async queue(batch: MessageBatch<{ slot: number }>, env: Env) {
     for (const message of batch.messages) {
-      await runFetchJob(env, message.body.slot);
-      message.ack();
+      try {
+        await runFetchJob(env, message.body.slot);
+        message.ack();
+      } catch (error) {
+        const resumeAt = quotaResetAt(error);
+        if (!resumeAt) throw error;
+        message.retry({
+          delaySeconds: Math.min(
+            86_400,
+            Math.max(1, Math.ceil((resumeAt - Date.now()) / 1000)),
+          ),
+        });
+      }
     }
   },
   async fetch(request: Request, env: Env): Promise<Response> {
