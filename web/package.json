@@ -1,0 +1,39 @@
+{
+  "name": "@waffles/web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc --noEmit",
+    "check": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "0.31.1",
+    "@solana/web3.js": "^1.98.4",
+    "@solana/spl-token": "^0.4.14",
+    "@tanstack/react-router": "^1.132.0",
+    "@tanstack/react-query": "^5.101.4",
+    "@waffles/shared": "workspace:*",
+    "@fontsource/inter": "^5.2.0",
+    "@fontsource/geist-mono": "^5.2.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "lightweight-charts": "^5.2.1",
+    "@wallet-standard/app": "^1.1.0",
+    "@wallet-standard/base": "^1.1.0",
+    "buffer": "^6.0.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261028.1",
+    "@tailwindcss/vite": "^4.3.0",
+    "@tanstack/router-plugin": "^1.132.0",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.3.4",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^5.9.3",
+    "vite": "^6.1.0",
+    "wrangler": "^4.135.0"
+  }
+}

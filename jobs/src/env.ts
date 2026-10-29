@@ -1,0 +1,18 @@
+export interface Env {
+  DB: D1Database;
+  ARTIFACTS: R2Bucket;
+  BLOCKS: Queue<{ slot: number }>;
+  COORDINATOR: DurableObjectNamespace;
+  API: Fetcher;
+  SETTLEMENT: Workflow<{ epoch: number }>;
+  RPC_URL: string;
+  PROGRAM_ID: string;
+  GENESIS_HASH: string;
+  START_SLOT: string;
+  PYTH_URL: string;
+  PYTH_API_KEY?: string;
+  DRAND_CHAIN_HASH: string;
+  OPERATIONS_TOKEN: string;
+  FINALIZER_SECRET?: string;
+  KEEPER_SECRET?: string;
+}

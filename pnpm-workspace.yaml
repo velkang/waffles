@@ -1,13 +1,10 @@
 packages:
-  - frontend
-  - indexer
-  - backend
   - shared
+  - web
+  - api
+  - jobs
 
 onlyBuiltDependencies:
-  - '@reown/appkit'
   - bufferutil
   - esbuild
-  - keccak
-  - unrs-resolver
   - utf-8-validate

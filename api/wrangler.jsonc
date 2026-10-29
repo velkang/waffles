@@ -1,0 +1,11 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json", "name": "waffles-api", "main": "src/index.ts", "compatibility_date": "2026-10-28", "compatibility_flags": ["nodejs_compat"],
+  "vars": { "RPC_URL": "https://api.devnet.solana.com", "PROGRAM_ID": "6SpQkgcbZjbrz94pYuWDy5nmBo3czhDGxft1uTvSUR8w", "GENESIS_HASH": "EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG", "UPGRADE_AUTHORITY": "4aMAd4MWzmusUqyGJijr7rF4vaEjxXTLRiBbPdRYxFV7", "MEDIA_ORIGIN": "", "ACCESS_TEAM": "", "ACCESS_AUD": "" },
+  "d1_databases": [{ "binding": "DB", "database_name": "waffles-devnet", "database_id": "00000000-0000-0000-0000-000000000000", "migrations_dir": "migrations" }],
+  "r2_buckets": [{ "binding": "ARTIFACTS", "bucket_name": "waffles-devnet" }],
+  "services": [{ "binding": "JOBS", "service": "waffles-jobs" }],
+  "durable_objects": { "bindings": [{ "name": "LIVE", "class_name": "LiveHub" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["LiveHub"] }],
+  "ratelimits": [{ "name": "RPC_LIMIT", "namespace_id": "1002", "simple": { "limit": 120, "period": 60 } },{ "name": "UPLOAD_LIMIT", "namespace_id": "1001", "simple": { "limit": 10, "period": 60 } }],
+  "observability": { "enabled": true }
+}

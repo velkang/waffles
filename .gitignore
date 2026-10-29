@@ -12,12 +12,8 @@ skills-lock.json
 node_modules/
 
 # Build and test output
-.next/
 dist/
 coverage/
-/contract/out/
-/contract/broadcast/
-/contract/cache/
 *.tsbuildinfo
 
 # Logs
@@ -36,4 +32,19 @@ yarn-error.log*
 PRODUCT.md
 DESIGN.md
 AGENTS.md
+SOLANA.md
+SECURITY.md
 docs
+/.wrangler/
+**/.wrangler/
+/solana/target/
+/solana/.anchor/
+/solana/test-ledger/
+/solana/keys
+*.keypair.json
+
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+.pnpm-store
+.tanstack

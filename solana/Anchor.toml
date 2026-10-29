@@ -1,0 +1,12 @@
+[toolchain]
+anchor_version = "0.31.1"
+[features]
+resolution = false
+skip-lint = false
+[programs.localnet]
+waffles = "6SpQkgcbZjbrz94pYuWDy5nmBo3czhDGxft1uTvSUR8w"
+[programs.devnet]
+waffles = "6SpQkgcbZjbrz94pYuWDy5nmBo3czhDGxft1uTvSUR8w"
+[provider]
+cluster = "devnet"
+wallet = "~/.config/solana/id.json"

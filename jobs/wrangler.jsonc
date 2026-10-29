@@ -1,0 +1,12 @@
+{
+ "$schema":"../node_modules/wrangler/config-schema.json", "name":"waffles-jobs", "main":"src/index.ts", "compatibility_date":"2026-10-28", "compatibility_flags":["nodejs_compat"],
+ "vars":{"RPC_URL":"https://api.devnet.solana.com","PROGRAM_ID":"6SpQkgcbZjbrz94pYuWDy5nmBo3czhDGxft1uTvSUR8w","GENESIS_HASH":"EtWTRABZaYq6iMfeYKouRu166VU2xqa1wcaWoxPkrZBG","START_SLOT":"516322729","PYTH_URL":"https://hermes.pyth.network","DRAND_CHAIN_HASH":"52db9ba70e0cc0f6eaf7803dd07447a1f5477735fd3f661792ba94600c84e971"},
+ "d1_databases":[{"binding":"DB","database_name":"waffles-devnet","database_id":"00000000-0000-0000-0000-000000000000","migrations_dir":"../api/migrations"}],
+ "r2_buckets":[{"binding":"ARTIFACTS","bucket_name":"waffles-devnet"}],
+ "queues":{"producers":[{"binding":"BLOCKS","queue":"waffles-blocks"}],"consumers":[{"queue":"waffles-blocks","max_batch_size":20,"max_retries":8,"dead_letter_queue":"waffles-blocks-dead"}]},
+ "durable_objects":{"bindings":[{"name":"COORDINATOR","class_name":"Coordinator"}]},
+ "migrations":[{"tag":"v1","new_sqlite_classes":["Coordinator"]}],
+ "services":[{"binding":"API","service":"waffles-api"}],
+ "workflows":[{"binding":"SETTLEMENT","name":"waffles-settlement","class_name":"Settlement"}],
+ "triggers":{"crons":["* * * * *"]},"observability":{"enabled":true},"limits":{"cpu_ms":300000}
+}

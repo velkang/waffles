@@ -1,0 +1,28 @@
+{
+  "name": "@waffles/api-worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev -c wrangler.jsonc -c ../jobs/wrangler.jsonc --persist-to ../.wrangler/state --local",
+    "build": "wrangler deploy --dry-run",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "db:local": "wrangler d1 migrations apply waffles-devnet --local --persist-to ../.wrangler/state"
+  },
+  "dependencies": {
+    "hono": "^4.9.9",
+    "@waffles/shared": "workspace:*",
+    "@coral-xyz/anchor": "0.31.1",
+    "@solana/web3.js": "^1.98.4",
+    "@solana/spl-token": "^0.4.14",
+    "drand-client": "^1.4.2",
+    "jose": "^6.1.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261028.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "wrangler": "^4.135.0",
+    "@cloudflare/vitest-plugin": "1.4.9"
+  }
+}

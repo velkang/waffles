@@ -2,27 +2,17 @@
   "name": "waffles-meme",
   "private": true,
   "packageManager": "pnpm@10.15.1",
-  "workspaces": [
-    "frontend",
-    "backend",
-    "indexer",
-    "shared"
-  ],
   "scripts": {
-    "dev": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter @waffles/api --filter indexer --filter frontend dev",
-    "dev:f": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter frontend dev",
-    "dev:b": "pnpm --filter @waffles/shared build && pnpm --parallel --filter @waffles/shared --filter @waffles/api dev",
-    "dev:i": "pnpm --filter indexer dev",
-    "build": "pnpm -r build",
-    "test": "pnpm -r test"
-  },
-  "pnpm": {
-    "overrides": {
-      "@reown/appkit@1.8.23>@walletconnect/universal-provider": "2.24.0"
-    },
-    "ignoredBuiltDependencies": [
-      "@nestjs/core",
-      "@scarf/scarf"
-    ]
+    "dev": "pnpm --parallel --filter @waffles/api-worker --filter @waffles/web dev",
+    "build": "pnpm --filter @waffles/shared build && pnpm --filter @waffles/web build && pnpm --filter @waffles/api-worker build && pnpm --filter @waffles/jobs build",
+    "test": "pnpm --filter @waffles/shared test && pnpm --filter @waffles/api-worker test",
+    "dev:web": "pnpm --filter @waffles/web dev",
+    "dev:api": "pnpm --filter @waffles/api-worker dev",
+    "check": "pnpm --filter @waffles/shared build && pnpm --filter @waffles/web check && pnpm --filter @waffles/api-worker check && pnpm --filter @waffles/jobs check",
+    "test:program": "cargo +1.93.0 test --manifest-path solana/Cargo.toml",
+    "db:local": "pnpm --filter @waffles/api-worker db:local",
+    "verify:distribution": "pnpm --filter @waffles/shared exec node --import tsx ../jobs/scripts/replay.ts",
+    "solana:initialize": "pnpm --filter @waffles/shared exec node --import tsx test/initialize.ts",
+    "test:validator": "pnpm --filter @waffles/shared test:validator"
   }
 }
