@@ -6,6 +6,8 @@ export interface Env {
   API: Fetcher;
   SETTLEMENT: Workflow<{ epoch: number }>;
   RPC_URL: string;
+  RPC: DurableObjectNamespace;
+  RPC_CU_PER_SECOND?: string;
   PROGRAM_ID: string;
   GENESIS_HASH: string;
   START_SLOT: string;

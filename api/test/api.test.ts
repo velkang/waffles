@@ -1,4 +1,4 @@
-import { env, SELF } from "cloudflare:test";
+import { env, SELF, runInDurableObject } from "cloudflare:test";
 import { describe, it, expect, vi } from "vitest";
 import { Keypair, PublicKey, type ParsedBlockResponse } from "@solana/web3.js";
 import {
@@ -45,10 +45,22 @@ describe("Hono and D1 inside Workers", () => {
     expect(config.configured).toBe(false);
     expect(config.network).toBe("devnet");
     expect(
-      (await SELF.fetch("https://waffles/v1/protocol/balances")).status,
+      (
+        await app.request(
+          "https://waffles/v1/protocol/balances",
+          {},
+          { ...env, GENESIS_HASH: "" },
+        )
+      ).status,
     ).toBe(503);
     expect(
-      (await SELF.fetch(`https://waffles/v1/creator-earnings/${mint}`)).status,
+      (
+        await app.request(
+          `https://waffles/v1/creator-earnings/${mint}`,
+          {},
+          { ...env, GENESIS_HASH: "" },
+        )
+      ).status,
     ).toBe(503);
     expect((await SELF.fetch("https://waffles/health/ready")).status).toBe(503);
   });
@@ -564,10 +576,6 @@ it("requests and archives version-1 finalized transactions", async () => {
       ...env,
       GENESIS_HASH: "verified-devnet",
       RPC_URL: "https://rpc.test",
-      COORDINATOR: {
-        idFromName: () => "test",
-        get: () => ({ fetch: async () => new Response("applied") }),
-      },
     } as unknown as JobsEnv,
     12,
   );
@@ -585,7 +593,7 @@ it("requests and archives version-1 finalized transactions", async () => {
 
 import jobs from "../../jobs/src/index";
 import * as ingestion from "../../jobs/src/ingest";
-it("acknowledges successful block jobs when another job in the batch must retry", async () => {
+it("acknowledges archived jobs and durably defers failed jobs without stacked retries", async () => {
   const fetch = vi
     .spyOn(ingestion, "fetchBlock")
     .mockImplementation(async (_env, slot) => {
@@ -601,8 +609,13 @@ it("acknowledges successful block jobs when another job in the batch must retry"
     );
     expect(good.ack).toHaveBeenCalledOnce();
     expect(good.retry).not.toHaveBeenCalled();
-    expect(failed.ack).not.toHaveBeenCalled();
-    expect(failed.retry).toHaveBeenCalledWith({ delaySeconds: 30 });
+    expect(failed.ack).toHaveBeenCalledOnce();
+    expect(failed.retry).not.toHaveBeenCalled();
+    const pending = await env.DB.prepare(
+      "SELECT attempts,retry_at FROM fetch_jobs WHERE slot=13",
+    ).first<{ attempts: number; retry_at: number }>();
+    expect(pending?.attempts).toBe(1);
+    expect(pending!.retry_at).toBeGreaterThan(Date.now());
   } finally {
     fetch.mockRestore();
     log.mockRestore();
@@ -694,4 +707,253 @@ it("uploads validated images without a verification challenge", async () => {
       })
     ).status,
   ).toBe(400);
+});
+
+it("starts alarm scheduling only with the operations token", async () => {
+  const fetch = vi.fn(async () => new Response("scheduled"));
+  const coordinator = {
+    idFromName: vi.fn(() => "devnet"),
+    get: vi.fn(() => ({ fetch })),
+  };
+  const bindings = {
+    ...env,
+    OPERATIONS_TOKEN: "test-start",
+    COORDINATOR: coordinator,
+  } as unknown as JobsEnv;
+  const denied = await jobs.fetch(
+    new Request("https://jobs/start", { method: "POST" }),
+    bindings,
+  );
+  expect(denied.status).toBe(401);
+  expect(fetch).not.toHaveBeenCalled();
+  const started = await jobs.fetch(
+    new Request("https://jobs/start", {
+      method: "POST",
+      headers: { Authorization: "Bearer test-start" },
+    }),
+    bindings,
+  );
+  expect(started.status).toBe(200);
+  expect(await started.text()).toBe("scheduled");
+  expect(coordinator.idFromName).toHaveBeenCalledWith("devnet");
+  expect(fetch).toHaveBeenCalledWith("https://coordinator/discover", {
+    method: "POST",
+  });
+});
+
+import { RpcBudget, rpcConnection, RpcDeferred } from "../../jobs/src/rpc";
+import { Coordinator } from "../../jobs/src/index";
+const rpcCall = (
+  stub: DurableObjectStub,
+  method: string,
+  params: unknown[] = [],
+  lane = "background",
+) =>
+  stub.fetch("https://rpc/", {
+    method: "POST",
+    headers: { "X-RPC-Lane": lane },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+
+it("shares provider cooldown across callers and retains it after restart", async () => {
+  const id = env.RPC.idFromName(crypto.randomUUID());
+  let stub = env.RPC.get(id);
+  const limited = await rpcCall(stub, "getBalance", ["rate-limit"]);
+  expect(limited.status).toBe(429);
+  expect(Number(limited.headers.get("Retry-After"))).toBeGreaterThanOrEqual(59);
+  await limited.text();
+  await expect(
+    runInDurableObject<RpcBudget, void>(stub, (_instance, state) => {
+      state.abort("test restart");
+    }),
+  ).rejects.toThrow("test restart");
+  stub = env.RPC.get(id);
+  const blocked = await rpcCall(stub, "getBalance", ["normal"], "interactive");
+  expect(blocked.status).toBe(429);
+  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+    const budget = (await state.storage.get<any>("budget"))!;
+    budget.until = 0;
+    await state.storage.put("budget", budget);
+  });
+  expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
+});
+
+it("reserves RPC capacity for interactive work and rejects JSON batches", async () => {
+  const stub = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
+  expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
+  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+    const budget = (await state.storage.get<any>("budget"))!;
+    budget.background = 0;
+    budget.at = Date.now();
+    await state.storage.put("budget", budget);
+  });
+  expect((await rpcCall(stub, "getBlock", [12, {}])).status).toBe(429);
+  expect(
+    (await rpcCall(stub, "getBalance", ["normal"], "interactive")).status,
+  ).toBe(200);
+  expect(
+    (await stub.fetch("https://rpc/", { method: "POST", body: "[]" })).status,
+  ).toBe(400);
+});
+
+it("does not hide SDK retries inside a coordinated deferral", async () => {
+  const fetch = vi.fn(
+    async () =>
+      new Response("busy", { status: 429, headers: { "Retry-After": "60" } }),
+  );
+  const bindings = {
+    ...env,
+    RPC: { idFromName: () => "devnet", get: () => ({ fetch }) },
+  } as unknown as JobsEnv;
+  await expect(rpcConnection(bindings).getSlot()).rejects.toBeInstanceOf(
+    RpcDeferred,
+  );
+  expect(fetch).toHaveBeenCalledOnce();
+  await expect(fetchBlock(bindings, 12)).rejects.toBeInstanceOf(RpcDeferred);
+  expect(fetch).toHaveBeenCalledTimes(2);
+});
+
+it("reuses an archived block even when RPC is unavailable", async () => {
+  const bindings = { ...env } as unknown as JobsEnv;
+  await fetchBlock(bindings, 12);
+  const fetch = vi.fn(async () => {
+    throw new Error("RPC must not be called");
+  });
+  await fetchBlock(
+    {
+      ...bindings,
+      RPC: { idFromName: () => "devnet", get: () => ({ fetch }) },
+    } as unknown as JobsEnv,
+    12,
+  );
+  expect(fetch).not.toHaveBeenCalled();
+  expect(
+    (
+      await env.DB.prepare(
+        "SELECT count(*) AS n FROM pending_blocks WHERE slot=12",
+      ).first<{ n: number }>()
+    )?.n,
+  ).toBe(1);
+  expect(
+    await env.DB.prepare(
+      "SELECT value FROM checkpoints WHERE id='complete-slot'",
+    ).first(),
+  ).toBeNull();
+});
+
+it("recovers the earliest gap despite an advanced discovery cursor and exhausted attempts", async () => {
+  await env.DB.prepare(
+    "INSERT INTO checkpoints(id,value) VALUES('complete-slot','11'),('discovered-slot','999')",
+  ).run();
+  await env.DB.prepare(
+    "INSERT INTO pending_blocks(slot,parent,time,object_key,hash) VALUES(14,12,200,'future','hash')",
+  ).run();
+  await env.DB.prepare(
+    "INSERT INTO fetch_jobs(slot,attempts,retry_at,last_error) VALUES(12,8,0,'fetch_failed')",
+  ).run();
+  const stub = env.COORDINATOR.get(
+    env.COORDINATOR.idFromName(crypto.randomUUID()),
+  );
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await state.storage.put("maintenance-at", Date.now());
+    await instance.alarm();
+    await state.storage.deleteAlarm();
+  });
+  expect(
+    await env.DB.prepare(
+      "SELECT slot FROM pending_blocks WHERE slot=12",
+    ).first(),
+  ).not.toBeNull();
+  expect(
+    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
+  ).toBeNull();
+  expect(
+    (await env.DB.prepare(
+      "SELECT value FROM checkpoints WHERE id='complete-slot'",
+    ).first<{ value: string }>())!.value,
+  ).toBe("11");
+  expect(
+    (await env.DB.prepare(
+      "SELECT applied FROM pending_blocks WHERE slot=14",
+    ).first<{ applied: number }>())!.applied,
+  ).toBe(0);
+});
+
+it("validates the upstream network once and caches validation across requests", async () => {
+  const stub = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
+  const first = (await (
+    await rpcCall(stub, "getBalance", ["network-checks"])
+  ).json()) as { result: { value: number } };
+  const second = (await (
+    await rpcCall(stub, "getBalance", ["network-checks"])
+  ).json()) as { result: { value: number } };
+  expect(second.result.value).toBe(first.result.value);
+});
+
+import { accountPendingPrices } from "../../jobs/src/oracle";
+it("backfills pending USD from historical prices while unavailable prices stay pending", async () => {
+  await seed();
+  await env.DB.prepare(
+    "INSERT INTO trades(id,mint,trader,slot,time,signature,gross_sol,usd_micros,excluded,data) VALUES('pending',?,?,1,200,'sig','2000000000',NULL,0,'{}')",
+  )
+    .bind(mint, wallet)
+    .run();
+  const bindings = {
+    ...env,
+    PYTH_URL: "https://oracle.test",
+  } as unknown as JobsEnv;
+  await expect(accountPendingPrices(bindings)).rejects.toThrow(
+    "Historical SOL/USD unavailable",
+  );
+  expect(
+    (await env.DB.prepare(
+      "SELECT usd_micros FROM trades WHERE id='pending'",
+    ).first<{ usd_micros: string | null }>())!.usd_micros,
+  ).toBeNull();
+  await env.DB.prepare(
+    "INSERT INTO oracle_prices(at,publish_time,usd_micros,r2_key) VALUES(200,200,'150000000','oracle/200.json')",
+  ).run();
+  await accountPendingPrices(bindings);
+  expect(
+    (await env.DB.prepare(
+      "SELECT usd_micros FROM trades WHERE id='pending'",
+    ).first<{ usd_micros: string }>())!.usd_micros,
+  ).toBe("300000000");
+});
+
+it("retains verified empty ranges while waiting for the next produced block", async () => {
+  await env.DB.prepare(
+    "INSERT INTO checkpoints(id,value) VALUES('complete-slot','11')",
+  ).run();
+  const stub = env.COORDINATOR.get(
+    env.COORDINATOR.idFromName(crypto.randomUUID()),
+  );
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await state.storage.put("maintenance-at", Date.now());
+    await state.storage.put("discovery-window", {
+      start: 12,
+      end: 13,
+      slots: [],
+    });
+    await instance.alarm();
+    await instance.alarm();
+    await state.storage.deleteAlarm();
+    expect(await state.storage.get("empty-through")).toBe(13);
+    expect(
+      (await state.storage.get<{ start: number }>("discovery-window"))?.start,
+    ).toBe(14);
+  });
+  expect(
+    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
+  ).toBeNull();
+  expect(
+    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=14").first(),
+  ).not.toBeNull();
+  expect(
+    (
+      await env.DB.prepare(
+        "SELECT value FROM checkpoints WHERE id='complete-slot'",
+      ).first<{ value: string }>()
+    )?.value,
+  ).toBe("11");
 });

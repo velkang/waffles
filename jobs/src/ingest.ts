@@ -1,3 +1,4 @@
+import { rpcConnection } from "./rpc";
 import {
   Connection,
   PublicKey,
@@ -37,7 +38,6 @@ import {
   sha,
   hex,
 } from "@waffles/shared/rewards";
-import { oracle } from "./oracle";
 import type { Env } from "./env";
 
 type Event = { name: string; data: Record<string, any>; order: number };
@@ -56,14 +56,13 @@ type TokenOwner = {
 };
 const text = new TextEncoder();
 export async function fetchBlock(env: Env, slot: number) {
-  const connection = new Connection(env.RPC_URL, "finalized");
-  if (
-    !env.GENESIS_HASH ||
-    (await connection.getGenesisHash()) !== env.GENESIS_HASH
+  const saved = await env.DB.prepare(
+    "SELECT object_key FROM pending_blocks WHERE slot=?",
   )
-    throw new Error(
-      "Configure the expected devnet genesis hash before ingestion",
-    );
+    .bind(slot)
+    .first<{ object_key: string }>();
+  if (saved && (await env.ARTIFACTS.head(saved.object_key))) return;
+  const connection = rpcConnection(env);
   const block = await connection.getParsedBlock(slot, {
     commitment: "finalized",
     maxSupportedTransactionVersion: 1,
@@ -88,10 +87,6 @@ export async function fetchBlock(env: Env, slot: number) {
   )
     .bind(slot, block.parentSlot, block.blockTime, objectKey, hash)
     .run();
-  await env.COORDINATOR.get(env.COORDINATOR.idFromName("devnet")).fetch(
-    "https://coordinator/apply",
-    { method: "POST" },
-  );
 }
 function flatten(tx: ParsedBlockResponse["transactions"][number]) {
   const result: (ParsedInstruction | PartiallyDecodedInstruction)[] = [];
@@ -132,7 +127,7 @@ export async function applyBlock(
   block: ParsedBlockResponse,
 ) {
   if (block.blockTime === null) throw new Error("Missing block timestamp");
-  const connection = new Connection(env.RPC_URL, "finalized");
+  const connection = rpcConnection(env);
   let hasMarkets = Boolean(
     await env.DB.prepare("SELECT mint FROM markets LIMIT 1").first(),
   );
@@ -566,15 +561,14 @@ export async function applyBlock(
           time: Number(d.time),
           protocol: Boolean(d.protocol),
         };
-        let usd: string | null = null;
-        try {
-          usd = (
-            (BigInt(d.gross) * (await oracle(env, trade.time))) /
-            LAMPORTS
-          ).toString();
-        } catch (error) {
-          console.warn(`Price pending for ${trade.id}: ${String(error)}`);
-        }
+        const price = await env.DB.prepare(
+          "SELECT usd_micros FROM oracle_prices WHERE at=?",
+        )
+          .bind(trade.time)
+          .first<{ usd_micros: string }>();
+        const usd = price
+          ? ((BigInt(d.gross) * BigInt(price.usd_micros)) / LAMPORTS).toString()
+          : null;
         sql(
           "INSERT INTO trades(id,mint,trader,slot,time,signature,gross_sol,usd_micros,excluded,data) VALUES(?,?,?,?,?,?,?,?,?,?)",
           trade.id,

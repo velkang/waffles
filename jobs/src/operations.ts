@@ -1,5 +1,6 @@
+import { rpcConnection } from "./rpc";
 import { BN } from "@waffles/shared/client";
-import { Connection, PublicKey, SystemProgram } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import {
   program,
@@ -39,7 +40,7 @@ async function distribute(
   },
 ) {
   const authority = signer(env.FINALIZER_SECRET),
-    connection = new Connection(env.RPC_URL, "finalized"),
+    connection = rpcConnection(env),
     distribution = distributionAddress(kind, mint, epoch);
   const existing = await env.DB.prepare(
     "SELECT status,data FROM distributions WHERE id=?",
@@ -216,7 +217,7 @@ export async function settleHolders(env: Env, epoch: number) {
     body: JSON.stringify({ at: cutoff }),
   });
   if (!closed.ok) throw new Error("Holder ownership measurement is incomplete");
-  const connection = new Connection(env.RPC_URL, "finalized"),
+  const connection = rpcConnection(env),
     authority = signer(env.FINALIZER_SECRET);
   const markets = await env.DB.prepare(
     "SELECT mint FROM markets ORDER BY mint",
@@ -306,7 +307,7 @@ export async function keepMarkets(
     throw new Error("Positive incentives allocation required");
   if (incentives) key(incentives.mint);
   const authority = signer(env.KEEPER_SECRET),
-    connection = new Connection(env.RPC_URL, "finalized"),
+    connection = rpcConnection(env),
     epoch = epochAt(Math.floor(Date.now() / 1000));
   const query = incentives
     ? env.DB.prepare(
@@ -440,7 +441,7 @@ export async function keepMarkets(
 
 /** Bound each scheduled reconciliation and rotate through all indexed markets. */
 export async function reconcileMarkets(env: Env) {
-  const connection = new Connection(env.RPC_URL, "finalized");
+  const connection = rpcConnection(env);
   if (
     !env.GENESIS_HASH ||
     (await connection.getGenesisHash()) !== env.GENESIS_HASH

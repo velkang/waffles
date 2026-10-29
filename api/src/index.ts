@@ -1,9 +1,10 @@
+import { rpcConnection, rpcFetch, RpcDeferred } from "../../jobs/src/rpc";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { bodyLimit } from "hono/body-limit";
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import { PublicKey, Connection } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import {
   program,
   fundAddress,
@@ -46,7 +47,17 @@ app.use("*", async (c, next) => {
   await next();
 });
 app.onError((error, c) => {
-  const status = error instanceof HTTPException ? error.status : 500;
+  const status =
+    error instanceof RpcDeferred
+      ? 503
+      : error instanceof HTTPException
+        ? error.status
+        : 500;
+  if (error instanceof RpcDeferred)
+    c.header(
+      "Retry-After",
+      String(Math.max(1, Math.ceil((error.retryAt - Date.now()) / 1000))),
+    );
   if (status === 500)
     console.error(
       json({ requestId: c.get("requestId"), error: error.message }),
@@ -220,7 +231,7 @@ app.get("/v1/protocol/actions", async (c) => {
   return c.json({ actions: actions.results });
 });
 app.get("/v1/commitment/:id", async (c) => {
-  const connection = new Connection(c.env.RPC_URL, "finalized");
+  const connection = rpcConnection(c.env, "finalized", false);
   const commitment = (await program(connection).account["commitment"].fetch(
     new PublicKey(address(c.req.param("id"))),
   )) as { nonce: { toString(): string } };
@@ -313,7 +324,7 @@ app.get("/v1/protocol/balances", async (c) => {
     ).success
   )
     throw new HTTPException(429);
-  const p = program(new Connection(c.env.RPC_URL, "finalized"));
+  const p = program(rpcConnection(c.env, "finalized", false));
   const [config, fund] = await Promise.all([
     p.account.config.fetchNullable(configAddress()),
     p.account.fund.fetchNullable(fundAddress(2, zeroKey, 0)),
@@ -340,7 +351,7 @@ app.get("/v1/creator-earnings/:mint", async (c) => {
     ).success
   )
     throw new HTTPException(429);
-  const connection = new Connection(c.env.RPC_URL, "finalized");
+  const connection = rpcConnection(c.env, "finalized", false);
   const custody = await marketCustody(connection, new PublicKey(mint));
   if (!custody)
     throw new HTTPException(404, { message: "Market account not found" });
@@ -646,17 +657,19 @@ app.post(
     }>();
     if (!body || !rpcMethods.has(body.method) || !Array.isArray(body.params))
       throw new HTTPException(400, { message: "RPC method unavailable" });
-    const response = await fetch(c.env.RPC_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, jsonrpc: "2.0" }),
-      signal: AbortSignal.timeout(20_000),
-    });
+    const response = await rpcFetch(
+      c.env,
+      JSON.stringify({ ...body, jsonrpc: "2.0" }),
+      false,
+    );
     return new Response(response.body, {
       status: response.status,
       headers: {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
+        ...(response.headers.has("Retry-After")
+          ? { "Retry-After": response.headers.get("Retry-After")! }
+          : {}),
       },
     });
   },

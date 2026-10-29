@@ -1,3 +1,4 @@
+import { rpcConnection } from "./rpc";
 import {
   WorkflowEntrypoint,
   type WorkflowEvent,
@@ -5,7 +6,6 @@ import {
 } from "cloudflare:workers";
 import { BN } from "@waffles/shared/client";
 import {
-  Connection,
   Keypair,
   SystemProgram,
   Transaction,
@@ -61,7 +61,7 @@ export async function submit(
   authority: Keypair,
   instructions: Parameters<Transaction["add"]>[0][],
 ) {
-  const connection = new Connection(env.RPC_URL, "confirmed");
+  const connection = rpcConnection(env, "confirmed");
   if (
     !env.GENESIS_HASH ||
     (await connection.getGenesisHash()) !== env.GENESIS_HASH
@@ -264,7 +264,7 @@ export async function snapshot(
     };
   }
   const bounds = epochBounds(epoch),
-    connection = new Connection(env.RPC_URL, "finalized");
+    connection = rpcConnection(env);
   const complete = await env.DB.prepare(
     "SELECT value FROM checkpoints WHERE id='complete-time'",
   ).first<{ value: string }>();
@@ -428,7 +428,7 @@ export class Settlement extends WorkflowEntrypoint<Env, { epoch: number }> {
     )
       throw new Error("Only completed epochs may settle");
     const authority = signer(this.env.FINALIZER_SECRET),
-      connection = new Connection(this.env.RPC_URL, "finalized");
+      connection = rpcConnection(this.env);
     await step.do("close ownership at cutoff", async () => {
       const response = await this.env.COORDINATOR.get(
         this.env.COORDINATOR.idFromName("devnet"),

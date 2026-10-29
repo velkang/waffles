@@ -4,6 +4,7 @@ export interface Env {
   JOBS: Fetcher;
   LIVE: DurableObjectNamespace;
   RPC_URL: string;
+  RPC: DurableObjectNamespace;
   PROGRAM_ID: string;
   GENESIS_HASH: string;
   UPGRADE_AUTHORITY: string;

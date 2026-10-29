@@ -1,5 +1,6 @@
 import {
   SOL_USD_FEED,
+  LAMPORTS,
   priceMicros,
   json,
   type PriceObservation,
@@ -51,4 +52,26 @@ export async function oracle(env: Env, at: number): Promise<bigint> {
     .bind(at, observation.publishTime, price.toString(), objectKey)
     .run();
   return price;
+}
+
+// Price recovery is independent of finalized block application and remains bounded.
+export async function accountPendingPrices(env: Env) {
+  const pending = await env.DB.prepare(
+    "SELECT id,time,gross_sol FROM trades WHERE usd_micros IS NULL ORDER BY time,id LIMIT 20",
+  ).all<{ id: string; time: number; gross_sol: string }>();
+  const prices = new Map<number, bigint>();
+  const statements: D1PreparedStatement[] = [];
+  for (const trade of pending.results) {
+    const price = prices.get(trade.time) ?? (await oracle(env, trade.time));
+    prices.set(trade.time, price);
+    statements.push(
+      env.DB.prepare(
+        "UPDATE trades SET usd_micros=? WHERE id=? AND usd_micros IS NULL",
+      ).bind(
+        ((BigInt(trade.gross_sol) * price) / LAMPORTS).toString(),
+        trade.id,
+      ),
+    );
+  }
+  if (statements.length) await env.DB.batch(statements);
 }
