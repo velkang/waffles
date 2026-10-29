@@ -46,6 +46,10 @@ The public site is https://waffles-web.velikanghost.workers.dev.
 Deploy the API, jobs, and web Workers using their existing Wrangler configurations.
 Supply RPC and signing credentials through Worker secrets, never plaintext variables.
 
+With GitHub integration enabled, pushes to the configured production branch
+trigger builds for each connected Worker. Check all three Workers' Builds pages
+to confirm the commit was deployed successfully.
+
 The jobs coordinator uses a recurring Durable Object alarm for ingestion and
 minute-level maintenance; it does not require a cron slot. After the first jobs
 deployment (or to restart scheduling), send an authenticated `POST /start` to the
