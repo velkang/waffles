@@ -144,50 +144,56 @@ export async function submit(
   });
   throw new Error(`Awaiting finalized transaction ${saved.signature}`);
 }
-export async function flushOwnership(env: Env, at: number) {
-  const rows = await env.DB.prepare(
-    "SELECT mint,wallet,balance,lots,updated_at FROM ownership WHERE updated_at<? ORDER BY mint,wallet",
-  )
-    .bind(at)
-    .all<{
-      mint: string;
-      wallet: string;
-      balance: string;
-      lots: string;
-      updated_at: number;
-    }>();
-  for (const o of rows.results) {
-    let start = o.updated_at;
-    const statements: D1PreparedStatement[] = [];
-    while (start < at) {
-      const epoch = epochAt(start),
-        end = Math.min(at, epochBounds(epoch).end);
-      const old = await env.DB.prepare(
-        "SELECT weight FROM holder_weights WHERE epoch=? AND mint=? AND wallet=?",
-      )
-        .bind(epoch, o.mint, o.wallet)
-        .first<{ weight: string }>();
+export async function flushOwnership(
+  env: Env,
+  at: number,
+  options: { accrueHolders?: boolean; reserveWrites?: (rows: number) => Promise<void> } = {},
+) {
+  if (options.accrueHolders !== false) {
+    const rows = await env.DB.prepare(
+      "SELECT mint,wallet,balance,lots,updated_at FROM ownership WHERE updated_at<? ORDER BY mint,wallet",
+    )
+      .bind(at)
+      .all<{
+        mint: string;
+        wallet: string;
+        balance: string;
+        lots: string;
+        updated_at: number;
+      }>();
+    for (const o of rows.results) {
+      let start = o.updated_at;
+      const statements: D1PreparedStatement[] = [];
+      while (start < at) {
+        const epoch = epochAt(start),
+          end = Math.min(at, epochBounds(epoch).end);
+        const old = await env.DB.prepare(
+          "SELECT weight FROM holder_weights WHERE epoch=? AND mint=? AND wallet=?",
+        )
+          .bind(epoch, o.mint, o.wallet)
+          .first<{ weight: string }>();
+        statements.push(
+          env.DB.prepare(
+            "INSERT INTO holder_weights(epoch,mint,wallet,weight) VALUES(?,?,?,?) ON CONFLICT(epoch,mint,wallet) DO UPDATE SET weight=excluded.weight",
+          ).bind(
+            epoch,
+            o.mint,
+            o.wallet,
+            (
+              BigInt(old?.weight ?? "0") +
+              BigInt(o.balance) * BigInt(end - start)
+            ).toString(),
+          ),
+        );
+        start = end;
+      }
       statements.push(
         env.DB.prepare(
-          "INSERT INTO holder_weights(epoch,mint,wallet,weight) VALUES(?,?,?,?) ON CONFLICT(epoch,mint,wallet) DO UPDATE SET weight=excluded.weight",
-        ).bind(
-          epoch,
-          o.mint,
-          o.wallet,
-          (
-            BigInt(old?.weight ?? "0") +
-            BigInt(o.balance) * BigInt(end - start)
-          ).toString(),
-        ),
+          "UPDATE ownership SET updated_at=? WHERE mint=? AND wallet=?",
+        ).bind(at, o.mint, o.wallet),
       );
-      start = end;
+      await env.DB.batch(statements);
     }
-    statements.push(
-      env.DB.prepare(
-        "UPDATE ownership SET updated_at=? WHERE mint=? AND wallet=?",
-      ).bind(at, o.mint, o.wallet),
-    );
-    await env.DB.batch(statements);
   }
   const due = await env.DB.prepare(
     "SELECT h.mint,m.creator,m.launched_at FROM holding_checkpoints h JOIN markets m ON m.mint=h.mint WHERE h.completed=0 AND h.at<=?",
@@ -222,6 +228,7 @@ export async function flushOwnership(env: Env, at: number) {
         "UPDATE holding_checkpoints SET completed=1 WHERE mint=?",
       ).bind(m.mint),
     );
+    await options.reserveWrites?.(statements.length * 4);
     await env.DB.batch(statements);
   }
 }

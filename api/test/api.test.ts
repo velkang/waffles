@@ -6,6 +6,8 @@ import {
   INITIAL_SOL,
   INITIAL_TOKENS,
   SUPPLY,
+  epochAt,
+  epochBounds,
   type Market,
 } from "@waffles/shared/solana";
 import { sha, claimLeaf, merkle, verifyProof } from "@waffles/shared/rewards";
@@ -74,6 +76,45 @@ describe("Hono and D1 inside Workers", () => {
     expect(
       (await SELF.fetch("https://waffles/v1/launches/not-an-address")).status,
     ).toBe(400);
+  });
+  it.each([
+    ["http://127.0.0.1:5174/v1/assets/images/original", true],
+    ["http://localhost:5174/v1/assets/images/original", true],
+    ["http://[::1]:5174/v1/assets/images/original", true],
+    ["https://images.example/token.jpg", false],
+    ["http://localhost:5174/other/image.jpg", false],
+    ["", false],
+  ])("resolves local uploaded images without changing other URLs: %s", async (imageUri, local) => {
+    await seed();
+    await env.DB.prepare("UPDATE markets SET data=? WHERE mint=?")
+      .bind(json({ ...market, imageUri }), mint)
+      .run();
+    const mediaOrigin = "https://public.waffles.example";
+    for (const path of [
+      "/v1/launches",
+      `/v1/launches/${mint}`,
+      `/v1/portfolios/${wallet}`,
+    ]) {
+      const response = await app.request(
+        `https://api.waffles.example${path}`,
+        {},
+        { ...env, MEDIA_ORIGIN: mediaOrigin },
+      );
+      expect(response.status).toBe(200);
+      const data = await response.json() as {
+        launches?: Market[];
+        launch?: Market;
+        created?: Market[];
+      };
+      const result = data.launch ?? data.launches?.[0] ?? data.created?.[0];
+      expect(result?.imageUri).toBe(
+        local ? `${mediaOrigin}/v1/assets/images/original` : imageUri,
+      );
+    }
+    const stored = await env.DB.prepare("SELECT data FROM markets WHERE mint=?")
+      .bind(mint)
+      .first<{ data: string }>();
+    expect(JSON.parse(stored!.data).imageUri).toBe(imageUri);
   });
   it("preserves Solana address case and quotes from stored integer reserves", async () => {
     await seed();
@@ -229,7 +270,7 @@ describe("Hono and D1 inside Workers", () => {
 });
 
 // Run finalized ownership accounting against real D1, including activity outside Waffles.
-import { applyBlock, fetchBlock } from "../../jobs/src/ingest";
+import { applyBlock } from "../../jobs/src/ingest";
 import type { Env as JobsEnv } from "../../jobs/src/env";
 const tokenProgram = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
@@ -464,6 +505,7 @@ it("blocks incomplete token metadata and unrecorded ownership movement", async (
 });
 
 import { pda } from "@waffles/shared/client";
+import { createdMints } from "../../jobs/src/ingest";
 it.each(["active", "withdrawn", "noncanonical"])(
   "counts only releasable commitment tokens: %s",
   async (state) => {
@@ -570,59 +612,9 @@ it("identifies loopback validators as localnet and public devnet as devnet", asy
   }
 });
 
-it("requests and archives version-1 finalized transactions", async () => {
-  await fetchBlock(
-    {
-      ...env,
-      GENESIS_HASH: "verified-devnet",
-      RPC_URL: "https://rpc.test",
-    } as unknown as JobsEnv,
-    12,
-  );
-  const row = await env.DB.prepare(
-    "SELECT object_key FROM pending_blocks WHERE slot=12",
-  ).first<{ object_key: string }>();
-  const artifact = await env.ARTIFACTS.get(row!.object_key);
-  const saved = JSON.parse(
-    await new Response(
-      artifact!.body.pipeThrough(new DecompressionStream("gzip")),
-    ).text(),
-  );
-  expect(saved.transactions[0].version).toBe(1);
-});
-
 import jobs from "../../jobs/src/index";
-import * as ingestion from "../../jobs/src/ingest";
-it("acknowledges archived jobs and durably defers failed jobs without stacked retries", async () => {
-  const fetch = vi
-    .spyOn(ingestion, "fetchBlock")
-    .mockImplementation(async (_env, slot) => {
-      if (slot === 13) throw new Error("RPC unavailable");
-    });
-  const log = vi.spyOn(console, "error").mockImplementation(() => {});
-  const good = { body: { slot: 12 }, ack: vi.fn(), retry: vi.fn() };
-  const failed = { body: { slot: 13 }, ack: vi.fn(), retry: vi.fn() };
-  try {
-    await jobs.queue(
-      { messages: [good, failed] } as unknown as MessageBatch<{ slot: number }>,
-      env as unknown as JobsEnv,
-    );
-    expect(good.ack).toHaveBeenCalledOnce();
-    expect(good.retry).not.toHaveBeenCalled();
-    expect(failed.ack).toHaveBeenCalledOnce();
-    expect(failed.retry).not.toHaveBeenCalled();
-    const pending = await env.DB.prepare(
-      "SELECT attempts,retry_at FROM fetch_jobs WHERE slot=13",
-    ).first<{ attempts: number; retry_at: number }>();
-    expect(pending?.attempts).toBe(1);
-    expect(pending!.retry_at).toBeGreaterThan(Date.now());
-  } finally {
-    fetch.mockRestore();
-    log.mockRestore();
-  }
-});
 
-it("advances finalized history past vote-only transactions without token accounting", async () => {
+it("ignores vote-only transactions without per-block database writes", async () => {
   const block = transferBlock(14, 200, wallet);
   const tx = block.transactions[0];
   tx.transaction.message.accountKeys = [
@@ -638,10 +630,10 @@ it("advances finalized history past vote-only transactions without token account
   tx.meta!.innerInstructions = null;
   await applyBlock(env as unknown as JobsEnv, 14, block);
   expect(
-    (await env.DB.prepare(
+    await env.DB.prepare(
       "SELECT value FROM checkpoints WHERE id='complete-slot'",
-    ).first<{ value: string }>())!.value,
-  ).toBe("14");
+    ).first(),
+  ).toBeNull();
   expect(
     (await env.DB.prepare("SELECT count(*) n FROM indexed_events").first<{
       n: number;
@@ -649,7 +641,7 @@ it("advances finalized history past vote-only transactions without token account
   ).toBe(0);
 });
 
-it("advances history without indexing unrelated tokens before the first Waffles market", async () => {
+it("ignores unrelated tokens before the first Waffles market", async () => {
   await applyBlock(
     env as unknown as JobsEnv,
     15,
@@ -661,10 +653,10 @@ it("advances history without indexing unrelated tokens before the first Waffles 
     }>())!.n,
   ).toBe(0);
   expect(
-    (await env.DB.prepare(
+    await env.DB.prepare(
       "SELECT value FROM checkpoints WHERE id='complete-slot'",
-    ).first<{ value: string }>())!.value,
-  ).toBe("15");
+    ).first(),
+  ).toBeNull();
 });
 
 it("uploads validated images without a verification challenge", async () => {
@@ -743,6 +735,585 @@ it("starts alarm scheduling only with the operations token", async () => {
 
 import { RpcBudget, rpcConnection, RpcDeferred } from "../../jobs/src/rpc";
 import { Coordinator } from "../../jobs/src/index";
+import { fetchRange, readRange, relevantBlock, verifyHistory, type RangeJob, type RangeArchive } from "../../jobs/src/ranges";
+import { flushOwnership } from "../../jobs/src/settlement";
+
+async function rangeJob(start = 12, end = 15) {
+  await env.DB.prepare("INSERT INTO ingestion_ranges(start,end) VALUES(?,?)")
+    .bind(start, end).run();
+  return (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=?")
+    .bind(start).first<RangeJob>())!;
+}
+async function retainRange(archive: RangeArchive) {
+  const job = await rangeJob(archive.start, archive.end);
+  const raw = new TextEncoder().encode(json(archive));
+  const hash = Array.from(await sha(raw), (b) => b.toString(16).padStart(2, "0")).join("");
+  const objectKey = `test-ranges/${archive.start}/${hash}`;
+  await env.ARTIFACTS.put(objectKey, await new Response(
+    new Blob([raw]).stream().pipeThrough(new CompressionStream("gzip")),
+  ).arrayBuffer());
+  await env.DB.prepare("UPDATE ingestion_ranges SET object_key=?,hash=?,complete=1 WHERE start=?")
+    .bind(objectKey, hash, job.start).run();
+}
+function headers(slot: number, parent: number, time = 200) {
+  return { ...transferBlock(slot, time, wallet), parentSlot: parent, transactions: [] };
+}
+const thirdAccount = Keypair.fromSeed(new Uint8Array(32).fill(6)).publicKey;
+const thirdOwner = Keypair.fromSeed(new Uint8Array(32).fill(7)).publicKey.toBase58();
+const receipt = (signature: string, slot: number) => ({ signature, slot, err: null });
+async function anchoredHistory(withSource = false) {
+  if (withSource) {
+    await ownership();
+    await env.DB.prepare("INSERT INTO token_accounts(address,mint,owner) VALUES(?,?,?)")
+      .bind(source.toBase58(), mint, receiver).run();
+  }
+  await env.DB.prepare("INSERT INTO checkpoints(id,value) VALUES('complete-slot','11')").run();
+  await retainRange({ version: 2, start: 12, end: 16, slots: [], blocks: [], history: {
+    queries: {
+      [env.PROGRAM_ID]: { anchor: receipt("program-anchor", 11), pages: [] },
+      ...(withSource ? { [source.toBase58()]: { anchor: receipt("source-anchor", 11), pages: [] } } : {}),
+    },
+  } });
+  await env.DB.prepare("UPDATE ingestion_ranges SET complete=0 WHERE start=12").run();
+  return (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+}
+function historyRpc(histories: Record<string, ReturnType<typeof receipt>[]>, blocks: Record<number, ParsedBlockResponse>) {
+  const calls: { method: string; params: any[] }[] = [];
+  const fetch = async (_url: string, init: RequestInit) => {
+    const payload = JSON.parse(String(init.body));
+    const respond = (call: { id: unknown; method: string; params: any[] }) => {
+      calls.push(call);
+      let result: unknown;
+      if (call.method === "getSignaturesForAddress") {
+        const rows = histories[call.params[0]] ?? [];
+        const before = call.params[1].before;
+        const start = before ? rows.findIndex((row) => row.signature === before) + 1 : 0;
+        result = rows.slice(start, start + 1000);
+      } else if (call.method === "getBlock") {
+        expect(call.params[1].maxSupportedTransactionVersion).toBe(1);
+        result = blocks[call.params[0]] ?? null;
+      } else if (call.method === "getBlocks") result = [12, 13, 14, 15, 16];
+      else if (call.method === "getBlockTime") result = 204;
+      else throw new Error(`Unexpected history RPC ${call.method}`);
+      return { jsonrpc: "2.0", id: call.id, result };
+    };
+    return Response.json(Array.isArray(payload) ? payload.map(respond) : respond(payload));
+  };
+  return { calls, bindings: { ...env, RPC: { idFromName: () => "history", get: () => ({ fetch }) } } as unknown as JobsEnv };
+}
+function relayBlock(slot = 14) {
+  const block = transferBlock(slot, 201, thirdOwner, "10"), tx = block.transactions[0];
+  tx.transaction.signatures = ["relay"];
+  tx.transaction.message.accountKeys[0].pubkey = destination;
+  tx.transaction.message.accountKeys[1].pubkey = thirdAccount;
+  const ix = tx.transaction.message.instructions[0];
+  if ("parsed" in ix) Object.assign(ix.parsed.info, {
+    source: destination.toBase58(), destination: thirdAccount.toBase58(),
+  });
+  tx.meta!.preTokenBalances![0].owner = wallet;
+  tx.meta!.preTokenBalances![0].uiTokenAmount.amount = "25";
+  tx.meta!.postTokenBalances![0].owner = wallet;
+  tx.meta!.postTokenBalances![0].uiTokenAmount.amount = "15";
+  return block;
+}
+function burnCloseBlock() {
+  const block = transferBlock(15, 202, thirdOwner, "10"), tx = block.transactions[0];
+  tx.transaction.signatures = ["burn-close"];
+  tx.transaction.message.accountKeys[0].pubkey = thirdAccount;
+  tx.transaction.message.instructions = [
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "burn", info: { account: thirdAccount.toBase58(), mint, amount: "10" } } },
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "closeAccount", info: { account: thirdAccount.toBase58() } } },
+  ];
+  tx.meta!.preTokenBalances = [tx.meta!.preTokenBalances![0]];
+  tx.meta!.preTokenBalances[0].owner = thirdOwner;
+  tx.meta!.preTokenBalances[0].uiTokenAmount.amount = "10";
+  tx.meta!.postTokenBalances = [];
+  return block;
+}
+async function applyHistory(stub: DurableObjectStub) {
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const publish = vi.spyOn(instance as unknown as { publish(): Promise<void> }, "publish").mockResolvedValue();
+    try { await instance.fetch(new Request("https://coordinator/apply")); }
+    finally { publish.mockRestore(); await state.storage.deleteAlarm(); }
+  });
+}
+
+it("follows outside transfers into newly discovered and later-closed accounts before advancing", async () => {
+  const job = await anchoredHistory(true);
+  const { bindings, calls } = historyRpc({
+    [env.PROGRAM_ID]: [receipt("program-anchor", 11)],
+    [source.toBase58()]: [receipt("fixture-12", 12), receipt("source-anchor", 11)],
+    [destination.toBase58()]: [receipt("relay", 14), receipt("fixture-12", 12)],
+    [thirdAccount.toBase58()]: [receipt("burn-close", 15), receipt("relay", 14)],
+  }, { 12: transferBlock(12, 200, wallet), 14: relayBlock(), 15: burnCloseBlock() });
+  await fetchRange(bindings, job);
+  const saved = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(saved.complete).toBe(1);
+  const archive = await readRange(bindings, saved);
+  expect(archive.slots).toEqual([12, 14, 15]);
+  expect(Object.keys(archive.history!.queries)).toContain(thirdAccount.toBase58());
+  await verifyHistory(bindings, archive);
+  const thirdQuery = archive.history!.queries[thirdAccount.toBase58()];
+  delete archive.history!.queries[thirdAccount.toBase58()];
+  await expect(verifyHistory(bindings, archive)).rejects.toThrow("Unqueried token account");
+  archive.history!.queries[thirdAccount.toBase58()] = thirdQuery;
+  const signatures = archive.blocks[1].signatures;
+  archive.blocks[1].signatures = [];
+  await expect(verifyHistory(bindings, archive)).rejects.toThrow("History receipt missing");
+  archive.blocks[1].signatures = signatures;
+  expect(calls.some((call) => call.method === "getTokenAccountsByOwner")).toBe(false);
+  await applyHistory(env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID())));
+  const balances = await env.DB.prepare("SELECT wallet,balance FROM ownership WHERE mint=?").bind(mint)
+    .all<{ wallet: string; balance: string }>();
+  expect(new Map(balances.results.map((row) => [row.wallet, row.balance]))).toEqual(
+    new Map([[receiver, "75"], [wallet, "15"], [thirdOwner, "0"]]),
+  );
+  expect(await env.DB.prepare("SELECT address FROM token_accounts WHERE address=?").bind(thirdAccount.toBase58()).first()).not.toBeNull();
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("16");
+});
+
+it("uses canonical within-block order rather than signature order", async () => {
+  const job = await anchoredHistory(true);
+  const block = transferBlock(12, 200, wallet);
+  block.transactions[0].transaction.signatures = ["z-first"];
+  const second = relayBlock(12).transactions[0];
+  second.transaction.signatures = ["a-second"];
+  block.transactions.push(second);
+  const { bindings } = historyRpc({
+    [env.PROGRAM_ID]: [receipt("program-anchor", 11)],
+    [source.toBase58()]: [receipt("z-first", 12), receipt("source-anchor", 11)],
+    [destination.toBase58()]: [receipt("a-second", 12), receipt("z-first", 12)],
+    [thirdAccount.toBase58()]: [receipt("a-second", 12)],
+  }, { 12: block });
+  await fetchRange(bindings, job);
+  const saved = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(saved.complete).toBe(1);
+  await applyHistory(env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID())));
+  expect((await env.DB.prepare("SELECT balance FROM ownership WHERE wallet=?").bind(wallet).first<{ balance: string }>())?.balance).toBe("15");
+});
+
+it("paginates beyond newer activity to an older anchor without downloading irrelevant blocks", async () => {
+  const job = await anchoredHistory();
+  const rows = Array.from({ length: 1000 }, (_, i) => receipt(`future-${i}`, 2000 - i));
+  rows.push(receipt("program-anchor", 11));
+  const { bindings, calls } = historyRpc({ [env.PROGRAM_ID]: rows }, {});
+  await fetchRange(bindings, job);
+  const saved = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(saved.complete).toBe(1);
+  const archive = await readRange(bindings, saved);
+  expect(archive.slots).toEqual([]);
+  expect(calls.filter((call) => call.method === "getSignaturesForAddress")).toHaveLength(2);
+  expect(calls.filter((call) => call.method === "getBlock")).toHaveLength(0);
+  await applyHistory(env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID())));
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-time'").first<{ value: string }>())?.value).toBe("204");
+});
+
+it("does not interpret a missing recorded anchor as an empty period and retries the rejected page", async () => {
+  const job = await anchoredHistory();
+  const histories = { [env.PROGRAM_ID]: [] as ReturnType<typeof receipt>[] };
+  const { bindings } = historyRpc(histories, {});
+  await fetchRange(bindings, job);
+  const partial = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(partial.complete).toBe(0);
+  expect((await readRange(bindings, partial)).history!.queries[env.PROGRAM_ID].pages).toEqual([]);
+  histories[env.PROGRAM_ID] = [receipt("program-anchor", 11)];
+  await fetchRange(bindings, partial);
+  expect((await env.DB.prepare("SELECT complete FROM ingestion_ranges WHERE start=12").first<{ complete: number }>())?.complete).toBe(1);
+});
+
+it("rejects a repeated pagination page without advancing the checkpoint", async () => {
+  const job = await anchoredHistory();
+  const page = Array.from({ length: 1000 }, (_, i) => receipt(`repeat-${i}`, 2000 - i));
+  let reads = 0;
+  const fetch = async (_url: string, init: RequestInit) => {
+    const calls = JSON.parse(String(init.body));
+    reads++;
+    return Response.json(calls.map((call: { id: string }) => ({ jsonrpc: "2.0", id: call.id, result: page })));
+  };
+  const bindings = { ...env, RPC: { idFromName: () => "repeat", get: () => ({ fetch }) } } as unknown as JobsEnv;
+  await fetchRange(bindings, job);
+  expect(reads).toBe(2);
+  expect((await env.DB.prepare("SELECT complete FROM ingestion_ranges WHERE start=12").first<{ complete: number }>())?.complete).toBe(0);
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("11");
+});
+
+it("waits through a short RPC cooldown without checkpointing every throttled burst", async () => {
+  const job = await anchoredHistory();
+  const { bindings } = historyRpc({ [env.PROGRAM_ID]: [receipt("program-anchor", 11)] }, {});
+  const downstream = bindings.RPC.get(bindings.RPC.idFromName("history"));
+  let limited = true;
+  const fetch = async (url: string, init: RequestInit) => {
+    if (limited) {
+      limited = false;
+      return new Response("busy", { status: 429, headers: { "Retry-After": "1" } });
+    }
+    return downstream.fetch(url, init);
+  };
+  await fetchRange({ ...bindings, RPC: { idFromName: () => "wait", get: () => ({ fetch }) } } as unknown as JobsEnv, job);
+  expect(await env.DB.prepare("SELECT complete,attempts FROM ingestion_ranges WHERE start=12").first())
+    .toEqual({ complete: 1, attempts: 0 });
+});
+
+it("retains existing range metadata when widening the history window bound", async () => {
+  await env.DB.prepare("DROP TABLE ingestion_ranges").run();
+  const old = env.TEST_MIGRATIONS.find((migration) => migration.name === "0003_ingestion_ranges.sql")!;
+  const next = env.TEST_MIGRATIONS.find((migration) => migration.name === "0004_history_windows.sql")!;
+  await env.DB.batch(old.queries.map((sql) => env.DB.prepare(sql)));
+  await env.DB.prepare("INSERT INTO ingestion_ranges(start,end,object_key,hash,complete,applied) VALUES(12,523,'retained','hash',1,1)").run();
+  await env.DB.batch(next.queries.map((sql) => env.DB.prepare(sql)));
+  expect(await env.DB.prepare("SELECT object_key,hash,complete,applied FROM ingestion_ranges WHERE start=12").first())
+    .toEqual({ object_key: "retained", hash: "hash", complete: 1, applied: 1 });
+  await env.DB.prepare("INSERT INTO ingestion_ranges(start,end) VALUES(1000,9191)").run();
+  await expect(env.DB.prepare("INSERT INTO ingestion_ranges(start,end) VALUES(10000,18192)").run()).rejects.toThrow();
+});
+
+it("batches quiet head periods but wakes promptly for a new Waffles call after restart", async () => {
+  await anchoredHistory();
+  const stored = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  // Finish a real anchored quiet range, so the hint is reconstructed from its archive.
+  const { bindings: quiet } = historyRpc({ [env.PROGRAM_ID]: [receipt("program-anchor", 11)] }, {});
+  await fetchRange(quiet, stored);
+  const id = env.COORDINATOR.idFromName(crypto.randomUUID());
+  let stub = env.COORDINATOR.get(id);
+  await applyHistory(stub);
+  let latest = "program-anchor";
+  const fetch = async (_url: string, init: RequestInit) => {
+    const payload = JSON.parse(String(init.body));
+    const respond = (call: any) => ({ jsonrpc: "2.0", id: call.id,
+      result: call.method === "getSlot" ? 100 : [receipt(latest, latest === "program-anchor" ? 11 : 99)],
+    });
+    return Response.json(Array.isArray(payload) ? payload.map(respond) : respond(payload));
+  };
+  const check = async (instance: Coordinator, state: DurableObjectState, wake: boolean) => {
+    const local = (instance as unknown as { env: JobsEnv }).env, previous = local.RPC;
+    local.RPC = { idFromName: () => "hint", get: () => ({ fetch }) } as unknown as DurableObjectNamespace;
+    const send = vi.spyOn(local.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
+    try {
+      await (instance as unknown as { discover(): Promise<void> }).discover();
+      if (wake) expect(send).toHaveBeenCalledExactlyOnceWith({ start: 17, end: 100 });
+      else expect(send).not.toHaveBeenCalled();
+    } finally { send.mockRestore(); local.RPC = previous; await state.storage.deleteAlarm(); }
+  };
+  await runInDurableObject<Coordinator, void>(stub, (instance, state) => check(instance, state, false));
+  await expect(runInDurableObject<Coordinator, void>(stub, (_instance, state) => state.abort("hint restart"))).rejects.toThrow("hint restart");
+  stub = env.COORDINATOR.get(id);
+  await runInDurableObject<Coordinator, void>(stub, (instance, state) => check(instance, state, false));
+  latest = "new-call";
+  await runInDurableObject<Coordinator, void>(stub, (instance, state) => check(instance, state, true));
+});
+
+it("accounts for a token account initialized, funded, burned and closed within one transaction", async () => {
+  await ownership();
+  const block = transferBlock(12, 200, wallet), tx = block.transactions[0];
+  tx.meta!.preTokenBalances = [tx.meta!.preTokenBalances![0]];
+  tx.meta!.postTokenBalances = [tx.meta!.postTokenBalances![0]];
+  tx.transaction.message.instructions.unshift({ programId: tokenProgram, program: "spl-token", parsed: {
+    type: "initializeAccount3", info: { account: destination.toBase58(), mint, owner: wallet },
+  } });
+  tx.transaction.message.instructions.push(
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "burn", info: { account: destination.toBase58(), mint, amount: "25" } } },
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "closeAccount", info: { account: destination.toBase58() } } },
+  );
+  const tracked = new Set<string>();
+  relevantBlock(block, new Set([mint]), env.PROGRAM_ID, tracked);
+  expect(tracked.has(destination.toBase58())).toBe(true);
+  await applyBlock(env as unknown as JobsEnv, 12, block);
+  expect((await env.DB.prepare("SELECT balance FROM ownership WHERE wallet=?").bind(wallet).first<{ balance: string }>())?.balance).toBe("0");
+});
+
+it("does not mistake a closed address reused for a foreign mint for Waffles holdings", async () => {
+  await ownership();
+  const block = transferBlock(12, 200, wallet), tx = block.transactions[0];
+  const foreign = { ...tx.meta!.postTokenBalances![1], mint: thirdAccount.toBase58(),
+    uiTokenAmount: { ...tx.meta!.postTokenBalances![1].uiTokenAmount, amount: "7" } };
+  tx.meta!.preTokenBalances = [tx.meta!.preTokenBalances![0]];
+  tx.meta!.postTokenBalances = [tx.meta!.postTokenBalances![0], foreign];
+  tx.transaction.message.instructions.unshift({ programId: tokenProgram, program: "spl-token", parsed: {
+    type: "initializeAccount3", info: { account: destination.toBase58(), mint, owner: wallet },
+  } });
+  tx.transaction.message.instructions.push(
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "burn", info: { account: destination.toBase58(), mint, amount: "25" } } },
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "closeAccount", info: { account: destination.toBase58() } } },
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "initializeAccount3", info: { account: destination.toBase58(), mint: thirdAccount.toBase58(), owner: wallet } } },
+    { programId: tokenProgram, program: "spl-token", parsed: { type: "mintTo", info: { account: destination.toBase58(), amount: "7" } } },
+  );
+  const tracked = new Set<string>();
+  relevantBlock(block, new Set([mint]), env.PROGRAM_ID, tracked);
+  expect(tracked.has(destination.toBase58())).toBe(true);
+  await applyBlock(env as unknown as JobsEnv, 12, block);
+  expect((await env.DB.prepare("SELECT balance FROM ownership WHERE wallet=?").bind(wallet).first<{ balance: string }>())?.balance).toBe("0");
+  expect(await env.DB.prepare("SELECT mint FROM token_accounts WHERE address=?").bind(destination.toBase58()).first()).toBeNull();
+  expect(await env.DB.prepare("SELECT mint FROM ownership WHERE mint=?").bind(thirdAccount.toBase58()).first()).toBeNull();
+});
+
+it("discovers only event-verified launch mints rather than foreign balances mentioned in a Waffles call", () => {
+  const block = transferBlock(12, 200, wallet), tx = block.transactions[0];
+  tx.transaction.message.accountKeys.push({ pubkey: new PublicKey(env.PROGRAM_ID), signer: false, writable: false });
+  tx.transaction.message.instructions = [{
+    programId: new PublicKey(env.PROGRAM_ID), accounts: [],
+    // Fixed Created-event vector encoded by the installed Anchor library.
+    data: "bdbn4SHaezrHaVaBCoYQjNCCwidut48mQJFCm2ZYDqQkkJE4sJ1oEST6RUrexjG8LNMKBPcSN3c3wg8YkLVW9zfP7VJtNU6Nraoq7acbQdZSKHsMLGudivYpcUdypqR3urp8y8okhSsaWMSXFs8F9y6u9M2WjhwikZYpWKDLhLFe2hVkuBu",
+  }];
+  const foreignMint = thirdAccount.toBase58();
+  tx.meta!.postTokenBalances!.push({ ...tx.meta!.postTokenBalances![0], mint: foreignMint });
+  const discovered = createdMints(env as unknown as JobsEnv, block);
+  expect(discovered).toEqual([mint]);
+  const mints = new Set(discovered);
+  relevantBlock(block, mints, env.PROGRAM_ID);
+  expect(mints.has(foreignMint)).toBe(false);
+});
+
+it("archives a finalized range including version-1 instructions without per-block rows", async () => {
+  const job = await rangeJob();
+  await fetchRange(env as unknown as JobsEnv, job);
+  const saved = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(saved.complete).toBe(1);
+  const archive = await readRange(env as unknown as JobsEnv, saved);
+  expect(archive.slots).toEqual([12, 14, 15]);
+  expect(archive.blocks.map((entry) => entry.slot)).toEqual([12, 14, 15]);
+  expect(archive.blocks[0].block.transactions[0].version).toBe(1);
+  expect(await env.DB.prepare("SELECT slot FROM pending_blocks").first()).toBeNull();
+  expect(await env.DB.prepare("SELECT id FROM checkpoints").first()).toBeNull();
+});
+
+it("retains the contiguous download prefix and resumes without fetching completed blocks again", async () => {
+  await retainRange({ version: 1, start: 12, end: 15, slots: [12, 14, 15], blocks: [] });
+  await env.DB.prepare("UPDATE ingestion_ranges SET complete=0 WHERE start=12").run();
+  const job = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  let fail = true;
+  const fetched: number[] = [];
+  const upstream = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
+  const fetch = async (url: string, init: RequestInit) => {
+    const payload = JSON.parse(String(init.body));
+    const calls = Array.isArray(payload) ? payload : [payload];
+    for (const call of calls) if (call.method === "getBlock") fetched.push(call.params[0]);
+    const response = await upstream.fetch(url, init);
+    if (Array.isArray(payload) && calls.some((call) => call.params[0] === 14) && fail) {
+      fail = false;
+      const replies = await response.json() as { id: number }[];
+      return Response.json(replies.map((reply) => reply.id === 14
+        ? { jsonrpc: "2.0", id: 14, error: { code: -32004, message: "temporarily unavailable" } }
+        : reply));
+    }
+    return response;
+  };
+  const bindings = { ...env, RPC: { idFromName: () => "unused", get: () => ({ fetch }) } } as unknown as JobsEnv;
+  await fetchRange(bindings, job);
+  const partial = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(partial.complete).toBe(0);
+  expect((await readRange(bindings, partial)).blocks.map((entry) => entry.slot)).toEqual([12]);
+  await fetchRange(bindings, partial);
+  const complete = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect(complete.complete).toBe(1);
+  expect(fetched.filter((slot) => slot === 12)).toHaveLength(1);
+  expect(fetched.filter((slot) => slot === 14)).toHaveLength(2);
+});
+
+it("reuses legacy block archives and rejects altered range replay artifacts", async () => {
+  const block = headers(12, 11);
+  const raw = new TextEncoder().encode(json(block));
+  const hash = Array.from(await sha(raw), (b) => b.toString(16).padStart(2, "0")).join("");
+  await env.ARTIFACTS.put("legacy-block", await new Response(
+    new Blob([raw]).stream().pipeThrough(new CompressionStream("gzip")),
+  ).arrayBuffer());
+  await env.DB.prepare("INSERT INTO pending_blocks(slot,parent,time,object_key,hash) VALUES(12,11,200,'legacy-block',?)")
+    .bind(hash).run();
+  const fetch = vi.fn(async () => { throw new Error("RPC must not be called"); });
+  const bindings = { ...env, RPC: { idFromName: () => "unused", get: () => ({ fetch }) } } as unknown as JobsEnv;
+  await retainRange({ version: 1, start: 12, end: 13, slots: [12], blocks: [] });
+  await env.DB.prepare("UPDATE ingestion_ranges SET complete=0 WHERE start=12").run();
+  await fetchRange(bindings, (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!);
+  expect(fetch).not.toHaveBeenCalled();
+  const job = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
+  expect((await readRange(bindings, job)).blocks).toHaveLength(1);
+  await env.ARTIFACTS.put(job.object_key!, await new Response(
+    new Blob(["{}"]).stream().pipeThrough(new CompressionStream("gzip")),
+  ).arrayBuffer());
+  await expect(readRange(bindings, job)).rejects.toThrow("checksum mismatch");
+});
+
+it("retains external transfers, burns, owner changes and incomplete tracked-account metadata", () => {
+  const block = transferBlock(12, 200, wallet);
+  expect(relevantBlock(block, new Set([mint]), env.PROGRAM_ID).transactions).toHaveLength(1);
+  expect(relevantBlock(block, new Set(), env.PROGRAM_ID).transactions).toHaveLength(0);
+  const missing = JSON.parse(json(block)) as ParsedBlockResponse;
+  missing.transactions[0].meta!.preTokenBalances = [];
+  missing.transactions[0].meta!.postTokenBalances = [];
+  expect(relevantBlock(missing, new Set([mint]), env.PROGRAM_ID,
+    new Set([source.toBase58()])).transactions).toHaveLength(1);
+  const ownerChange = transferBlock(12, 200, wallet);
+  ownerChange.transactions[0].meta!.postTokenBalances = undefined;
+  expect(relevantBlock(ownerChange, new Set(), env.PROGRAM_ID).transactions).toHaveLength(1);
+});
+
+it("applies skipped-slot ranges atomically at the checkpoint and accepts duplicate delivery", async () => {
+  await env.DB.prepare("INSERT INTO checkpoints(id,value) VALUES('complete-slot','11')").run();
+  await retainRange({ version: 1, start: 12, end: 16, slots: [12, 14, 15],
+    blocks: [{ slot: 12, block: headers(12, 11) }, { slot: 14, block: headers(14, 12) }, { slot: 15, block: headers(15, 14) }] });
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await instance.fetch(new Request("https://coordinator/apply"));
+    await instance.fetch(new Request("https://coordinator/apply"));
+    await state.storage.deleteAlarm();
+  });
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("16");
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-block'").first<{ value: string }>())?.value).toBe("15");
+  await retainRange({ version: 1, start: 17, end: 18, slots: [17], blocks: [{ slot: 17, block: headers(17, 15, 201) }] });
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await instance.fetch(new Request("https://coordinator/apply"));
+    await state.storage.deleteAlarm();
+  });
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("18");
+});
+
+it("does not apply earlier transactions or advance across a missing parent", async () => {
+  await ownership();
+  await env.DB.prepare("INSERT INTO checkpoints(id,value) VALUES('complete-slot','11')").run();
+  await retainRange({ version: 1, start: 12, end: 14, slots: [12, 14], blocks: [
+    { slot: 12, block: transferBlock(12, 200, wallet) },
+    { slot: 14, block: headers(14, 13) },
+  ] });
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance) => {
+    await expect(instance.fetch(new Request("https://coordinator/apply"))).rejects.toThrow("Missing finalized block");
+  });
+  expect((await env.DB.prepare("SELECT balance FROM ownership WHERE wallet=?").bind(receiver).first<{ balance: string }>())?.balance).toBe("100");
+  expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("11");
+});
+
+it("keeps exact holder-time weights without rewriting inactive positions every block", async () => {
+  await ownership();
+  await applyBlock(env as unknown as JobsEnv, 12, transferBlock(12, 200, wallet));
+  await flushOwnership(env as unknown as JobsEnv, 300, { accrueHolders: false });
+  expect((await env.DB.prepare("SELECT updated_at FROM ownership WHERE wallet=?").bind(receiver).first<{ updated_at: number }>())?.updated_at).toBe(200);
+  await flushOwnership(env as unknown as JobsEnv, 400);
+  const weights = await env.DB.prepare("SELECT wallet,weight FROM holder_weights WHERE mint=?").bind(mint).all<{ wallet: string; weight: string }>();
+  const byWallet = new Map(weights.results.map((row) => [row.wallet, row.weight]));
+  expect(byWallet.get(receiver)).toBe("25000");
+  expect(byWallet.get(wallet)).toBe("5000");
+});
+
+it("splits lazy holder accrual exactly at the weekly boundary", async () => {
+  await ownership();
+  const epoch = epochAt(100), boundary = epochBounds(epoch).end;
+  await applyBlock(env as unknown as JobsEnv, 12, transferBlock(12, boundary + 10, wallet));
+  await flushOwnership(env as unknown as JobsEnv, boundary + 20);
+  const rows = await env.DB.prepare("SELECT epoch,wallet,weight FROM holder_weights WHERE mint=?")
+    .bind(mint).all<{ epoch: number; wallet: string; weight: string }>();
+  const weights = new Map(rows.results.map((row) => [`${row.epoch}:${row.wallet}`, row.weight]));
+  expect(weights.get(`${epoch}:${receiver}`)).toBe((100n * BigInt(boundary - 100)).toString());
+  expect(weights.get(`${epoch + 1}:${receiver}`)).toBe("1750");
+  expect(weights.get(`${epoch + 1}:${wallet}`)).toBe("250");
+});
+
+it("tracks a mint and its accounts introduced earlier in the same range", () => {
+  const created = transferBlock(12, 200, wallet);
+  created.transactions[0].transaction.message.accountKeys.push({
+    pubkey: new PublicKey(env.PROGRAM_ID), signer: false, writable: false,
+  });
+  const mints = new Set<string>([mint]), accounts = new Set<string>();
+  relevantBlock(created, mints, env.PROGRAM_ID, accounts);
+  expect(mints.has(mint)).toBe(true);
+  expect(accounts.has(destination.toBase58())).toBe(true);
+  expect(relevantBlock(transferBlock(14, 201, wallet), mints, env.PROGRAM_ID, accounts).transactions).toHaveLength(1);
+});
+
+it("reserves daily queue and write budgets before effects and resets on the next UTC day", async () => {
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const work = instance as unknown as { reserve(kind: "messages" | "writes", count: number): Promise<void> };
+    const day = new Date().toISOString().slice(0, 10);
+    await state.storage.put("ingestion-budget", { day, messages: 1499, writes: 39999 });
+    await work.reserve("messages", 1);
+    await work.reserve("writes", 1);
+    await expect(work.reserve("messages", 1)).rejects.toThrow("messages budget");
+    await expect(work.reserve("writes", 1)).rejects.toThrow("writes budget");
+    await state.storage.put("ingestion-budget", { day: "2000-01-01", messages: 1500, writes: 40000 });
+    await work.reserve("messages", 1);
+    expect(await state.storage.get("ingestion-budget")).toEqual({ day, messages: 1, writes: 0 });
+  });
+});
+
+it("drains legacy queue notifications by waking durable range work rather than re-fetching each block", async () => {
+  const fetch = vi.fn(async (_url: string) => new Response("scheduled"));
+  const message = { body: { slot: 12 }, ack: vi.fn() };
+  await jobs.queue({ messages: [message] } as unknown as MessageBatch<{ slot: number }>, {
+    ...env, COORDINATOR: { idFromName: () => "devnet", get: () => ({ fetch }) },
+  } as unknown as JobsEnv);
+  expect(fetch.mock.calls[0][0]).toBe("https://coordinator/discover");
+  expect(message.ack).toHaveBeenCalledOnce();
+});
+
+it("sends one range job and recovers an expired lease after a coordinator restart", async () => {
+  const id = env.COORDINATOR.idFromName(crypto.randomUUID());
+  let stub = env.COORDINATOR.get(id);
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const bindings = (instance as unknown as { env: JobsEnv }).env;
+    const send = vi.spyOn(bindings.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
+    await state.storage.put("maintenance-at", Date.now());
+    try {
+      await instance.alarm();
+      await instance.alarm();
+      expect(send).toHaveBeenCalledExactlyOnceWith({ start: 12, end: 1000 });
+      expect((await env.DB.prepare("SELECT start FROM ingestion_ranges").all()).results).toHaveLength(1);
+    } finally {
+      send.mockRestore();
+      await state.storage.deleteAlarm();
+    }
+  });
+  await env.DB.prepare("UPDATE ingestion_ranges SET retry_at=0").run();
+  await expect(runInDurableObject<Coordinator, void>(stub, (_instance, state) => {
+    state.abort("range restart");
+  })).rejects.toThrow("range restart");
+  stub = env.COORDINATOR.get(id);
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await instance.alarm();
+    await state.storage.deleteAlarm();
+  });
+  expect((await env.DB.prepare("SELECT complete FROM ingestion_ranges WHERE start=12").first<{ complete: number }>())?.complete).toBe(1);
+});
+
+it("stops new sends after a provider queue quota error while retaining recoverable work", async () => {
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const bindings = (instance as unknown as { env: JobsEnv }).env;
+    const send = vi.spyOn(bindings.BLOCKS, "send").mockRejectedValue(
+      new Error("Queue has exceeded daily operations limit"),
+    );
+    await state.storage.put("maintenance-at", Date.now());
+    try {
+      await instance.alarm();
+      expect(await state.storage.get<number>("queue-resume-at")).toBeGreaterThan(Date.now());
+      await instance.alarm(); // Finish the already-persisted range without another send.
+      await instance.alarm(); // Apply it, but do not enqueue the next range.
+      expect(send).toHaveBeenCalledOnce();
+      expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("1000");
+    } finally {
+      send.mockRestore();
+      await state.storage.deleteAlarm();
+    }
+  });
+});
+
+it("uses the durable alarm instead of sending when the daily message reservation is exhausted", async () => {
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const bindings = (instance as unknown as { env: JobsEnv }).env;
+    const send = vi.spyOn(bindings.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
+    await state.storage.put("ingestion-budget", {
+      day: new Date().toISOString().slice(0, 10), messages: 1500, writes: 0,
+    });
+    try {
+      await instance.alarm();
+      expect(send).not.toHaveBeenCalled();
+      expect(await state.storage.get<number>("queue-resume-at")).toBeGreaterThan(Date.now());
+      expect(await env.DB.prepare("SELECT start FROM ingestion_ranges").first()).not.toBeNull();
+    } finally {
+      send.mockRestore();
+      await state.storage.deleteAlarm();
+    }
+  });
+});
 const rpcCall = (
   stub: DurableObjectStub,
   method: string,
@@ -770,10 +1341,11 @@ it("shares provider cooldown across callers and retains it after restart", async
   stub = env.RPC.get(id);
   const blocked = await rpcCall(stub, "getBalance", ["normal"], "interactive");
   expect(blocked.status).toBe(429);
-  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+  await runInDurableObject<RpcBudget, void>(stub, async (instance, state) => {
     const budget = (await state.storage.get<any>("budget"))!;
     budget.until = 0;
     await state.storage.put("budget", budget);
+    (instance as unknown as { budget?: unknown }).budget = undefined;
   });
   expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
 });
@@ -781,11 +1353,14 @@ it("shares provider cooldown across callers and retains it after restart", async
 it("reserves RPC capacity for interactive work and rejects JSON batches", async () => {
   const stub = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
   expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
-  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+  await runInDurableObject<RpcBudget, void>(stub, async (instance, state) => {
     const budget = (await state.storage.get<any>("budget"))!;
     budget.background = 0;
+    budget.tokens = 320;
+    budget.until = 0;
     budget.at = Date.now();
     await state.storage.put("budget", budget);
+    (instance as unknown as { budget?: unknown }).budget = undefined;
   });
   expect((await rpcCall(stub, "getBlock", [12, {}])).status).toBe(429);
   expect(
@@ -794,6 +1369,10 @@ it("reserves RPC capacity for interactive work and rejects JSON batches", async 
   expect(
     (await stub.fetch("https://rpc/", { method: "POST", body: "[]" })).status,
   ).toBe(400);
+  expect((await stub.fetch("https://rpc/", {
+    method: "POST", headers: { "X-RPC-Lane": "interactive" },
+    body: JSON.stringify([{ jsonrpc: "2.0", id: 1, method: "getBlock", params: [12] }]),
+  })).status).toBe(400);
 });
 
 it("does not hide SDK retries inside a coordinated deferral", async () => {
@@ -809,74 +1388,6 @@ it("does not hide SDK retries inside a coordinated deferral", async () => {
     RpcDeferred,
   );
   expect(fetch).toHaveBeenCalledOnce();
-  await expect(fetchBlock(bindings, 12)).rejects.toBeInstanceOf(RpcDeferred);
-  expect(fetch).toHaveBeenCalledTimes(2);
-});
-
-it("reuses an archived block even when RPC is unavailable", async () => {
-  const bindings = { ...env } as unknown as JobsEnv;
-  await fetchBlock(bindings, 12);
-  const fetch = vi.fn(async () => {
-    throw new Error("RPC must not be called");
-  });
-  await fetchBlock(
-    {
-      ...bindings,
-      RPC: { idFromName: () => "devnet", get: () => ({ fetch }) },
-    } as unknown as JobsEnv,
-    12,
-  );
-  expect(fetch).not.toHaveBeenCalled();
-  expect(
-    (
-      await env.DB.prepare(
-        "SELECT count(*) AS n FROM pending_blocks WHERE slot=12",
-      ).first<{ n: number }>()
-    )?.n,
-  ).toBe(1);
-  expect(
-    await env.DB.prepare(
-      "SELECT value FROM checkpoints WHERE id='complete-slot'",
-    ).first(),
-  ).toBeNull();
-});
-
-it("recovers the earliest gap despite an advanced discovery cursor and exhausted attempts", async () => {
-  await env.DB.prepare(
-    "INSERT INTO checkpoints(id,value) VALUES('complete-slot','11'),('discovered-slot','999')",
-  ).run();
-  await env.DB.prepare(
-    "INSERT INTO pending_blocks(slot,parent,time,object_key,hash) VALUES(14,12,200,'future','hash')",
-  ).run();
-  await env.DB.prepare(
-    "INSERT INTO fetch_jobs(slot,attempts,retry_at,last_error) VALUES(12,8,0,'fetch_failed')",
-  ).run();
-  const stub = env.COORDINATOR.get(
-    env.COORDINATOR.idFromName(crypto.randomUUID()),
-  );
-  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    await state.storage.put("maintenance-at", Date.now());
-    await instance.alarm();
-    await state.storage.deleteAlarm();
-  });
-  expect(
-    await env.DB.prepare(
-      "SELECT slot FROM pending_blocks WHERE slot=12",
-    ).first(),
-  ).not.toBeNull();
-  expect(
-    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
-  ).toBeNull();
-  expect(
-    (await env.DB.prepare(
-      "SELECT value FROM checkpoints WHERE id='complete-slot'",
-    ).first<{ value: string }>())!.value,
-  ).toBe("11");
-  expect(
-    (await env.DB.prepare(
-      "SELECT applied FROM pending_blocks WHERE slot=14",
-    ).first<{ applied: number }>())!.applied,
-  ).toBe(0);
 });
 
 it("validates the upstream network once and caches validation across requests", async () => {
@@ -888,6 +1399,41 @@ it("validates the upstream network once and caches validation across requests", 
     await rpcCall(stub, "getBalance", ["network-checks"])
   ).json()) as { result: { value: number } };
   expect(second.result.value).toBe(first.result.value);
+});
+
+it("persists one conservative RPC reservation for successive requests and grants no fresh burst after restart", async () => {
+  const id = env.RPC.idFromName(crypto.randomUUID());
+  let stub = env.RPC.get(id);
+  expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
+  let reserved: unknown;
+  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+    reserved = await state.storage.get("budget");
+  });
+  expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(200);
+  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+    expect(await state.storage.get("budget")).toEqual(reserved);
+  });
+  await expect(runInDurableObject<RpcBudget, void>(stub, (_instance, state) => {
+    state.abort("reservation restart");
+  })).rejects.toThrow("reservation restart");
+  stub = env.RPC.get(id);
+  expect((await rpcCall(stub, "getBalance", ["normal"])).status).toBe(429);
+  await runInDurableObject<RpcBudget, void>(stub, async (instance) => {
+    expect((instance as unknown as { budget: { at: number } }).budget.at).toBeGreaterThan(Date.now());
+  });
+});
+
+it("pauses background RPC at its daily budget while preserving interactive access", async () => {
+  const stub = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
+  await runInDurableObject<RpcBudget, void>(stub, async (_instance, state) => {
+    await state.storage.put("rpc-requests", {
+      day: new Date().toISOString().slice(0, 10), used: 60000,
+    });
+  });
+  const blocked = await rpcCall(stub, "getBalance", ["normal"]);
+  expect(blocked.status).toBe(429);
+  expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(1);
+  expect((await rpcCall(stub, "getBalance", ["normal"], "interactive")).status).toBe(200);
 });
 
 import { accountPendingPrices } from "../../jobs/src/oracle";
@@ -919,43 +1465,6 @@ it("backfills pending USD from historical prices while unavailable prices stay p
       "SELECT usd_micros FROM trades WHERE id='pending'",
     ).first<{ usd_micros: string }>())!.usd_micros,
   ).toBe("300000000");
-});
-
-it("retains verified empty ranges while waiting for the next produced block", async () => {
-  await env.DB.prepare(
-    "INSERT INTO checkpoints(id,value) VALUES('complete-slot','11')",
-  ).run();
-  const stub = env.COORDINATOR.get(
-    env.COORDINATOR.idFromName(crypto.randomUUID()),
-  );
-  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    await state.storage.put("maintenance-at", Date.now());
-    await state.storage.put("discovery-window", {
-      start: 12,
-      end: 13,
-      slots: [],
-    });
-    await instance.alarm();
-    await instance.alarm();
-    await state.storage.deleteAlarm();
-    expect(await state.storage.get("empty-through")).toBe(13);
-    expect(
-      (await state.storage.get<{ start: number }>("discovery-window"))?.start,
-    ).toBe(14);
-  });
-  expect(
-    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
-  ).toBeNull();
-  expect(
-    await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=14").first(),
-  ).not.toBeNull();
-  expect(
-    (
-      await env.DB.prepare(
-        "SELECT value FROM checkpoints WHERE id='complete-slot'",
-      ).first<{ value: string }>()
-    )?.value,
-  ).toBe("11");
 });
 
 it("pauses D1 work until the UTC reset and retains the pause across restart", async () => {
@@ -1017,36 +1526,4 @@ it("pauses D1 work until the UTC reset and retains the pause across restart", as
       await state.storage.deleteAlarm();
     }
   });
-});
-
-it("defers quota-blocked queue messages without acknowledging or writing retry state", async () => {
-  const fetch = vi
-    .spyOn(ingestion, "fetchBlock")
-    .mockRejectedValue(
-      new Error(
-        "D1_ERROR: Your account has exceeded D1's free tier daily row read limit.",
-      ),
-    );
-  const message = { body: { slot: 12 }, ack: vi.fn(), retry: vi.fn() };
-  try {
-    await jobs.queue(
-      { messages: [message] } as unknown as MessageBatch<{ slot: number }>,
-      env as unknown as JobsEnv,
-    );
-    expect(message.ack).not.toHaveBeenCalled();
-    expect(message.retry).toHaveBeenCalledOnce();
-    const delay = message.retry.mock.calls[0][0].delaySeconds;
-    const now = new Date();
-    const resetAt =
-      Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) +
-      5000;
-    expect(
-      Math.abs(delay - Math.ceil((resetAt - Date.now()) / 1000)),
-    ).toBeLessThanOrEqual(1);
-    expect(
-      await env.DB.prepare("SELECT slot FROM fetch_jobs WHERE slot=12").first(),
-    ).toBeNull();
-  } finally {
-    fetch.mockRestore();
-  }
 });

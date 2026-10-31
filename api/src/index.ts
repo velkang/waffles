@@ -103,6 +103,17 @@ async function getMarket(db: D1Database, mint: string) {
     )[0] ?? null
   );
 }
+function publicMarket(market: Market, mediaOrigin: string): Market {
+  if (!URL.canParse(market.imageUri)) return market;
+  const image = new URL(market.imageUri);
+  if (
+    ["http:", "https:"].includes(image.protocol) &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(image.hostname) &&
+    /^\/v1\/assets\/images\/[a-zA-Z0-9_-]+$/.test(image.pathname)
+  )
+    return { ...market, imageUri: new URL(image.pathname, mediaOrigin).href };
+  return market;
+}
 function network(rpcUrl: string): "localnet" | "devnet" {
   return ["localhost", "127.0.0.1", "[::1]"].includes(new URL(rpcUrl).hostname)
     ? "localnet"
@@ -189,7 +200,11 @@ app.get("/v1/launches", async (c) => {
     launches.sort((a, b) =>
       BigInt(a.tokenReserve) < BigInt(b.tokenReserve) ? -1 : 1,
     );
-  return c.json({ launches: launches.slice(0, limit) });
+  return c.json({
+    launches: launches.slice(0, limit).map((m) =>
+      publicMarket(m, c.env.MEDIA_ORIGIN || new URL(c.req.url).origin),
+    ),
+  });
 });
 app.get("/v1/launches/:mint", async (c) => {
   const mint = address(c.req.param("mint"));
@@ -198,8 +213,11 @@ app.get("/v1/launches/:mint", async (c) => {
   )
     .bind(mint)
     .first<{ at: number; completed: number }>();
+  const launch = await getMarket(c.env.DB, mint);
   return c.json({
-    launch: await getMarket(c.env.DB, mint),
+    launch: launch
+      ? publicMarket(launch, c.env.MEDIA_ORIGIN || new URL(c.req.url).origin)
+      : null,
     holdingCheckpoint: checkpoint
       ? { at: checkpoint.at, completed: Boolean(checkpoint.completed) }
       : null,
@@ -389,7 +407,13 @@ app.get("/v1/portfolios/:wallet", async (c) => {
     "SELECT data FROM commitments WHERE owner=? ORDER BY start_at DESC",
     wallet,
   );
-  return c.json({ positions: positions.results, created, commitments });
+  return c.json({
+    positions: positions.results,
+    created: created.map((m) =>
+      publicMarket(m, c.env.MEDIA_ORIGIN || new URL(c.req.url).origin),
+    ),
+    commitments,
+  });
 });
 async function liveTickets(db: D1Database, epoch: number) {
   const { start, end } = epochBounds(epoch);

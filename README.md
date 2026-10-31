@@ -13,13 +13,13 @@ acceptance checks remain outstanding. Mainnet and real-funds readiness are separ
 
 ## Workspace
 
-| Directory | Purpose |
-| --- | --- |
-| `web/` | React, Vite, TanStack Router/Query, Tailwind, and Static Assets Worker |
-| `api/` | Hono API, D1 migrations, R2 uploads, and live-update Durable Object |
-| `jobs/` | Finalized ingestion, Queues, coordination, Workflows, and scheduled operations |
-| `shared/` | Solana transaction client, IDL, integer accounting, and reward calculations |
-| `solana/` | Rust/Anchor program and tests |
+| Directory | Purpose                                                                        |
+| --------- | ------------------------------------------------------------------------------ |
+| `web/`    | React, Vite, TanStack Router/Query, Tailwind, and Static Assets Worker         |
+| `api/`    | Hono API, D1 migrations, R2 uploads, and live-update Durable Object            |
+| `jobs/`   | Finalized ingestion, Queues, coordination, Workflows, and scheduled operations |
+| `shared/` | Solana transaction client, IDL, integer accounting, and reward calculations    |
+| `solana/` | Rust/Anchor program and tests                                                  |
 
 ## Development
 
@@ -62,22 +62,6 @@ interactive calls retain capacity. Set this below the provider's account allowan
 including any other apps sharing that account. Provider cooldowns and network
 validation survive restarts. Changing the jobs RPC URL or expected genesis hash
 invalidates cached validation automatically. SDK rate-limit retries are disabled.
-
-The `fetch_jobs` D1 table retains retry deadlines independently of Queue retention.
-Discovery repairs the earliest gap, reuses archived blocks, and repairs known gaps
-ahead of an old queue backlog. Queued fetches acknowledge only after archive state
-is recorded (or a durable retry is recorded); ordered application runs separately.
-No completion checkpoint advances across missing history. Apply all D1 migrations
-before deploying jobs, and deploy jobs before the API when adding an RPC binding.
-
-Workers Free quotas and CPU limits still apply. The full-block ingestion source
-has not been shown to sustain live Solana traffic within those quotas; RPC pacing
-alone does not establish deployed-pilot readiness. The deployment's Pyth key is
-stored as a Worker secret; historical requests and live R2/D1 archival have been
-verified. Missing
-trade prices are backfilled in batches of 20 during maintenance and still block
-affected ticket accounting and settlement. `/health/ready` remains 503 until
-finalized history catches up. Empty market lists do not prove no launches exist.
 
 ## Verification
 

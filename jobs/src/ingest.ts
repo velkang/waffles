@@ -35,7 +35,6 @@ import {
   consumeLots,
   holdingWeight,
   type PurchaseLot,
-  sha,
   hex,
 } from "@waffles/shared/rewards";
 import type { Env } from "./env";
@@ -54,41 +53,7 @@ type TokenOwner = {
   beneficiary: string | null;
   limit?: bigint;
 };
-const text = new TextEncoder();
-export async function fetchBlock(env: Env, slot: number) {
-  const saved = await env.DB.prepare(
-    "SELECT object_key FROM pending_blocks WHERE slot=?",
-  )
-    .bind(slot)
-    .first<{ object_key: string }>();
-  if (saved && (await env.ARTIFACTS.head(saved.object_key))) return;
-  const connection = rpcConnection(env);
-  const block = await connection.getParsedBlock(slot, {
-    commitment: "finalized",
-    maxSupportedTransactionVersion: 1,
-    transactionDetails: "full",
-    rewards: false,
-  });
-  if (!block || block.blockTime === null)
-    throw new Error(
-      `Finalized block ${slot} is unavailable or missing its timestamp`,
-    );
-  const body = json(block);
-  const hash = hex(await sha(text.encode(body)));
-  const objectKey = `blocks/${slot}/${hash}.json.gz`;
-  const compressed = await new Response(
-    new Blob([body]).stream().pipeThrough(new CompressionStream("gzip")),
-  ).arrayBuffer();
-  await env.ARTIFACTS.put(objectKey, compressed, {
-    httpMetadata: { contentType: "application/json", contentEncoding: "gzip" },
-  });
-  await env.DB.prepare(
-    "INSERT INTO pending_blocks(slot,parent,time,object_key,hash) VALUES(?,?,?,?,?) ON CONFLICT(slot) DO UPDATE SET object_key=excluded.object_key,hash=excluded.hash WHERE pending_blocks.applied=0",
-  )
-    .bind(slot, block.parentSlot, block.blockTime, objectKey, hash)
-    .run();
-}
-function flatten(tx: ParsedBlockResponse["transactions"][number]) {
+export function flatten(tx: ParsedBlockResponse["transactions"][number]) {
   const result: (ParsedInstruction | PartiallyDecodedInstruction)[] = [];
   tx.transaction.message.instructions.forEach((ix, i) => {
     result.push(ix);
@@ -107,7 +72,7 @@ function events(
   const coder = program(connection).coder.events;
   const result: Event[] = [];
   instructions.forEach((ix, order) => {
-    if (ix.programId.toBase58() !== env.PROGRAM_ID || !("data" in ix)) return;
+    if (String(ix.programId) !== env.PROGRAM_ID || !("data" in ix)) return;
     const data = utils.bytes.bs58.decode(ix.data);
     // Anchor's self-CPI event tag. Only our program can sign its event authority.
     if (hex(data.subarray(0, 8)) !== "e445a52e51cb9a1d") return;
@@ -121,10 +86,19 @@ function events(
   });
   return result;
 }
+export function createdMints(env: Env, block: ParsedBlockResponse): string[] {
+  const connection = rpcConnection(env);
+  return block.transactions.filter((tx) => !tx.meta?.err &&
+    tx.transaction.message.accountKeys.some(({ pubkey }) => String(pubkey) === env.PROGRAM_ID))
+    .flatMap((tx) => events(env, connection, flatten(tx)))
+    .filter((event) => event.name === "created")
+    .map((event) => event.data.mint as string);
+}
 export async function applyBlock(
   env: Env,
   slot: number,
   block: ParsedBlockResponse,
+  options: { reserveWrites?: (rows: number) => Promise<void> } = {},
 ) {
   if (block.blockTime === null) throw new Error("Missing block timestamp");
   const connection = rpcConnection(env);
@@ -178,6 +152,7 @@ export async function applyBlock(
     const markets = new Map<string, Market>();
     const owners = new Map<string, Owner>();
     const accounts = new Map<string, TokenOwner>();
+    const replacedAccounts = new Set<string>();
     const market = async (mint: string): Promise<Market | null> => {
       let m = markets.get(mint);
       if (m) return m;
@@ -292,6 +267,7 @@ export async function applyBlock(
         accounts.set(id, await describe(id, balance.mint, balance.owner));
     }
     const account = async (id: string) => {
+      if (replacedAccounts.has(id)) return;
       let a = accounts.get(id);
       if (!a) {
         const row = await env.DB.prepare(
@@ -299,7 +275,7 @@ export async function applyBlock(
         )
           .bind(id)
           .first<TokenOwner>();
-        if (row) {
+        if (row && await market(row.mint)) {
           a = await describe(id, row.mint, row.owner);
           accounts.set(id, a);
         }
@@ -447,7 +423,18 @@ export async function applyBlock(
       if (ix.programId.equals(TOKEN_PROGRAM_ID) && "parsed" in ix) {
         const info = ix.parsed.info,
           type = ix.parsed.type;
-        if (type === "transfer" || type === "transferChecked") {
+        if (["initializeAccount", "initializeAccount2", "initializeAccount3"].includes(type)) {
+          if (await market(info.mint)) {
+            replacedAccounts.delete(info.account);
+            accounts.set(info.account, await describe(info.account, info.mint, info.owner));
+          } else {
+            // A closed, non-ATA address can be reused for a foreign mint.
+            // Remove its stale current description; replay history retains its root.
+            accounts.delete(info.account);
+            replacedAccounts.add(info.account);
+          }
+          tokenBalances.set(info.account, 0n);
+        } else if (type === "transfer" || type === "transferChecked") {
           const source = await account(info.source),
             destination = await account(info.destination);
           if (!source || !destination) {
@@ -523,10 +510,10 @@ export async function applyBlock(
           const b = tx.meta?.preTokenBalances?.find(
             (b) => b.accountIndex === index,
           );
-          if (!b) throw new Error("Missing owner-change balance");
+          if (!b && !tokenBalances.has(info.account)) throw new Error("Missing owner-change balance");
           await checkpoint(a.mint, at);
           const amount =
-            tokenBalances.get(info.account) ?? BigInt(b.uiTokenAmount.amount);
+            tokenBalances.get(info.account) ?? BigInt(b!.uiTokenAmount.amount);
           const next = await describe(info.account, a.mint, info.newAuthority);
           await move(a, next, held(a, amount), held(next, amount), at);
           accounts.set(info.account, next);
@@ -825,12 +812,14 @@ export async function applyBlock(
       );
     for (const a of accounts)
       sql(
-        "INSERT INTO token_accounts(address,mint,owner,beneficiary) VALUES(?,?,?,?) ON CONFLICT(address) DO UPDATE SET owner=excluded.owner,beneficiary=excluded.beneficiary",
+        "INSERT INTO token_accounts(address,mint,owner,beneficiary) VALUES(?,?,?,?) ON CONFLICT(address) DO UPDATE SET mint=excluded.mint,owner=excluded.owner,beneficiary=excluded.beneficiary",
         a[0],
         a[1].mint,
         a[1].owner,
         a[1].beneficiary,
       );
+    for (const address of replacedAccounts)
+      sql("DELETE FROM token_accounts WHERE address=?", address);
     for (const w of weights.values()) {
       const old = await env.DB.prepare(
         "SELECT weight FROM holder_weights WHERE epoch=? AND mint=? AND wallet=?",
@@ -847,18 +836,9 @@ export async function applyBlock(
     }
     if (statements.length) {
       sql("INSERT INTO indexed_events(id,slot) VALUES(?,?)", txid, slot);
+      // Every statement here targets one row; 4 covers the row and indexes.
+      await options.reserveWrites?.(statements.length * 4);
       await env.DB.batch(statements);
     }
   }
-  await env.DB.batch([
-    env.DB.prepare("UPDATE pending_blocks SET applied=1 WHERE slot=?").bind(
-      slot,
-    ),
-    env.DB.prepare(
-      "INSERT INTO checkpoints(id,value) VALUES('complete-slot',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",
-    ).bind(String(slot)),
-    env.DB.prepare(
-      "INSERT INTO checkpoints(id,value) VALUES('complete-time',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",
-    ).bind(String(block.blockTime)),
-  ]);
 }
