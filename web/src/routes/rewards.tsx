@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { api, request } from "../api";
-import { formatUnits } from "@waffles/shared/solana";
+import { TICKET_CAP, formatUnits } from "@waffles/shared/solana";
 import { unhex } from "@waffles/shared/rewards";
 import { useWallet } from "../wallet";
+import { useDiscoveryTime, DiscoveryIcon } from "../discovery";
+import { weekRemaining } from "../ux";
 import { useTransaction } from "../transaction";
 import { dateTime, AddressLink, TransactionNotice } from "../components";
 export const Route = createFileRoute("/rewards")({ component: Rewards });
@@ -48,127 +50,254 @@ function Rewards() {
         }[];
       }>("/v1/distributions"),
   });
+  const now = useDiscoveryTime();
+  const user = current.data?.user;
+  const total = current.data
+    ? BigInt(user?.trading ?? "0") +
+      BigInt(user?.holding ?? "0") +
+      BigInt(user?.creator ?? "0")
+    : null;
+  const unclaimed = claims.data?.claims.filter((claim) => !claim.claimed);
+  const claimable = unclaimed?.reduce(
+    (sum, claim) => sum + BigInt(claim.amount),
+    0n,
+  );
   return (
-    <div className="market-page">
+    <div className="market-page rewards-page">
       <div className="market-heading">
         <div>
-          <h1>Weekly rewards</h1>
+          <h1>A little extra on top.</h1>
           <p>
-            Trade, hold, or commit. Each activity earns tickets differently.
+            Your weekly Waffle rewards. Trade, hold, or commit to earn eligible
+            tickets.
           </p>
         </div>
+        <img
+          className="rewards-mascot"
+          src="/art/waffle-mascot-cartoon.png"
+          alt=""
+          width="112"
+          height="112"
+        />
       </div>
-      {current.isError ? (
-        <div className="market-empty" role="alert">
-          <h2>Rewards unavailable</h2>
-          <p>{current.error.message}</p>
-          <button
-            className="market-button"
-            onClick={() => void current.refetch()}
-          >
-            Retry
-          </button>
-        </div>
-      ) : (
-        <section className="analytics-panel">
-          <div className="reward-summary">
-            <div>
-              <h2>Current raffle pool</h2>
-              <strong>
-                {current.data ? formatUnits(current.data.poolSol) : "—"} SOL
-              </strong>
-            </div>
-            <div>
-              <h2>Estimated winning tickets</h2>
-              <strong>
-                {current.data?.winningTickets ?? "Awaiting price"}
-              </strong>
-            </div>
-            <div>
-              <h2>Week closes</h2>
-              <p>{current.data ? dateTime(current.data.end) : "Loading…"}</p>
-            </div>
+      <nav className="reward-shortcuts" aria-label="Rewards sections">
+        <a href="#your-tickets-title">Your tickets</a>
+        <a href="#reward-claims">Claim prizes</a>
+        <a href="#draw-evidence">Past draws & proof</a>
+      </nav>
+      <div className={`reward-overview${wallet.account ? " has-wallet" : ""}`}>
+        <section
+          className="analytics-panel reward-pool-panel"
+          aria-labelledby="weekly-pool-title"
+        >
+          <div className="ux-panel-heading">
+            <h2 id="weekly-pool-title">This week’s raffle</h2>
+            <span className="ux-network-chip">SOL · Devnet</span>
           </div>
-          <p>
-            Approximately $1,000 per winning ticket, paid in SOL. One wallet can
-            hold several winning tickets. Dollar value may change after the
-            cutoff.
-          </p>
-          {current.data?.missingPrices ? (
-            <p role="status">
-              {current.data.missingPrices} trades are awaiting historical
-              prices. Ticket totals remain provisional.
-            </p>
-          ) : null}
+          {current.isError ? (
+            <div role="alert">
+              <p>The weekly pool couldn’t be loaded.</p>
+              <button
+                className="market-button"
+                onClick={() => void current.refetch()}
+              >
+                Try again
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="reward-pool-amount">
+                {current.data ? formatUnits(current.data.poolSol) : "—"}
+                <span>SOL in the pool</span>
+              </div>
+              <div className="reward-clock">
+                <div>
+                  <span>Week closes in</span>
+                  <strong>
+                    {current.data
+                      ? weekRemaining(current.data.end, now)
+                      : "Loading…"}
+                  </strong>
+                </div>
+                <div>
+                  <span>Weekly cutoff</span>
+                  <strong>
+                    {current.data ? dateTime(current.data.end) : "—"}
+                  </strong>
+                </div>
+              </div>
+              <p className="reward-pool-rule">
+                20% of trading fees fund the pool. A raffle requires a pool of
+                at least $1,000; otherwise the SOL goes to the incentives vault
+                and tickets expire.
+              </p>
+              <details className="reward-prize-details">
+                <summary>Prize structure & estimates</summary>
+                <p>
+                  Estimated winning tickets:{" "}
+                  <strong>
+                    {current.isPending
+                      ? "Loading…"
+                      : (current.data?.winningTickets ?? "Awaiting price")}
+                  </strong>
+                  . Approximately $1,000 per winning ticket, paid in SOL. One
+                  wallet can hold several winning tickets. Dollar value may
+                  change after the cutoff.
+                </p>
+              </details>
+            </>
+          )}
         </section>
-      )}
-      <section className="analytics-panel">
-        <h2>Your tickets</h2>
-        {wallet.account ? (
-          <dl className="analytics-fees">
+        <section
+          className="analytics-panel reward-tickets-panel"
+          aria-labelledby="your-tickets-title"
+        >
+          <div className="ux-panel-heading">
+            <h2 id="your-tickets-title">Your tickets</h2>
+            <DiscoveryIcon name="ticket" />
+          </div>
+          <div className="reward-ticket-total">
+            {wallet.account
+              ? current.isError
+                ? "Unavailable"
+                : total === null
+                  ? "—"
+                  : total.toLocaleString("en")
+              : "Join the weekly mix."}
+            {wallet.account && <span>tickets so far this week</span>}
+          </div>
+          {!wallet.account && (
+            <button
+              className="market-primary"
+              type="button"
+              onClick={() =>
+                window.dispatchEvent(new Event("waffles:connect-wallet"))
+              }
+            >
+              Connect wallet
+            </button>
+          )}
+          <dl className="ticket-categories">
             {(["trading", "holding", "creator"] as const).map((kind) => (
               <div key={kind}>
                 <dt>
-                  {kind === "trading"
-                    ? "Trading"
-                    : kind === "holding"
-                      ? "First-day holding"
-                      : "Creator locks"}
+                  {
+                    {
+                      trading: "Trading",
+                      holding: "First-day holding",
+                      creator: "Creator locks",
+                    }[kind]
+                  }
                 </dt>
-                <dd>{current.data?.user?.[kind] ?? "0"} / 1,000</dd>
+                <dd>
+                  {wallet.account && !current.isError && current.data
+                    ? (user?.[kind] ?? "0")
+                    : "—"}
+                  <span> / {TICKET_CAP.toLocaleString("en")}</span>
+                </dd>
+                {wallet.account && !current.isError && current.data ? (
+                  <progress
+                    max={Number(TICKET_CAP)}
+                    value={Number(user?.[kind] ?? "0")}
+                    aria-label={`${kind} tickets toward weekly cap`}
+                  />
+                ) : (
+                  <div className="ticket-track" aria-hidden="true" />
+                )}
               </div>
             ))}
           </dl>
-        ) : (
-          <p>Connect a wallet to see your ticket totals and claims.</p>
-        )}
-        <p>
-          Holding bonuses appear after the launch’s 24-hour checkpoint. Creator
-          tickets require each funded deposit to complete a full week.
-        </p>
-      </section>
-      <section className="analytics-panel">
-        <h2>Ready to claim</h2>
-        {claims.isError ? (
-          <p role="alert">Claims could not be loaded.</p>
-        ) : claims.data?.claims.some((c) => !c.claimed) ? (
-          claims.data.claims
-            .filter((c) => !c.claimed)
-            .map((c) => (
-              <div className="claim-row" key={c.id}>
-                <span>
-                  {c.kind === "raffle"
+          <p className="ux-muted-note">
+            Holding tickets appear after the 24-hour checkpoint. Creator tickets
+            require each funded deposit to complete a full week. Totals remain
+            provisional until settlement.
+          </p>
+          {Boolean(current.data?.missingPrices) && (
+            <p role="status" className="launch-warning">
+              {current.data!.missingPrices} trades are awaiting historical
+              prices. Ticket totals remain provisional.
+            </p>
+          )}
+        </section>
+      </div>
+      <section id="reward-claims" className="analytics-panel reward-claims">
+        <div className="ux-panel-heading">
+          <h2>Ready to claim</h2>
+          {wallet.account && (
+            <span className="claimable-total">
+              {claims.isError
+                ? "Unavailable"
+                : claimable === undefined
+                  ? "Loading…"
+                  : `${formatUnits(claimable)} SOL`}
+            </span>
+          )}
+        </div>
+        {!wallet.account ? (
+          <p>Connect your wallet to check for prizes and distributions.</p>
+        ) : claims.isPending ? (
+          <div className="ux-inline-loading" role="status">
+            Checking your claimable rewards…
+          </div>
+        ) : claims.isError ? (
+          <div role="alert">
+            <p>Claims couldn’t be loaded.</p>
+            <button
+              className="market-button"
+              onClick={() => void claims.refetch()}
+            >
+              Retry claims
+            </button>
+          </div>
+        ) : unclaimed?.length ? (
+          unclaimed.map((claim) => (
+            <div className="claim-row" key={claim.id}>
+              <span>
+                <strong>
+                  {claim.kind === "raffle"
                     ? "Raffle prize"
-                    : c.kind === "holders"
+                    : claim.kind === "holders"
                       ? "Holder distribution"
-                      : "Protocol reward"}{" "}
-                  · Week {c.epoch}
-                </span>
-                <button
-                  className="market-primary"
-                  disabled={tx.pending}
-                  onClick={() =>
-                    void tx
-                      .send({
-                        action: "claim",
-                        distribution: c.distribution,
-                        amount: c.amount,
-                        proof: c.proof.map((p) => Array.from(unhex(p))),
-                      })
-                      .then(() => void claims.refetch())
-                  }
-                >
-                  Claim {formatUnits(c.amount)} SOL
-                </button>
-              </div>
-            ))
+                      : "Protocol reward"}
+                </strong>{" "}
+                · Week {claim.epoch}
+              </span>
+              <button
+                className="market-primary"
+                disabled={tx.pending}
+                onClick={() =>
+                  void tx
+                    .send({
+                      action: "claim",
+                      distribution: claim.distribution,
+                      amount: claim.amount,
+                      proof: claim.proof.map((proof) =>
+                        Array.from(unhex(proof)),
+                      ),
+                    })
+                    .then(() => void claims.refetch())
+                }
+              >
+                {tx.pending
+                  ? tx.label
+                  : `Claim ${formatUnits(claim.amount)} SOL`}
+              </button>
+            </div>
+          ))
         ) : (
-          <p>No finalized, unclaimed distributions for this wallet.</p>
+          <p>
+            No finalized rewards are waiting to be claimed. Published draws and
+            evidence appear below.
+          </p>
         )}
-        <TransactionNotice error={tx.error} signature={tx.signature} />
+        <TransactionNotice
+          error={tx.error}
+          signature={tx.signature}
+          phase={tx.phase}
+        />
       </section>
       <section className="analytics-panel">
-        <h2>How tickets work</h2>
+        <h2>How tickets are earned</h2>
         <table className="market-table">
           <thead>
             <tr>
@@ -241,8 +370,20 @@ function Rewards() {
         )}
       </section>
       <section className="analytics-panel">
-        <h2>Published distributions</h2>
-        {distributions.data?.distributions.length ? (
+        <h2 id="draw-evidence">Published distributions</h2>
+        {distributions.isPending ? (
+          <p role="status">Loading published distributions…</p>
+        ) : distributions.isError ? (
+          <p role="alert">
+            Published distributions are unavailable.{" "}
+            <button
+              className="market-button"
+              onClick={() => void distributions.refetch()}
+            >
+              Retry
+            </button>
+          </p>
+        ) : distributions.data?.distributions.length ? (
           <table className="market-table">
             <thead>
               <tr>
@@ -278,6 +419,10 @@ function Rewards() {
         )}
         <details>
           <summary>Weekly raffle history</summary>
+          {history.isPending && <p role="status">Loading previous weeks…</p>}
+          {history.isError && (
+            <p role="alert">Previous weeks could not be loaded.</p>
+          )}
           {history.data?.epochs.map((e) => (
             <p key={e.epoch}>
               Week {e.epoch} · {e.status} · {formatUnits(e.pool_sol)} SOL{" "}

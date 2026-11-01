@@ -13,8 +13,8 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
-      "/v1": { target: apiOrigin, ws: true },
-      "/health": apiOrigin,
+      "/v1": { target: apiOrigin, ws: true, changeOrigin: true },
+      "/health": { target: apiOrigin, changeOrigin: true },
     },
   },
 });

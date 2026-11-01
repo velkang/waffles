@@ -1,2 +1,25 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta name="theme-color" content="#0e0f12"/><title>waffles.meme · Solana devnet</title><meta name="description" content="Launch and trade on Solana devnet. Inspect creator commitments and earn weekly rewards."/></head><body><div id="root"></div><script type="module" src="/src/main.tsx"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#fff9ef" />
+    <script>
+      try {
+        document.documentElement.dataset.theme =
+          localStorage.getItem("waffles-theme") === "dark" ? "dark" : "light";
+      } catch {
+        document.documentElement.dataset.theme = "light";
+      }
+    </script>
+    <title>waffles.meme · Solana devnet</title>
+    <meta
+      name="description"
+      content="Launch and trade on Solana devnet. Inspect creator commitments and earn weekly rewards."
+    />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

@@ -12,6 +12,7 @@ import { api } from "./api";
 const rpcUrl =
   import.meta.env.VITE_RPC_URL || `${window.location.origin}/v1/rpc`;
 export const connection = new Connection(rpcUrl, "confirmed");
+export type WalletSendPhase = "awaiting-wallet" | "submitting" | "confirming";
 interface WalletState {
   wallet: Wallet | null;
   account: WalletAccount | null;
@@ -21,6 +22,7 @@ interface WalletState {
   send: (
     transaction: Transaction,
     lastValidBlockHeight: number,
+    onProgress?: (phase: WalletSendPhase, signature?: string) => void,
   ) => Promise<string>;
 }
 const Context = createContext<WalletState | null>(null);
@@ -74,13 +76,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   async function disconnect() {
     if (wallet) {
       const feature = wallet.features["standard:disconnect"] as
-        { disconnect: () => Promise<void> } | undefined;
+        | { disconnect: () => Promise<void> }
+        | undefined;
       await feature?.disconnect();
     }
     setWallet(null);
     setAccount(null);
   }
-  async function send(transaction: Transaction, lastValidBlockHeight: number) {
+  async function send(
+    transaction: Transaction,
+    lastValidBlockHeight: number,
+    onProgress?: (phase: WalletSendPhase, signature?: string) => void,
+  ) {
     if (!wallet || !account) throw new Error("Connect a Solana wallet");
     const config = await api.config();
     if (!config.configured)
@@ -103,6 +110,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         }[]
       ) => Promise<readonly { signedTransaction: Uint8Array }[]>;
     };
+    onProgress?.("awaiting-wallet");
     const [signed] = await feature.signTransaction({
       account,
       chain,
@@ -111,9 +119,11 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         verifySignatures: false,
       }),
     });
+    onProgress?.("submitting");
     const hash = await connection.sendRawTransaction(signed.signedTransaction, {
       skipPreflight: false,
     });
+    onProgress?.("confirming", hash);
     // The restricted HTTP proxy does not expose Solana RPC subscriptions.
     // Confirm through statuses so local and deployed wallets use the same path.
     for (;;) {

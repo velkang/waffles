@@ -3,7 +3,7 @@ import {
   Link,
   Outlet,
 } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useQuery,
   useQueryClient,
@@ -11,6 +11,8 @@ import {
 } from "@tanstack/react-query";
 import { api } from "../api";
 import { useWallet } from "../wallet";
+import { WaffleMark } from "../brand";
+import { ThemeToggle } from "../theme";
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   {
     component: Shell,
@@ -29,6 +31,26 @@ function Shell() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
   const config = useQuery({ queryKey: ["config"], queryFn: api.config });
+  const walletMenu = useRef<HTMLElement>(null);
+  const walletTrigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    walletMenu.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        walletTrigger.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open]);
+  useEffect(() => {
+    const openWallet = () => setOpen(true);
+    window.addEventListener("waffles:connect-wallet", openWallet);
+    return () =>
+      window.removeEventListener("waffles:connect-wallet", openWallet);
+  }, []);
   useEffect(() => {
     let socket: WebSocket | undefined,
       timer: ReturnType<typeof setTimeout> | undefined,
@@ -94,7 +116,10 @@ function Shell() {
       <header className="market-header">
         <div className="market-header-inner">
           <Link to="/" className="market-brand">
-            waffles<span>.meme</span>
+            <WaffleMark />{" "}
+            <span className="waffle-wordmark">
+              waffles<span>.meme</span>
+            </span>
           </Link>
           <nav aria-label="Main navigation">
             <Link to="/">Explore</Link>
@@ -103,13 +128,25 @@ function Shell() {
             <Link to="/rewards">Rewards</Link>
           </nav>
           <div className="market-header-actions">
+            <ThemeToggle />
             <Link to="/create" className="market-button">
               Create
             </Link>
-            <button className="market-primary" onClick={() => setOpen(!open)}>
-              {wallet.account
-                ? `${wallet.account.address.slice(0, 4)}…${wallet.account.address.slice(-4)}`
-                : "Connect"}
+            <button
+              className="market-primary"
+              ref={walletTrigger}
+              aria-expanded={open}
+              aria-controls="waffles-wallet-menu"
+              onClick={() => setOpen(!open)}
+            >
+              {wallet.account ? (
+                `${wallet.account.address.slice(0, 4)}…${wallet.account.address.slice(-4)}`
+              ) : (
+                <>
+                  <span className="wallet-label-long">Connect wallet</span>
+                  <span className="wallet-label-short">Connect</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -122,7 +159,12 @@ function Shell() {
           : "Deployment configuration pending"}
       </div>
       {open && (
-        <section className="wallet-drawer" aria-label="Connect wallet">
+        <section
+          id="waffles-wallet-menu"
+          ref={walletMenu}
+          className="wallet-drawer"
+          aria-label="Connect wallet"
+        >
           <h2>{wallet.account ? "Your wallet" : "Connect a Solana wallet"}</h2>
           {wallet.account ? (
             <button

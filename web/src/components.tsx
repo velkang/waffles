@@ -2,12 +2,15 @@ import { formatUnits } from "@waffles/shared/solana";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { request } from "./api";
+import { transactionLabels, type TransactionPhase } from "./transaction-status";
 export function TransactionNotice({
   error,
   signature,
+  phase = signature ? "confirmed" : "idle",
 }: {
   error: string;
   signature: string;
+  phase?: TransactionPhase;
 }) {
   return (
     <>
@@ -16,17 +19,38 @@ export function TransactionNotice({
           {error}
         </p>
       )}
-      {signature && (
-        <p className="form-success" role="status">
-          Transaction confirmed. Finalized indexing can take a moment.{" "}
-          <a
-            href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            View transaction
-          </a>
-        </p>
+      {phase !== "idle" && (phase !== "error" || signature) && (
+        <div
+          className={`transaction-status ${phase === "confirmed" ? "is-complete" : ""}`}
+          role="status"
+          aria-live="polite"
+        >
+          <strong>
+            {phase === "error" && signature
+              ? "Check this transaction before retrying"
+              : transactionLabels[phase]}
+          </strong>
+          <p>
+            {phase === "awaiting-wallet"
+              ? "Check the amounts and approve or reject the request in your wallet."
+              : phase === "confirmed" || phase === "indexing"
+                ? "Confirmed on Solana. Finalized balances and rewards may take a moment to update."
+                : phase === "confirming"
+                  ? "Your transaction was submitted. Keep this page open while Solana confirms it."
+                  : phase === "error"
+                    ? "Confirmation was interrupted. Open the transaction to check its on-chain status."
+                    : "Your balances will update after confirmation."}
+          </p>
+          {signature && (
+            <a
+              href={`https://explorer.solana.com/tx/${signature}?cluster=devnet`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              View transaction
+            </a>
+          )}
+        </div>
       )}
     </>
   );
@@ -104,7 +128,18 @@ export function CreatorEarnings({ mint }: { mint: string }) {
     refetchInterval: 30_000,
     retry: false,
   });
-  if (balances.isError) return <p>Funded creator balances are unavailable.</p>;
+  if (balances.isError && !balances.data)
+    return (
+      <div role="alert">
+        <p>Funded creator balances are unavailable.</p>
+        <button
+          className="market-button"
+          onClick={() => void balances.refetch()}
+        >
+          Retry earnings
+        </button>
+      </div>
+    );
   if (balances.data?.custodyConsistent === false)
     return (
       <p role="alert">
@@ -113,17 +148,29 @@ export function CreatorEarnings({ mint }: { mint: string }) {
       </p>
     );
   return (
-    <dl className="analytics-fees">
-      {[
-        ["Direct earnings", balances.data?.directSol],
-        ["Locked earnings", balances.data?.lockedSol],
-        ["Buyback allocation", balances.data?.buybackSol],
-      ].map(([label, value]) => (
-        <div key={label}>
-          <dt>{label} · funded</dt>
-          <dd>{value === undefined ? "—" : formatUnits(value)} SOL</dd>
-        </div>
-      ))}
-    </dl>
+    <div aria-busy={balances.isPending}>
+      {balances.isPending && (
+        <p className="ux-muted-note" role="status">
+          Loading funded creator balances…
+        </p>
+      )}
+      {balances.isError && (
+        <p className="ux-muted-note" role="alert">
+          Creator balances couldn’t refresh. Showing the last loaded amounts.
+        </p>
+      )}
+      <dl className="analytics-fees">
+        {[
+          ["Direct earnings", balances.data?.directSol],
+          ["Locked earnings", balances.data?.lockedSol],
+          ["Buyback allocation", balances.data?.buybackSol],
+        ].map(([label, value]) => (
+          <div key={label}>
+            <dt>{label} · funded</dt>
+            <dd>{value === undefined ? "—" : formatUnits(value)} SOL</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }

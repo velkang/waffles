@@ -6,6 +6,7 @@
     "dev": "pnpm --parallel --filter @waffles/api-worker --filter @waffles/web dev",
     "build": "pnpm --filter @waffles/shared build && pnpm --filter @waffles/web build && pnpm --filter @waffles/api-worker build && pnpm --filter @waffles/jobs build",
     "test": "pnpm --filter @waffles/shared test && pnpm --filter @waffles/api-worker test",
+    "test:ux": "pnpm --filter @waffles/shared exec tsx --tsconfig ../web/tsconfig.json --test ../web/test/ux.test.tsx",
     "dev:web": "pnpm --filter @waffles/web dev",
     "dev:api": "pnpm --filter @waffles/api-worker dev",
     "check": "pnpm --filter @waffles/shared build && pnpm --filter @waffles/web check && pnpm --filter @waffles/api-worker check && pnpm --filter @waffles/jobs check",

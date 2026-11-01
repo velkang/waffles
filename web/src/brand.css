@@ -1,0 +1,922 @@
+/* Waffles: butter, toasted edges, berry jam, and a little cartoon mischief. */
+:root {
+  color-scheme: light;
+  --font-sans: "Nunito";
+  --font-display: "Fredoka";
+  --font-data: "Geist Mono", monospace;
+  --bg-ground: var(--palette-ground);
+  --bg-surface: var(--palette-surface);
+  --bg-inset: var(--palette-inset);
+  --bg-hover: var(--palette-hover);
+  --border-main: var(--palette-line);
+  --border-subtle: var(--palette-line);
+  --accent-copper: var(--palette-accent);
+  --accent-copper-hover: var(--palette-accent-hover);
+  --accent-copper-dim: var(--palette-notice);
+  --text-primary: var(--palette-ink);
+  --text-secondary: var(--palette-secondary);
+  --text-muted: var(--palette-secondary);
+  --waffle-butter: #ffc85c;
+  --waffle-toast: var(--palette-accent);
+  --waffle-berry: var(--palette-berry);
+  --waffle-berry-milk: var(--palette-berry-bg);
+}
+body {
+  background: var(--bg-ground);
+  color: var(--text-primary);
+}
+::selection {
+  color: var(--palette-ink);
+  background: #ffda83;
+}
+::-webkit-scrollbar-track {
+  background: var(--palette-ground);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--palette-line-strong);
+  border-radius: 9px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--palette-accent);
+}
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: #ffdf9b;
+}
+:is(button, a, input, select, textarea):focus-visible {
+  outline-color: var(--palette-accent);
+}
+.market-header {
+  background: var(--palette-surface);
+  border-bottom: 1px solid var(--border-main);
+}
+.market-header-inner {
+  max-width: 1344px;
+  gap: 30px;
+  padding-block: 14px;
+}
+.market-brand {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.market-brand .waffle-wordmark {
+  color: var(--text-primary);
+  font-family: var(--font-display), sans-serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+.waffle-wordmark > span {
+  color: var(--palette-accent);
+  font-family: var(--font-sans), sans-serif;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0;
+  margin-left: 2px;
+}
+.waffle-mark {
+  flex-shrink: 0;
+  transform: rotate(-8deg);
+}
+.market-header nav {
+  gap: 4px;
+}
+.market-header nav a {
+  color: var(--palette-secondary);
+  font-weight: 800;
+  font-size: 14px;
+  padding: 12px 15px;
+  min-height: 44px;
+  border-radius: 14px;
+}
+.market-header nav a:hover {
+  background: var(--palette-hover);
+  color: var(--palette-accent);
+}
+.market-header nav a[aria-current="page"] {
+  background: var(--palette-selected);
+  color: var(--palette-selected-ink);
+}
+.market-header-actions {
+  gap: 12px;
+}
+.market-primary,
+.market-button {
+  min-height: 44px;
+  font-size: 14px;
+  font-weight: 800;
+  border-radius: 14px;
+  padding: 11px 20px;
+  transition:
+    background-color 0.18s ease-out,
+    transform 0.18s ease-out;
+}
+.market-primary {
+  background: var(--waffle-butter);
+  color: #55301a;
+  border: 1px solid #d79b3d;
+  border-bottom-width: 3px;
+}
+.market-primary:hover {
+  background: #ffdc85;
+  transform: translateY(-1px);
+}
+.market-primary:active {
+  transform: translateY(1px);
+}
+.market-button {
+  background: var(--palette-inset);
+  color: var(--palette-accent);
+  border: 1px solid var(--palette-line-strong);
+  border-bottom-width: 2px;
+}
+.market-button:hover {
+  background: var(--palette-hover);
+}
+.market-primary:disabled,
+.market-button:disabled {
+  transform: none;
+}
+.devnet-notice {
+  background: var(--palette-notice);
+  color: var(--palette-secondary);
+  padding: 8px 16px;
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--palette-notice-line);
+}
+.app-footer {
+  background: var(--palette-footer);
+  border-color: var(--palette-line);
+  color: var(--palette-secondary);
+  font-size: 11px;
+}
+.app-footer a:hover {
+  color: var(--palette-accent);
+  text-decoration: underline;
+}
+.market-page h1,
+.token-detail-name h1,
+.market-empty h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 38px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.market-page h2,
+.market-empty h2,
+.analytics-panel h2,
+.form-section h2,
+.launch-terms h2 {
+  font-family: var(--font-display), sans-serif;
+  font-weight: 600;
+}
+.market-heading {
+  padding: 20px 0 12px;
+  margin-bottom: 20px;
+}
+.market-heading p {
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--text-secondary);
+}
+.analytics-panel,
+.launch-terms,
+.token-detail-header {
+  border: 1px solid var(--border-main);
+  border-radius: 22px;
+  background: var(--palette-surface);
+}
+.analytics-panel {
+  padding: 28px;
+}
+.analytics-panel h2 {
+  color: var(--palette-ink);
+  font-size: 23px;
+}
+.analytics-fees {
+  gap: 24px;
+}
+.analytics-fees dd,
+.token-detail-stats dd {
+  font-family: var(--font-mono), monospace;
+  color: var(--palette-number);
+  font-size: 23px;
+}
+.analytics-fees dt,
+.market-table th {
+  color: var(--palette-secondary);
+}
+.analytics-panel .market-table {
+  margin-top: 14px;
+}
+.market-table {
+  font-size: 13px;
+}
+.market-table th {
+  background: var(--palette-notice);
+  font-size: 12px;
+  font-weight: 800;
+}
+.market-table :is(th, td) {
+  padding: 14px 12px;
+  border-color: var(--palette-line);
+}
+.market-table td {
+  color: var(--palette-number);
+}
+.market-table tr:hover td {
+  background: var(--palette-hover);
+}
+.market-table a {
+  color: var(--palette-accent);
+}
+.market-table a:hover {
+  text-decoration: underline;
+}
+.market-tabs button,
+.market-segment button {
+  min-height: 44px;
+  color: var(--palette-secondary);
+  font-weight: 800;
+}
+.market-tabs button[aria-pressed="true"],
+.market-segment button[aria-pressed="true"] {
+  background: var(--palette-selected);
+  color: var(--palette-selected-ink);
+}
+.market-segment {
+  background: var(--palette-footer);
+  border-radius: 14px;
+}
+.market-segment button {
+  border-radius: 11px;
+}
+.field {
+  color: var(--palette-secondary);
+  font-weight: 700;
+}
+.field input,
+.field textarea,
+.field select {
+  border-radius: 12px;
+  background: var(--palette-inset);
+  border-color: var(--palette-line);
+  font-weight: 600;
+  min-height: 46px;
+}
+.field input::placeholder,
+.field textarea::placeholder {
+  color: var(--palette-secondary);
+}
+.field input:focus,
+.field textarea:focus,
+.field select:focus {
+  outline: 2px solid var(--palette-line-strong);
+  outline-offset: 2px;
+}
+.form-section {
+  border-color: var(--palette-line);
+}
+.form-main {
+  background: var(--palette-surface);
+  border: 1px solid var(--palette-line);
+  border-radius: 24px;
+  padding: 5px 28px 28px;
+}
+.form-section:first-child {
+  border-top: 0;
+}
+.form-main > .market-primary {
+  margin-top: 14px;
+}
+.launch-terms {
+  background: var(--palette-hero);
+}
+.launch-warning {
+  background: var(--palette-notice);
+  color: var(--palette-warning) !important;
+  border-radius: 12px;
+}
+.form-error {
+  color: var(--palette-negative) !important;
+}
+.form-success {
+  color: var(--palette-positive) !important;
+}
+.wallet-drawer {
+  background: var(--palette-surface);
+  border: 2px solid var(--palette-line-strong);
+  border-radius: 24px;
+  top: 86px;
+  padding: 26px;
+  box-shadow: 0 14px 40px #67432224;
+}
+.wallet-drawer h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 24px;
+  color: var(--palette-ink);
+}
+.wallet-drawer p {
+  color: var(--palette-secondary);
+}
+.wallet-welcome {
+  max-width: 980px;
+  display: grid;
+  grid-template-columns: 0.85fr 1.15fr;
+  align-items: center;
+  gap: 48px;
+  margin: 45px auto 65px;
+  min-height: 450px;
+}
+.wallet-welcome-art {
+  background: var(--palette-hero);
+  border-radius: 46% 54% 50% 48%;
+  padding: 25px;
+}
+.wallet-welcome-art img {
+  display: block;
+  width: 100%;
+  height: auto;
+  transform: rotate(-5deg);
+}
+.wallet-welcome h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(34px, 4.2vw, 52px);
+  line-height: 1.12;
+  letter-spacing: -0.025em;
+  font-weight: 600;
+}
+.wallet-welcome h1 span {
+  color: var(--palette-accent);
+}
+.wallet-welcome-copy > p {
+  color: var(--palette-secondary);
+  font-size: 16px;
+  line-height: 1.8;
+  margin-top: 22px;
+  max-width: 46ch;
+}
+.wallet-welcome .market-primary {
+  margin-top: 24px;
+}
+.wallet-explore-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-left: 22px;
+  color: var(--palette-accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+.wallet-explore-link:hover {
+  text-decoration: underline;
+}
+.wallet-welcome-copy > .wallet-welcome-note {
+  font-size: 12px;
+  margin-top: 22px;
+}
+.discover-page .discover-intro {
+  grid-template-columns: minmax(0, 1.1fr) minmax(190px, 0.8fr) minmax(
+      270px,
+      0.82fr
+    );
+  gap: 18px;
+  background: var(--palette-hero);
+  border: 1px solid var(--palette-hero-line);
+  border-radius: 30px;
+  padding: 35px 30px;
+  margin: 2px 0 34px;
+}
+.discover-page .discover-welcome h1 {
+  font-family: var(--font-display), sans-serif;
+  font-size: clamp(38px, 4.4vw, 58px);
+  line-height: 1.06;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  text-wrap: initial;
+}
+.discover-page .discover-welcome h1 span {
+  color: var(--palette-accent);
+}
+.discover-page .discover-welcome h1 > .waffle-heading-long,
+.discover-page .discover-welcome h1 > .waffle-heading-compact {
+  color: inherit;
+}
+.waffle-heading-compact {
+  display: none;
+}
+.discover-page .discover-welcome > p {
+  color: var(--palette-secondary);
+  font-size: 14px;
+  line-height: 1.75;
+  margin-top: 18px;
+}
+.discover-page .discover-intro-actions {
+  gap: 10px 18px;
+  margin-top: 23px;
+}
+.discover-page .discover-intro-actions .market-primary {
+  border-radius: 14px;
+  gap: 14px;
+}
+.discover-page .discover-text-link {
+  color: var(--palette-accent);
+  font-weight: 800;
+  font-size: 12px;
+}
+.discover-page .discover-network-note {
+  font-size: 10px !important;
+}
+.waffle-hero-art {
+  position: relative;
+  min-width: 0;
+  text-align: center;
+  align-self: center;
+}
+.waffle-hero-art img {
+  display: block;
+  width: 115%;
+  max-width: none;
+  height: auto;
+  margin-left: -8%;
+  animation: waffle-bob 5s ease-in-out infinite;
+}
+.waffle-art-caption {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--palette-accent);
+  margin-top: 12px;
+  transform: rotate(-3deg);
+}
+.discover-page .discover-reward {
+  background: var(--palette-berry-bg);
+  border: 1px solid var(--palette-berry-line);
+  border-radius: 22px;
+  padding: 22px 20px 17px;
+  align-self: center;
+}
+.discover-page .discover-reward-heading h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 19px;
+  color: var(--palette-berry);
+}
+.discover-page .discover-ticket-mark {
+  color: var(--palette-berry);
+}
+.discover-page .discover-pool {
+  color: var(--palette-berry);
+  font-size: clamp(24px, 2.5vw, 32px);
+}
+.discover-page .discover-reward-timing {
+  color: var(--palette-berry-secondary);
+  font-size: 11px;
+}
+.discover-page .discover-reward-timing time {
+  color: var(--palette-berry);
+  font-weight: 800;
+}
+.discover-page .discover-reward-bottom {
+  border-top: 1px dashed var(--palette-berry-line);
+}
+.discover-page .discover-reward-bottom > a {
+  color: var(--palette-berry);
+  font-weight: 800;
+  font-size: 13px;
+}
+.discover-page .discover-reward-bottom p,
+.discover-page .discover-reward-disclosure {
+  color: var(--palette-berry-secondary);
+}
+.discover-page .discover-reward-heading > a:hover {
+  background: var(--palette-berry-bg);
+  color: var(--palette-berry);
+}
+.discover-page .discover-markets {
+  border-top: 0;
+  padding-top: 0;
+}
+.discover-page .discover-title-row h2 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: var(--palette-ink);
+}
+.discover-page .discover-update {
+  color: var(--palette-secondary);
+  font-size: 11px;
+}
+.discover-page .discover-search {
+  background: var(--palette-surface);
+  border-color: var(--palette-line);
+  border-radius: 14px;
+}
+.discover-page .discover-search input {
+  font-size: 13px;
+}
+.discover-page .discover-tabs {
+  gap: 5px;
+}
+.discover-page .discover-tabs button {
+  color: var(--palette-secondary);
+  font-size: 13px;
+  font-weight: 800;
+  border-radius: 12px;
+}
+.discover-page .discover-tabs button[aria-pressed="true"] {
+  background: var(--palette-selected);
+  color: var(--palette-selected-ink);
+}
+.discover-page .discover-tabs button:hover {
+  background: var(--palette-hover);
+  color: #673c21;
+}
+.discover-page .discover-filter {
+  background: var(--palette-surface);
+  border-radius: 12px;
+  border-color: var(--palette-line);
+  color: var(--palette-secondary);
+  font-weight: 800;
+  font-size: 12px;
+}
+.discover-page .discover-filter.is-selected {
+  background: var(--palette-notice);
+  border-color: var(--palette-accent);
+  color: var(--palette-selected-ink);
+}
+.discover-page .discover-results-meta {
+  color: var(--palette-secondary);
+}
+.discover-page .discover-token {
+  background: var(--palette-surface);
+  border: 1px solid var(--palette-line);
+  border-radius: 22px;
+  padding: 22px 22px 0;
+  transition:
+    transform 0.2s ease-out,
+    border-color 0.2s ease-out;
+}
+.discover-page .discover-token:hover {
+  background: var(--palette-surface);
+  border-color: var(--palette-line-strong);
+  transform: translateY(-3px);
+}
+.discover-page .discover-token-art {
+  border-radius: 16px;
+  background: var(--palette-selected);
+}
+.discover-page .discover-token-identity h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 21px;
+  color: var(--palette-ink);
+}
+.discover-page .discover-token-identity > span {
+  color: var(--palette-secondary);
+}
+.discover-page .discover-token-values {
+  margin-top: 24px;
+}
+.discover-page .discover-token-values dd {
+  color: var(--palette-number);
+  font-size: 22px;
+}
+.discover-page .discover-curve strong {
+  color: var(--palette-accent);
+  font-weight: 800;
+}
+.discover-page .discover-curve progress::-webkit-progress-bar {
+  background: var(--palette-progress);
+}
+.discover-page .discover-curve progress::-webkit-progress-value {
+  background: var(--palette-accent);
+}
+.discover-page .discover-curve progress::-moz-progress-bar {
+  background: var(--palette-accent);
+}
+.discover-page .discover-commitment {
+  color: var(--palette-secondary);
+}
+.discover-page .discover-commitment.is-active {
+  color: var(--palette-positive);
+}
+.discover-page .discover-token-footer {
+  border-top: 1px dashed var(--palette-line);
+  color: var(--palette-secondary);
+  min-height: 48px;
+}
+.discover-page .discover-token-footer > span:last-child {
+  color: var(--palette-accent);
+  font-weight: 800;
+}
+.discover-page .discover-explainer {
+  border-color: var(--palette-line);
+  padding-top: 28px;
+  margin-top: 30px;
+}
+.discover-page .discover-explainer strong {
+  color: var(--palette-ink);
+  font-size: 14px;
+}
+.discover-page .discover-explainer p span {
+  font-size: 12px;
+  color: var(--palette-secondary);
+}
+.discover-page .discover-empty {
+  border-color: var(--palette-line-strong);
+  background: var(--palette-hero);
+  border-radius: 22px;
+}
+.discover-page .discover-empty h3 {
+  font-family: var(--font-display), sans-serif;
+  font-size: 25px;
+}
+.discover-page .discover-skeleton {
+  border-color: var(--palette-line);
+  background: var(--palette-surface);
+  border-radius: 22px;
+}
+.rewards-mascot {
+  width: 112px;
+  height: 112px;
+  object-fit: contain;
+  transform: rotate(8deg);
+}
+.rewards-page > .analytics-panel:first-of-type {
+  background: var(--palette-hero);
+  border-color: var(--palette-hero-line);
+}
+.rewards-page .reward-summary {
+  gap: 40px;
+}
+.rewards-page .reward-summary h2 {
+  font-family: var(--font-sans), sans-serif;
+  color: var(--palette-accent);
+  font-size: 13px;
+  font-weight: 800;
+}
+.rewards-page .reward-summary strong {
+  color: var(--palette-accent);
+}
+.rewards-page > .analytics-panel:nth-of-type(2) {
+  background: var(--palette-berry-bg);
+  border-color: var(--palette-berry-line);
+}
+@keyframes waffle-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-3deg);
+  }
+  50% {
+    transform: translateY(-7px) rotate(1deg);
+  }
+}
+@media (max-width: 1100px) {
+  .market-header-inner {
+    gap: 12px 20px;
+  }
+  .market-header nav {
+    order: 0;
+    width: auto;
+  }
+  .discover-page .discover-intro {
+    grid-template-columns: minmax(0, 1fr) minmax(210px, 0.8fr);
+    gap: 24px;
+  }
+  .discover-page .discover-reward {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0 28px;
+  }
+  .discover-page .discover-reward-heading {
+    grid-column: 1;
+  }
+  .discover-page .discover-pool {
+    grid-column: 1;
+    grid-row: 2;
+    margin-top: 10px;
+  }
+  .discover-page .discover-reward-timing {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .discover-page .discover-reward-bottom {
+    grid-column: 2;
+    grid-row: 1 / 4;
+    border: 0;
+    margin-top: 0;
+    align-content: center;
+  }
+  .discover-page .discover-reward-disclosure {
+    grid-column: 1 / -1;
+    margin-top: 12px;
+  }
+}
+@media (max-width: 800px) {
+  .market-header nav {
+    order: 3;
+    width: 100%;
+  }
+  .market-header-inner {
+    padding: 10px 16px;
+  }
+  .market-header nav a {
+    font-size: 13px;
+  }
+  .market-brand .waffle-wordmark {
+    font-size: 26px;
+  }
+  .market-header-actions .market-primary {
+    padding: 10px 13px;
+    font-size: 12px;
+  }
+  .market-header-actions > a {
+    display: none;
+  }
+  .wallet-welcome {
+    gap: 24px;
+    margin-top: 24px;
+    grid-template-columns: minmax(0, 1fr);
+    text-align: center;
+  }
+  .wallet-welcome-art {
+    width: 230px;
+    margin: auto;
+    padding: 15px;
+  }
+  .wallet-welcome h1 {
+    font-size: 38px;
+  }
+  .wallet-welcome-copy > p {
+    font-size: 15px;
+    margin-inline: auto;
+  }
+  .form-main {
+    padding: 0 18px 22px;
+  }
+  .analytics-panel {
+    padding: 22px;
+  }
+}
+@media (max-width: 600px) {
+  .discover-page .discover-intro {
+    padding: 25px 20px 20px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+    border-radius: 24px;
+    position: relative;
+  }
+  .discover-page .discover-welcome h1 {
+    font-size: 40px;
+    max-width: calc(100% - 100px);
+  }
+  .waffle-heading-long {
+    display: none;
+  }
+  .waffle-heading-compact {
+    display: block;
+  }
+  .discover-page .discover-welcome > p {
+    max-width: 33ch;
+    font-size: 13px;
+  }
+  .waffle-hero-art {
+    position: absolute;
+    width: 110px;
+    right: 6px;
+    top: 0;
+    pointer-events: none;
+  }
+  .waffle-hero-art img {
+    width: 100%;
+    margin-left: 0;
+  }
+  .waffle-art-caption {
+    display: none;
+  }
+  .discover-page .discover-intro-actions {
+    margin-top: 18px;
+  }
+  .discover-page .discover-intro-actions .market-primary {
+    padding-inline: 14px;
+    font-size: 13px;
+    gap: 8px;
+  }
+  .discover-page .discover-text-link {
+    font-size: 12px;
+    gap: 6px;
+  }
+  .discover-page .discover-reward {
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding: 17px 15px 14px;
+    gap: 0 12px;
+    border-radius: 18px;
+  }
+  .discover-page .discover-reward-heading {
+    grid-column: 1 / -1;
+  }
+  .discover-page .discover-reward-heading h2 {
+    font-size: 17px;
+  }
+  .discover-page .discover-reward-heading > a {
+    display: none;
+  }
+  .discover-page .discover-pool {
+    font-size: 25px;
+    margin-top: 10px;
+  }
+  .discover-page .discover-reward-timing {
+    font-size: 10px;
+  }
+  .discover-page .discover-reward-bottom {
+    grid-column: 2;
+    grid-row: 2 / 4;
+    max-width: 104px;
+    padding: 0;
+  }
+  .discover-page .discover-reward-bottom > a {
+    font-size: 12px;
+  }
+  .discover-page .discover-reward-disclosure {
+    font-size: 10px;
+    margin-top: 12px;
+  }
+  .discover-page .discover-title-row h2 {
+    font-size: 29px;
+  }
+  .discover-page .discover-tabs button {
+    font-size: 12px;
+    padding-inline: 11px;
+  }
+  .discover-page .discover-token {
+    padding: 20px 20px 0;
+  }
+  .discover-page .discover-explainer {
+    gap: 22px;
+  }
+  .market-page h1 {
+    font-size: 32px;
+  }
+  .rewards-mascot {
+    width: 84px;
+    height: 84px;
+  }
+  .rewards-page .reward-summary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+  .rewards-page .reward-summary strong {
+    font-size: 25px;
+    overflow-wrap: anywhere;
+  }
+  .wallet-welcome h1 {
+    font-size: 35px;
+  }
+  .wallet-explore-link {
+    margin-left: 14px;
+    font-size: 13px;
+  }
+  .wallet-drawer {
+    top: 132px;
+  }
+}
+@media (max-width: 360px) {
+  .market-brand .waffle-wordmark {
+    font-size: 23px;
+  }
+  .market-brand .waffle-mark {
+    width: 30px;
+    height: 30px;
+  }
+  .waffle-wordmark > span {
+    display: none;
+  }
+  .discover-page .discover-welcome h1 {
+    font-size: 32px;
+  }
+  .waffle-hero-art {
+    width: 105px;
+    top: 4px;
+  }
+  .wallet-explore-link {
+    display: flex;
+    width: fit-content;
+    margin: 10px auto 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .waffle-hero-art img {
+    animation: none;
+  }
+  .market-primary:hover,
+  .market-primary:active,
+  .discover-page .discover-token:hover {
+    transform: none;
+  }
+}

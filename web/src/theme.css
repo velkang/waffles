@@ -1,0 +1,169 @@
+:root {
+  --palette-ground: #fff9ef;
+  --palette-surface: #fffdf9;
+  --palette-inset: #fff4e2;
+  --palette-hover: #faecd5;
+  --palette-line: #e7d5bb;
+  --palette-line-strong: #c8a375;
+  --palette-hero: #ffefc9;
+  --palette-hero-line: #edcf91;
+  --palette-notice: #fff1cf;
+  --palette-notice-line: #efdfba;
+  --palette-selected: #ffe4a2;
+  --palette-selected-ink: #663a1e;
+  --palette-ink: #4a2d1b;
+  --palette-number: #62412a;
+  --palette-secondary: #79604c;
+  --palette-accent: #a34a1c;
+  --palette-accent-hover: #823810;
+  --palette-berry: #823a56;
+  --palette-berry-secondary: #795b6c;
+  --palette-berry-bg: #fff9fc;
+  --palette-berry-line: #e4c6cf;
+  --palette-footer: #f8eedf;
+  --palette-progress: #f2e4cd;
+  --palette-positive: #23764c;
+  --palette-negative: #a92d45;
+  --palette-warning: #714d21;
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --palette-ground: #23150f;
+  --palette-surface: #38241b;
+  --palette-inset: #493125;
+  --palette-hover: #5a3a27;
+  --palette-line: #79523b;
+  --palette-line-strong: #b9865d;
+  --palette-hero: #63391e;
+  --palette-hero-line: #b77934;
+  --palette-notice: #382418;
+  --palette-notice-line: #805937;
+  --palette-selected: #805021;
+  --palette-selected-ink: #fff0bc;
+  --palette-ink: #fff3dc;
+  --palette-number: #ffe3ae;
+  --palette-secondary: #e3c8ad;
+  --palette-accent: #ffd173;
+  --palette-accent-hover: #ffe6ad;
+  --palette-berry: #ffc2d5;
+  --palette-berry-secondary: #f5c4d5;
+  --palette-berry-bg: #642f46;
+  --palette-berry-line: #bd738b;
+  --palette-footer: #2d1c15;
+  --palette-progress: #8b5b2d;
+  --palette-positive: #9be8b5;
+  --palette-negative: #ff9ba9;
+  --palette-warning: #ffe4a0;
+}
+
+:root[data-theme="dark"] .discover-page .discover-intro {
+  background: linear-gradient(115deg, #53321e 0%, #7c401e 72%, #985022 100%);
+}
+:root[data-theme="dark"] .discover-page .discover-welcome > p {
+  color: #fff0d4;
+}
+:root[data-theme="dark"] .discover-page .discover-reward {
+  background: #642f46;
+  border-color: #c77e92;
+}
+.theme-toggle {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 74px;
+  min-width: 74px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--palette-line-strong);
+  border-radius: 24px;
+  background: var(--palette-inset);
+  color: var(--palette-accent);
+  perspective: 120px;
+}
+.theme-toggle:hover {
+  border-color: var(--palette-accent);
+}
+.theme-day,
+.theme-night {
+  position: absolute;
+  top: 12px;
+  display: flex;
+}
+.theme-day {
+  left: 10px;
+}
+.theme-night {
+  right: 10px;
+}
+.theme-waffle {
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  left: 3px;
+  top: 3px;
+  display: flex;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.theme-waffle .waffle-mark {
+  width: 36px;
+  height: 36px;
+  transform: rotate(-8deg);
+}
+.theme-toggle[data-theme="dark"] .theme-waffle {
+  transform: translateX(30px) rotateY(180deg) rotate(-10deg);
+}
+html[data-theme] ::selection {
+  color: #4a2d1b;
+  background: #ffda83;
+}
+html[data-theme] .discover-page ::selection {
+  color: #4a2d1b;
+  background: #ffda83;
+}
+.wallet-label-short {
+  display: none;
+}
+@media (max-width: 600px) {
+  .market-header-inner {
+    gap: 10px;
+  }
+  .market-header-actions {
+    gap: 8px;
+  }
+  .waffle-wordmark > span {
+    display: none;
+  }
+  .theme-toggle {
+    width: 66px;
+    min-width: 66px;
+  }
+  .theme-toggle[data-theme="dark"] .theme-waffle {
+    transform: translateX(22px) rotateY(180deg) rotate(-10deg);
+  }
+  .theme-day {
+    left: 8px;
+  }
+  .theme-night {
+    right: 8px;
+  }
+}
+@media (max-width: 360px) {
+  .wallet-label-long {
+    display: none;
+  }
+  .wallet-label-short {
+    display: inline;
+  }
+  .market-header-actions .market-primary {
+    padding-inline: 10px;
+  }
+  .market-header-inner {
+    padding-inline: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .theme-waffle {
+    transition: none;
+  }
+}
