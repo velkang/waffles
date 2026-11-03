@@ -18,10 +18,40 @@ export { Settlement } from "./settlement";
 export class Coordinator extends DurableObject<Env> {
   private chain: Promise<unknown> = Promise.resolve();
   private programHead?: { through: number; signature: string };
+  private busy = false;
+  private active?: { day: string; ms: number; saved: number };
   private serial<T>(fn: () => Promise<T>): Promise<T> {
-    const next = this.chain.catch(() => {}).then(fn);
+    const next = this.chain.catch(() => {}).then(async () => {
+      const started = Date.now();
+      try {
+        return await fn();
+      } finally {
+        await this.charge(Date.now() - started);
+      }
+    });
     this.chain = next;
     return next;
+  }
+  // Durable Object duration is an account-wide daily allowance (13,000 GB-s,
+  // about 28 object-hours). Billing runs while executing or awaiting I/O, so
+  // track this object's own active time and stop well before the account cap.
+  private async activeToday() {
+    const day = new Date().toISOString().slice(0, 10);
+    if (this.active?.day !== day) {
+      const saved = await this.ctx.storage.get<{ day: string; ms: number }>("active-time");
+      const ms = saved?.day === day ? saved.ms : 0;
+      this.active = { day, ms, saved: ms };
+    }
+    return this.active;
+  }
+  private async charge(ms: number) {
+    const active = await this.activeToday();
+    active.ms += ms + 50;
+    // Persist in 30-second steps; an eviction can lose at most that much.
+    if (active.ms - active.saved >= 30_000) {
+      await this.ctx.storage.put("active-time", { day: active.day, ms: active.ms });
+      active.saved = active.ms;
+    }
   }
   async fetch(request: Request) {
     return this.serial(async () => {
@@ -44,22 +74,6 @@ export class Coordinator extends DurableObject<Env> {
         await flushOwnership(this.env, at);
         return new Response("closed");
       }
-      if (path === "/range") {
-        const { start } = await request.json() as { start: number };
-        if (!Number.isSafeInteger(start) || start < Number(this.env.START_SLOT))
-          return new Response("Invalid range", { status: 400 });
-        // A queue delivery is only a wakeup. The database is authoritative.
-        await this.ctx.storage.setAlarm(Date.now() + 5000);
-        try {
-          const job = await this.range();
-          if (job && job.start === start && !job.complete &&
-              (job.retry_at <= Date.now() || (!job.object_key && job.attempts === 0)))
-            await this.download(job);
-        } catch (error) {
-          if (!await this.pauseForQuota(error)) throw error;
-        }
-        return new Response("retained");
-      }
       await this.apply();
       return new Response("applied");
     });
@@ -71,8 +85,15 @@ export class Coordinator extends DurableObject<Env> {
         await this.ctx.storage.setAlarm(resumeAt);
         return;
       }
+      if ((await this.activeToday()).ms >= ACTIVE_LIMIT_MS) {
+        await this.ctx.storage.put("active-time", { day: this.active!.day, ms: this.active!.ms });
+        await this.ctx.storage.setAlarm(nextReset());
+        console.warn(json({ event: "duration_budget_pause", resumeAt: nextReset() }));
+        return;
+      }
       // Rearm before work so failures cannot silently stop scheduling.
       await this.ctx.storage.setAlarm(Date.now() + 5000);
+      this.busy = false;
       for (const work of [() => this.apply(), () => this.discover()]) {
         try {
           await work();
@@ -95,6 +116,8 @@ export class Coordinator extends DurableObject<Env> {
           console.error("maintenance", String(error));
         }
       }
+      // Nothing to catch up: wake less often so idle polling stays cheap.
+      if (!this.busy) await this.ctx.storage.setAlarm(Date.now() + IDLE_ALARM_MS);
     });
   }
   private async pauseForQuota(error: unknown) {
@@ -105,15 +128,13 @@ export class Coordinator extends DurableObject<Env> {
     console.warn(json({ event: "d1_quota_pause", resumeAt }));
     return true;
   }
-  private async reserve(kind: "messages" | "writes", count: number) {
+  private async reserve(kind: "writes", count: number) {
     const day = new Date().toISOString().slice(0, 10);
-    const saved = await this.ctx.storage.get<{ day: string; messages: number; writes: number }>("ingestion-budget");
-    const budget = saved?.day === day ? saved : { day, messages: 0, writes: 0 };
-    // 1,500 messages normally cost 4,500 Queue operations. Reserve headroom
-    // for retries, maintenance, API traffic, and other apps on this account.
-    const limit = kind === "messages" ? 1500 : 40_000;
-    if (budget[kind] + count > limit) throw new IngestionPaused(nextReset(), `${kind} budget`);
-    budget[kind] += count;
+    const saved = await this.ctx.storage.get<{ day: string; writes: number }>("ingestion-budget");
+    const budget = saved?.day === day ? saved : { day, writes: 0 };
+    // Leave D1 write headroom for the API, maintenance, and other apps.
+    if (budget.writes + count > 40_000) throw new IngestionPaused(nextReset(), `${kind} budget`);
+    budget.writes += count;
     // Reserve before side effects. A crash can overcount, never undercount.
     await this.ctx.storage.put("ingestion-budget", budget);
   }
@@ -146,12 +167,10 @@ export class Coordinator extends DurableObject<Env> {
       throw new Error("Set GENESIS_HASH and START_SLOT to the verified deployment slot");
     const pending = await this.range();
     if (pending) {
-      // Recover lost/expired messages without producing a second queue job.
+      this.busy = true;
       if (!pending.complete && pending.retry_at <= Date.now()) await this.download(pending);
       return;
     }
-    const queueResume = await this.ctx.storage.get<number>("queue-resume-at");
-    let queued = !queueResume || queueResume <= Date.now();
     const saved = await this.env.DB.prepare(
       "SELECT value FROM checkpoints WHERE id='complete-slot'",
     ).first<{ value: string }>();
@@ -173,32 +192,13 @@ export class Coordinator extends DurableObject<Env> {
       if (!this.programHead && head - start < 127) return;
     }
     const end = Math.min(head, start + 8191);
-    if (queued) {
-      try {
-        await this.reserve("messages", 1);
-      } catch (error) {
-        if (!(error instanceof IngestionPaused)) throw error;
-        queued = false;
-        await this.ctx.storage.put("queue-resume-at", error.retryAt);
-      }
-    }
     await this.reserve("writes", 4);
+    // The alarm journal is the only driver; Queues cost scarce daily operations.
     await this.env.DB.prepare(
       "INSERT INTO ingestion_ranges(start,end,retry_at) VALUES(?,?,?)",
-    ).bind(start, end, Date.now() + (queued ? 120_000 : 0)).run();
-    console.log(json({ event: "range_scheduled", start, end, wakeup: queued ? "queue" : "alarm" }));
-    if (!queued) return;
-    try {
-      await this.env.BLOCKS.send({ start, end });
-    } catch (error) {
-      // The range already exists durably; its lease will recover it.
-      const reset = quotaResetAt(error);
-      if (reset) {
-        await this.ctx.storage.put("queue-resume-at", reset);
-        await this.env.DB.prepare("UPDATE ingestion_ranges SET retry_at=? WHERE start=?")
-          .bind(Date.now(), start).run();
-      } else throw error;
-    }
+    ).bind(start, end, 0).run();
+    this.busy = true;
+    console.log(json({ event: "range_scheduled", start, end }));
   }
 
   private async apply() {
@@ -258,6 +258,7 @@ export class Coordinator extends DurableObject<Env> {
       await this.env.DB.batch(statements);
       const signature = programHistoryHead(archive, this.env.PROGRAM_ID);
       this.programHead = signature ? { through: job.end, signature } : undefined;
+      this.busy = true;
       await this.ctx.storage.setAlarm(Date.now() + 1);
       console.log(json({ event: "range_applied", start: job.start, end: job.end, time }));
       await this.publish();
@@ -349,6 +350,8 @@ async function maintain(env: Env) {
   }
 }
 
+const ACTIVE_LIMIT_MS = 10 * 3600_000;
+const IDLE_ALARM_MS = 30_000;
 function nextReset() {
   const now = new Date();
   return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) + 5000;
@@ -359,25 +362,12 @@ class IngestionPaused extends Error {
 function quotaResetAt(error: unknown): number | null {
   if (error instanceof IngestionPaused) return error.retryAt;
   const message = String(error) + (error instanceof Error ? String(error.cause ?? "") : "");
-  if ((/D1/i.test(message) && /free tier daily row (read|write) limit/i.test(message)) ||
-      (/(queue|operations)/i.test(message) && /(daily|quota).*(limit|exceed)|exceed.*(daily|quota)/i.test(message)))
+  if (/D1/i.test(message) && /free tier daily row (read|write) limit/i.test(message))
     return nextReset();
   return null;
 }
 
 export default {
-  async queue(batch: MessageBatch<{ start: number; end: number } | { slot: number }>, env: Env) {
-    for (const message of batch.messages) {
-      const ranged = "start" in message.body;
-      const response = await env.COORDINATOR.get(env.COORDINATOR.idFromName("devnet")).fetch(
-        ranged ? "https://coordinator/range" : "https://coordinator/discover",
-        { method: "POST", ...(ranged ? { body: json(message.body) } : {}) },
-      );
-      // Legacy per-block messages only wake the same durable range pipeline.
-      if (!response.ok) throw new Error("Range coordinator unavailable");
-      message.ack();
-    }
-  },
   async fetch(request: Request, env: Env): Promise<Response> {
     if (
       !env.OPERATIONS_TOKEN ||
@@ -445,4 +435,4 @@ export default {
       return Response.json({ error: String(error) }, { status: 409 });
     }
   },
-} satisfies ExportedHandler<Env, { start: number; end: number } | { slot: number }>;
+} satisfies ExportedHandler<Env>;

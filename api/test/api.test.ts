@@ -1,5 +1,5 @@
 import { env, SELF, runInDurableObject } from "cloudflare:test";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { Keypair, PublicKey, type ParsedBlockResponse } from "@solana/web3.js";
 import {
   json,
@@ -733,10 +733,29 @@ it("starts alarm scheduling only with the operations token", async () => {
   });
 });
 
-import { RpcBudget, rpcConnection, RpcDeferred } from "../../jobs/src/rpc";
+import { RpcBudget, rpcConnection, rpcFetch, fetchWithTimeout, RpcDeferred } from "../../jobs/src/rpc";
 import { Coordinator } from "../../jobs/src/index";
 import { fetchRange, readRange, relevantBlock, verifyHistory, type RangeJob, type RangeArchive } from "../../jobs/src/ranges";
 import { flushOwnership } from "../../jobs/src/settlement";
+// The limiter only grants; callers fetch RPC_URL themselves. Tests replace the
+// upstream (and optionally the grant) without the real token bucket.
+const realFetch = globalThis.fetch;
+const upstreamSpies: { mockRestore(): void }[] = [];
+afterEach(() => { for (const spy of upstreamSpies.splice(0)) spy.mockRestore(); });
+type Handler = (url: string, init: RequestInit) => Response | Promise<Response>;
+function fakeRpc(name: string, upstream: Handler, grant: Handler = () => new Response(null, { status: 204 })) {
+  upstreamSpies.push(vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = input instanceof Request ? input.url : String(input);
+    if (url !== env.RPC_URL) return realFetch(input, init);
+    const call = JSON.parse(String(init?.body));
+    if (call.method === "getGenesisHash") return Response.json({ jsonrpc: "2.0", id: call.id, result: env.GENESIS_HASH });
+    return upstream(url, init ?? {});
+  }));
+  const fetch = async (url: string, init: RequestInit) => url.endsWith("/reserve")
+    ? grant(url, init)
+    : Response.json({ jsonrpc: "2.0", error: { code: -32005 } }, { status: 429, headers: { "Retry-After": "1" } });
+  return { idFromName: () => name, get: () => ({ fetch }) } as unknown as DurableObjectNamespace;
+}
 
 async function rangeJob(start = 12, end = 15) {
   await env.DB.prepare("INSERT INTO ingestion_ranges(start,end) VALUES(?,?)")
@@ -799,7 +818,7 @@ function historyRpc(histories: Record<string, ReturnType<typeof receipt>[]>, blo
     };
     return Response.json(Array.isArray(payload) ? payload.map(respond) : respond(payload));
   };
-  return { calls, bindings: { ...env, RPC: { idFromName: () => "history", get: () => ({ fetch }) } } as unknown as JobsEnv };
+  return { calls, bindings: { ...env, RPC: fakeRpc("history", fetch) } as unknown as JobsEnv };
 }
 function relayBlock(slot = 14) {
   const block = transferBlock(slot, 201, thirdOwner, "10"), tx = block.transactions[0];
@@ -930,7 +949,7 @@ it("rejects a repeated pagination page without advancing the checkpoint", async 
     reads++;
     return Response.json(calls.map((call: { id: string }) => ({ jsonrpc: "2.0", id: call.id, result: page })));
   };
-  const bindings = { ...env, RPC: { idFromName: () => "repeat", get: () => ({ fetch }) } } as unknown as JobsEnv;
+  const bindings = { ...env, RPC: fakeRpc("repeat", fetch) } as unknown as JobsEnv;
   await fetchRange(bindings, job);
   expect(reads).toBe(2);
   expect((await env.DB.prepare("SELECT complete FROM ingestion_ranges WHERE start=12").first<{ complete: number }>())?.complete).toBe(0);
@@ -942,14 +961,14 @@ it("waits through a short RPC cooldown without checkpointing every throttled bur
   const { bindings } = historyRpc({ [env.PROGRAM_ID]: [receipt("program-anchor", 11)] }, {});
   const downstream = bindings.RPC.get(bindings.RPC.idFromName("history"));
   let limited = true;
-  const fetch = async (url: string, init: RequestInit) => {
+  const grant = async (url: string, init: RequestInit) => {
     if (limited) {
       limited = false;
       return new Response("busy", { status: 429, headers: { "Retry-After": "1" } });
     }
     return downstream.fetch(url, init);
   };
-  await fetchRange({ ...bindings, RPC: { idFromName: () => "wait", get: () => ({ fetch }) } } as unknown as JobsEnv, job);
+  await fetchRange({ ...bindings, RPC: { idFromName: () => "wait", get: () => ({ fetch: grant }) } } as unknown as JobsEnv, job);
   expect(await env.DB.prepare("SELECT complete,attempts FROM ingestion_ranges WHERE start=12").first())
     .toEqual({ complete: 1, attempts: 0 });
 });
@@ -986,13 +1005,13 @@ it("batches quiet head periods but wakes promptly for a new Waffles call after r
   };
   const check = async (instance: Coordinator, state: DurableObjectState, wake: boolean) => {
     const local = (instance as unknown as { env: JobsEnv }).env, previous = local.RPC;
-    local.RPC = { idFromName: () => "hint", get: () => ({ fetch }) } as unknown as DurableObjectNamespace;
-    const send = vi.spyOn(local.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
+    local.RPC = fakeRpc("hint", fetch);
     try {
       await (instance as unknown as { discover(): Promise<void> }).discover();
-      if (wake) expect(send).toHaveBeenCalledExactlyOnceWith({ start: 17, end: 100 });
-      else expect(send).not.toHaveBeenCalled();
-    } finally { send.mockRestore(); local.RPC = previous; await state.storage.deleteAlarm(); }
+      const scheduled = await env.DB.prepare("SELECT start,end FROM ingestion_ranges WHERE start=17").first();
+      if (wake) expect(scheduled).toEqual({ start: 17, end: 100 });
+      else expect(scheduled).toBeNull();
+    } finally { local.RPC = previous; await state.storage.deleteAlarm(); }
   };
   await runInDurableObject<Coordinator, void>(stub, (instance, state) => check(instance, state, false));
   await expect(runInDurableObject<Coordinator, void>(stub, (_instance, state) => state.abort("hint restart"))).rejects.toThrow("hint restart");
@@ -1082,12 +1101,11 @@ it("retains the contiguous download prefix and resumes without fetching complete
   const job = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
   let fail = true;
   const fetched: number[] = [];
-  const upstream = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
   const fetch = async (url: string, init: RequestInit) => {
     const payload = JSON.parse(String(init.body));
     const calls = Array.isArray(payload) ? payload : [payload];
     for (const call of calls) if (call.method === "getBlock") fetched.push(call.params[0]);
-    const response = await upstream.fetch(url, init);
+    const response = await realFetch(url, init);
     if (Array.isArray(payload) && calls.some((call) => call.params[0] === 14) && fail) {
       fail = false;
       const replies = await response.json() as { id: number }[];
@@ -1097,7 +1115,7 @@ it("retains the contiguous download prefix and resumes without fetching complete
     }
     return response;
   };
-  const bindings = { ...env, RPC: { idFromName: () => "unused", get: () => ({ fetch }) } } as unknown as JobsEnv;
+  const bindings = { ...env, RPC: fakeRpc("unused", fetch) } as unknown as JobsEnv;
   await fetchRange(bindings, job);
   const partial = (await env.DB.prepare("SELECT * FROM ingestion_ranges WHERE start=12").first<RangeJob>())!;
   expect(partial.complete).toBe(0);
@@ -1218,46 +1236,33 @@ it("tracks a mint and its accounts introduced earlier in the same range", () => 
   expect(relevantBlock(transferBlock(14, 201, wallet), mints, env.PROGRAM_ID, accounts).transactions).toHaveLength(1);
 });
 
-it("reserves daily queue and write budgets before effects and resets on the next UTC day", async () => {
+it("reserves daily write budgets before effects and resets on the next UTC day", async () => {
   const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
   await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    const work = instance as unknown as { reserve(kind: "messages" | "writes", count: number): Promise<void> };
+    const work = instance as unknown as { reserve(kind: "writes", count: number): Promise<void> };
     const day = new Date().toISOString().slice(0, 10);
-    await state.storage.put("ingestion-budget", { day, messages: 1499, writes: 39999 });
-    await work.reserve("messages", 1);
+    await state.storage.put("ingestion-budget", { day, writes: 39999 });
     await work.reserve("writes", 1);
-    await expect(work.reserve("messages", 1)).rejects.toThrow("messages budget");
     await expect(work.reserve("writes", 1)).rejects.toThrow("writes budget");
-    await state.storage.put("ingestion-budget", { day: "2000-01-01", messages: 1500, writes: 40000 });
-    await work.reserve("messages", 1);
-    expect(await state.storage.get("ingestion-budget")).toEqual({ day, messages: 1, writes: 0 });
+    await state.storage.put("ingestion-budget", { day: "2000-01-01", writes: 40000 });
+    await work.reserve("writes", 1);
+    expect(await state.storage.get("ingestion-budget")).toEqual({ day, writes: 1 });
   });
 });
 
-it("drains legacy queue notifications by waking durable range work rather than re-fetching each block", async () => {
-  const fetch = vi.fn(async (_url: string) => new Response("scheduled"));
-  const message = { body: { slot: 12 }, ack: vi.fn() };
-  await jobs.queue({ messages: [message] } as unknown as MessageBatch<{ slot: number }>, {
-    ...env, COORDINATOR: { idFromName: () => "devnet", get: () => ({ fetch }) },
-  } as unknown as JobsEnv);
-  expect(fetch.mock.calls[0][0]).toBe("https://coordinator/discover");
-  expect(message.ack).toHaveBeenCalledOnce();
-});
 
-it("sends one range job and recovers an expired lease after a coordinator restart", async () => {
+it("schedules one range through the alarm journal and recovers it after a coordinator restart", async () => {
   const id = env.COORDINATOR.idFromName(crypto.randomUUID());
   let stub = env.COORDINATOR.get(id);
   await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    const bindings = (instance as unknown as { env: JobsEnv }).env;
-    const send = vi.spyOn(bindings.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
     await state.storage.put("maintenance-at", Date.now());
     try {
       await instance.alarm();
-      await instance.alarm();
-      expect(send).toHaveBeenCalledExactlyOnceWith({ start: 12, end: 1000 });
-      expect((await env.DB.prepare("SELECT start FROM ingestion_ranges").all()).results).toHaveLength(1);
+      expect(await env.DB.prepare("SELECT start,end FROM ingestion_ranges").all())
+        .toMatchObject({ results: [{ start: 12, end: 1000 }] });
+      // Catching up keeps the short cadence instead of idling.
+      expect(await state.storage.getAlarm()).toBeLessThanOrEqual(Date.now() + 5000);
     } finally {
-      send.mockRestore();
       await state.storage.deleteAlarm();
     }
   });
@@ -1273,58 +1278,20 @@ it("sends one range job and recovers an expired lease after a coordinator restar
   expect((await env.DB.prepare("SELECT complete FROM ingestion_ranges WHERE start=12").first<{ complete: number }>())?.complete).toBe(1);
 });
 
-it("stops new sends after a provider queue quota error while retaining recoverable work", async () => {
-  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
-  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    const bindings = (instance as unknown as { env: JobsEnv }).env;
-    const send = vi.spyOn(bindings.BLOCKS, "send").mockRejectedValue(
-      new Error("Queue has exceeded daily operations limit"),
-    );
-    await state.storage.put("maintenance-at", Date.now());
-    try {
-      await instance.alarm();
-      expect(await state.storage.get<number>("queue-resume-at")).toBeGreaterThan(Date.now());
-      await instance.alarm(); // Finish the already-persisted range without another send.
-      await instance.alarm(); // Apply it, but do not enqueue the next range.
-      expect(send).toHaveBeenCalledOnce();
-      expect((await env.DB.prepare("SELECT value FROM checkpoints WHERE id='complete-slot'").first<{ value: string }>())?.value).toBe("1000");
-    } finally {
-      send.mockRestore();
-      await state.storage.deleteAlarm();
-    }
-  });
-});
 
-it("uses the durable alarm instead of sending when the daily message reservation is exhausted", async () => {
-  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
-  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
-    const bindings = (instance as unknown as { env: JobsEnv }).env;
-    const send = vi.spyOn(bindings.BLOCKS, "send").mockResolvedValue({ metadata: { metrics: { backlogCount: 0, backlogBytes: 0 } } });
-    await state.storage.put("ingestion-budget", {
-      day: new Date().toISOString().slice(0, 10), messages: 1500, writes: 0,
-    });
-    try {
-      await instance.alarm();
-      expect(send).not.toHaveBeenCalled();
-      expect(await state.storage.get<number>("queue-resume-at")).toBeGreaterThan(Date.now());
-      expect(await env.DB.prepare("SELECT start FROM ingestion_ranges").first()).not.toBeNull();
-    } finally {
-      send.mockRestore();
-      await state.storage.deleteAlarm();
-    }
-  });
-});
+const limiterEnv = (stub: DurableObjectStub) =>
+  ({ ...env, RPC: { idFromName: () => "limiter", get: () => stub } }) as unknown as JobsEnv;
 const rpcCall = (
   stub: DurableObjectStub,
   method: string,
   params: unknown[] = [],
   lane = "background",
 ) =>
-  stub.fetch("https://rpc/", {
-    method: "POST",
-    headers: { "X-RPC-Lane": lane },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-  });
+  rpcFetch(
+    limiterEnv(stub),
+    JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+    lane !== "interactive",
+  );
 
 it("shares provider cooldown across callers and retains it after restart", async () => {
   const id = env.RPC.idFromName(crypto.randomUUID());
@@ -1366,13 +1333,10 @@ it("reserves RPC capacity for interactive work and rejects JSON batches", async 
   expect(
     (await rpcCall(stub, "getBalance", ["normal"], "interactive")).status,
   ).toBe(200);
-  expect(
-    (await stub.fetch("https://rpc/", { method: "POST", body: "[]" })).status,
-  ).toBe(400);
-  expect((await stub.fetch("https://rpc/", {
-    method: "POST", headers: { "X-RPC-Lane": "interactive" },
-    body: JSON.stringify([{ jsonrpc: "2.0", id: 1, method: "getBlock", params: [12] }]),
-  })).status).toBe(400);
+  expect((await rpcFetch(limiterEnv(stub), "[]")).status).toBe(400);
+  expect((await rpcFetch(limiterEnv(stub),
+    JSON.stringify([{ jsonrpc: "2.0", id: 1, method: "getBlock", params: [12] }]), false,
+  )).status).toBe(400);
 });
 
 it("does not hide SDK retries inside a coordinated deferral", async () => {
@@ -1434,6 +1398,81 @@ it("pauses background RPC at its daily budget while preserving interactive acces
   expect(blocked.status).toBe(429);
   expect(Number(blocked.headers.get("Retry-After"))).toBeGreaterThan(1);
   expect((await rpcCall(stub, "getBalance", ["normal"], "interactive")).status).toBe(200);
+});
+
+it("grants RPC capacity without holding the limiter open for the upstream call", async () => {
+  const stub = env.RPC.get(env.RPC.idFromName(crypto.randomUUID()));
+  const upstream = vi.spyOn(globalThis, "fetch");
+  try {
+    const grant = await stub.fetch("https://rpc.internal/reserve", {
+      method: "POST",
+      body: JSON.stringify({ methods: ["getBlock", "getBlock"], id: 1, background: true, verify: false }),
+    });
+    expect(grant.status).toBe(204);
+    expect(upstream).not.toHaveBeenCalled();
+    expect((await stub.fetch("https://rpc.internal/reserve", {
+      method: "POST", body: JSON.stringify({ methods: [] }),
+    })).status).toBe(400);
+    expect((await stub.fetch("https://rpc.internal/other", { method: "POST", body: "{}" })).status).toBe(404);
+  } finally {
+    upstream.mockRestore();
+  }
+});
+
+it("pauses the coordinator until the UTC reset once its daily active time is spent", async () => {
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    const work = instance as unknown as { apply(): Promise<void>; discover(): Promise<void> };
+    const apply = vi.spyOn(work, "apply"), discover = vi.spyOn(work, "discover");
+    const now = new Date();
+    try {
+      await state.storage.put("active-time", { day: now.toISOString().slice(0, 10), ms: 10 * 3600_000 });
+      await instance.alarm();
+      expect(apply).not.toHaveBeenCalled();
+      expect(discover).not.toHaveBeenCalled();
+      expect(await state.storage.getAlarm()).toBe(
+        Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1) + 5000,
+      );
+    } finally {
+      apply.mockRestore(); discover.mockRestore(); await state.storage.deleteAlarm();
+    }
+  });
+});
+
+it("charges active time and idles the alarm when ingestion is caught up", async () => {
+  await env.DB.prepare("INSERT INTO checkpoints(id,value) VALUES('complete-slot','990')").run();
+  const stub = env.COORDINATOR.get(env.COORDINATOR.idFromName(crypto.randomUUID()));
+  await runInDurableObject<Coordinator, void>(stub, async (instance, state) => {
+    await state.storage.put("maintenance-at", Date.now());
+    try {
+      const before = Date.now();
+      await instance.alarm();
+      expect(await env.DB.prepare("SELECT start FROM ingestion_ranges").first()).toBeNull();
+      expect(await state.storage.getAlarm()).toBeGreaterThanOrEqual(before + 30_000);
+      expect((instance as unknown as { active: { ms: number } }).active.ms).toBeGreaterThan(0);
+    } finally {
+      await state.storage.deleteAlarm();
+    }
+  });
+});
+
+it("re-arms a lagging indexer from site traffic at most once per ten minutes", async () => {
+  const jobsFetch = vi.fn(async (_input: RequestInfo, _init?: RequestInit) => new Response("scheduled"));
+  const waits: Promise<unknown>[] = [];
+  const ctx = { waitUntil: (promise: Promise<unknown>) => waits.push(promise), passThroughOnException() {}, props: {} };
+  const bindings = { ...env, JOBS: { fetch: jobsFetch } };
+  const now = Math.floor(Date.now() / 1000);
+  await env.DB.prepare("INSERT INTO checkpoints(id,value) VALUES('complete-time',?)").bind(String(now - 3600)).run();
+  expect((await app.request("https://waffles/v1/config", {}, bindings, ctx as unknown as ExecutionContext)).status).toBe(200);
+  await app.request("https://waffles/health/ready", {}, bindings, ctx as unknown as ExecutionContext);
+  await Promise.all(waits);
+  expect(jobsFetch).toHaveBeenCalledOnce();
+  expect(String(jobsFetch.mock.calls[0][0])).toBe("https://jobs.internal/start");
+  expect(new Headers(jobsFetch.mock.calls[0][1]?.headers).get("Authorization")).toBe(`Bearer ${env.OPERATIONS_TOKEN}`);
+  await env.DB.prepare("UPDATE checkpoints SET value=? WHERE id IN ('complete-time','indexer-wake')").bind(String(now - 1)).run();
+  await env.DB.prepare("UPDATE checkpoints SET value=? WHERE id='indexer-wake'").bind(String(now - 3600)).run();
+  await app.request("https://waffles/v1/config", {}, bindings, ctx as unknown as ExecutionContext);
+  expect(jobsFetch).toHaveBeenCalledOnce();
 });
 
 import { accountPendingPrices } from "../../jobs/src/oracle";
@@ -1526,4 +1565,17 @@ it("pauses D1 work until the UTC reset and retains the pause across restart", as
       await state.storage.deleteAlarm();
     }
   });
+});
+
+it("clears the upstream timeout as soon as the response arrives", async () => {
+  const clear = vi.spyOn(globalThis, "clearTimeout");
+  const upstream = vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ ok: true }));
+  try {
+    expect((await fetchWithTimeout("https://rpc.test", { method: "POST" })).ok).toBe(true);
+    expect(clear).toHaveBeenCalledOnce();
+    expect((upstream.mock.calls[0][1] as RequestInit).signal?.aborted).toBe(false);
+  } finally {
+    clear.mockRestore();
+    upstream.mockRestore();
+  }
 });

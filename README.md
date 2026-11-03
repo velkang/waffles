@@ -63,6 +63,16 @@ including any other apps sharing that account. Provider cooldowns and network
 validation survive restarts. Changing the jobs RPC URL or expected genesis hash
 invalidates cached validation automatically. SDK rate-limit retries are disabled.
 
+Durable Object duration is an account-wide daily allowance on Workers Free
+(13,000 GB-s, about 28 object-hours, billed while executing or awaiting I/O).
+The `RPC` limiter therefore only grants capacity; callers make the upstream
+request themselves, so the limiter is never held open while the provider
+responds. The coordinator tracks its own active time and pauses until the UTC
+reset after 10 hours, re-arms every 5 seconds while catching up and every 30
+seconds when caught up. Ingestion no longer uses Queues. If a platform quota
+refuses the coordinator's alarm, `/v1/config` and `/health/ready` re-arm it
+(at most every 10 minutes) once finalized history lags by 5 minutes or more.
+
 ## Verification
 
 ```sh

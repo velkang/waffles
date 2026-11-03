@@ -6,6 +6,7 @@ import {
   type PriceObservation,
 } from "@waffles/shared/solana";
 import type { Env } from "./env";
+import { fetchWithTimeout } from "./rpc";
 export async function oracle(env: Env, at: number): Promise<bigint> {
   const saved = await env.DB.prepare(
     "SELECT usd_micros FROM oracle_prices WHERE at=?",
@@ -15,11 +16,10 @@ export async function oracle(env: Env, at: number): Promise<bigint> {
   if (saved) return BigInt(saved.usd_micros);
   const url = new URL(`/v2/updates/price/${at}`, env.PYTH_URL);
   url.searchParams.append("ids[]", SOL_USD_FEED);
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     headers: env.PYTH_API_KEY
       ? { Authorization: `Bearer ${env.PYTH_API_KEY}` }
       : {},
-    signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok)
     throw new Error(`Historical SOL/USD unavailable (${response.status})`);

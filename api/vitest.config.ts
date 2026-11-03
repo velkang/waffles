@@ -17,7 +17,6 @@ export default defineConfig(async () => ({
       main: "./test/worker.ts",
       wrangler: { configPath: "./wrangler.jsonc" },
       miniflare: {
-        queueProducers: { BLOCKS: "test-blocks" },
         durableObjects: {
           RPC: { className: "RpcBudget" },
           COORDINATOR: { className: "Coordinator" },

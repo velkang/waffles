@@ -1,7 +1,6 @@
 export interface Env {
   DB: D1Database;
   ARTIFACTS: R2Bucket;
-  BLOCKS: Queue<{ start: number; end: number }>;
   COORDINATOR: DurableObjectNamespace;
   API: Fetcher;
   SETTLEMENT: Workflow<{ epoch: number }>;

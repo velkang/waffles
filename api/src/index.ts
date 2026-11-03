@@ -119,11 +119,41 @@ function network(rpcUrl: string): "localnet" | "devnet" {
     ? "localnet"
     : "devnet";
 }
+// The jobs coordinator re-arms itself with alarms, but an alarm refused while a
+// platform daily quota is exhausted is dropped. Site traffic re-arms it.
+async function wakeIndexer(c: {
+  env: Env;
+  executionCtx: { waitUntil(promise: Promise<unknown>): void };
+}) {
+  if (!c.env.OPERATIONS_TOKEN) return;
+  try {
+    const rows = await c.env.DB.prepare(
+      "SELECT id,value FROM checkpoints WHERE id IN ('complete-time','indexer-wake')",
+    ).all<{ id: string; value: string }>();
+    const values = new Map(rows.results.map((row) => [row.id, Number(row.value)]));
+    const now = Math.floor(Date.now() / 1000);
+    const completed = values.get("complete-time");
+    if (completed !== undefined && now - completed < 300) return;
+    if (now - (values.get("indexer-wake") ?? 0) < 600) return;
+    await c.env.DB.prepare(
+      "INSERT INTO checkpoints(id,value) VALUES('indexer-wake',?) ON CONFLICT(id) DO UPDATE SET value=excluded.value",
+    ).bind(String(now)).run();
+    c.executionCtx.waitUntil(
+      c.env.JOBS.fetch("https://jobs.internal/start", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${c.env.OPERATIONS_TOKEN}` },
+      }).then((response) => response.body?.cancel()).catch(() => {}),
+    );
+  } catch (error) {
+    console.warn(json({ event: "indexer_wake_failed", error: String(error) }));
+  }
+}
 app.get("/health/live", (c) =>
   c.json({ status: "ok", network: `solana-${network(c.env.RPC_URL)}` }),
 );
 app.get("/health/ready", async (c) => {
   await c.env.DB.prepare("SELECT 1").first();
+  await wakeIndexer(c);
   const complete = await c.env.DB.prepare(
     "SELECT value FROM checkpoints WHERE id='complete-time'",
   ).first<{ value: string }>();
@@ -138,8 +168,9 @@ app.get("/health/ready", async (c) => {
     lag !== null && lag < 120 ? 200 : 503,
   );
 });
-app.get("/v1/config", (c) =>
-  c.json({
+app.get("/v1/config", async (c) => {
+  await wakeIndexer(c);
+  return c.json({
     network: network(c.env.RPC_URL),
     programId: c.env.PROGRAM_ID,
     upgradeAuthority: c.env.UPGRADE_AUTHORITY || null,
@@ -156,8 +187,8 @@ app.get("/v1/config", (c) =>
       launchFeeStartBps: 4000,
       launchDecaySeconds: 60,
     },
-  }),
-);
+  });
+});
 app.get("/v1/launches", async (c) => {
   const sort = c.req.query("sort") ?? "new";
   if (!["new", "trending", "graduating", "graduated", "volume"].includes(sort))
